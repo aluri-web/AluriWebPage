@@ -9,7 +9,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.0.0/css/flag-icons.min.css" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -450,8 +449,8 @@
                     </div>
                     <div class="mb-8">
                         <label class="block text-sm font-semibold text-text-main dark:text-white mb-3" for="interestRate">Tasa de Interés Mensual (%)</label>
-                        <input type="number" id="interestRate" class="w-full px-4 h-12 bg-background-subtle dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-text-main dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="1.2" value="1.2" min="0.5" max="5" step="0.1">
-                        <input type="range" id="interestRateRange" class="w-full mt-3 accent-primary" min="0.5" max="5" step="0.1" value="1.2">
+                        <input type="number" id="interestRate" class="w-full px-4 h-12 bg-background-subtle dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-text-main dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="1.7" value="1.7" min="0.5" max="5" step="0.1">
+                        <input type="range" id="interestRateRange" class="w-full mt-3 accent-primary" min="0.5" max="5" step="0.1" value="1.7">
                         <div class="flex justify-between text-xs text-text-muted dark:text-slate-400 mt-1">
                             <span>0.5%</span>
                             <span>5%</span>
@@ -543,69 +542,6 @@
         </div>
     </footer>
     <script>
-        // Initialize EmailJS with your public key
-        emailjs.init('YOUR_PUBLIC_KEY'); // Replace with your EmailJS public key
-
-        document.getElementById('form-propietarios').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const submitBtn = this.querySelector('button[type="submit"]');
-            const originalBtnText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<span class="animate-pulse">Enviando...</span>';
-            submitBtn.disabled = true;
-
-            // Get form data
-            const formData = {
-                propiedad: this.propiedad.value,
-                ubicacion: this.ubicacion.value,
-                monto: this.monto.value,
-                nombre: this.nombre.value,
-                email: this.email.value,
-                telefono_codigo: this.telefono_codigo.value,
-                telefono: this.telefono.value,
-                cedula: this.cedula.value,
-                tipo_formulario: 'Propietarios - Solicitud de Crédito'
-            };
-
-            // Send email using EmailJS
-            emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', formData)
-                .then(function(response) {
-                    // Success message
-                    submitBtn.innerHTML = '✓ Enviado correctamente';
-                    submitBtn.classList.remove('bg-primary', 'hover:bg-primary-dark');
-                    submitBtn.classList.add('bg-green-500');
-                    
-                    // Reset form
-                    document.getElementById('form-propietarios').reset();
-                    
-                    // Show success alert
-                    alert('¡Gracias por tu solicitud! Un asesor se pondrá en contacto contigo en las próximas 24 horas.');
-                    
-                    // Reset button after 3 seconds
-                    setTimeout(() => {
-                        submitBtn.innerHTML = originalBtnText;
-                        submitBtn.disabled = false;
-                        submitBtn.classList.remove('bg-green-500');
-                        submitBtn.classList.add('bg-primary', 'hover:bg-primary-dark');
-                    }, 3000);
-                }, function(error) {
-                    // Error message
-                    submitBtn.innerHTML = '✗ Error al enviar';
-                    submitBtn.classList.remove('bg-primary', 'hover:bg-primary-dark');
-                    submitBtn.classList.add('bg-red-500');
-                    
-                    alert('Hubo un error al enviar el formulario. Por favor intenta nuevamente o contacta directamente a info@aluri.co');
-                    
-                    // Reset button after 3 seconds
-                    setTimeout(() => {
-                        submitBtn.innerHTML = originalBtnText;
-                        submitBtn.disabled = false;
-                        submitBtn.classList.remove('bg-red-500');
-                        submitBtn.classList.add('bg-primary', 'hover:bg-primary-dark');
-                    }, 3000);
-                });
-        });
-
         // Loan Calculator
         function calculateLoan() {
             const amount = parseFloat(document.getElementById('loanAmount').value);
