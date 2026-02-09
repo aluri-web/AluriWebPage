@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation'
 import InvestmentPanel from './InvestmentPanel'
 import BentoMetrics from './BentoMetrics'
 import RiskAnalysis from './RiskAnalysis'
+import ImageGallery from './ImageGallery'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -40,14 +41,16 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
   const ltv = calculateLTV()
   const ltvString = ltv > 0 ? `${ltv.toFixed(1)}%` : '-'
 
-  // Gallery images
-  const galleryImages = [
-    'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&h=800&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&h=300&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=400&h=300&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=400&h=300&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=300&fit=crop&q=80'
-  ]
+  // Gallery images - use real photos from database or fallback to placeholders
+  const galleryImages = loan.property_info?.photos && loan.property_info.photos.length > 0 
+    ? loan.property_info.photos
+    : [
+        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&h=800&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&h=300&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=400&h=300&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=400&h=300&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=300&fit=crop&q=80'
+      ]
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
@@ -80,41 +83,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             {/* Image Gallery */}
-            <div className="bg-[#111] border border-white/5 rounded-2xl overflow-hidden">
-              {/* Main Image */}
-              <div className="relative h-[320px]">
-                <Image
-                  src={galleryImages[0]}
-                  alt={getPropertyTitle()}
-                  fill
-                  className="object-cover"
-                  priority
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent" />
-
-                {/* Image counter */}
-                <div className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/60 backdrop-blur-sm text-white text-sm rounded-lg">
-                  1/{galleryImages.length}
-                </div>
-              </div>
-
-              {/* Thumbnails */}
-              <div className="p-4 flex gap-3">
-                {galleryImages.slice(1).map((img, index) => (
-                  <div
-                    key={index}
-                    className="relative w-20 h-16 rounded-lg overflow-hidden border border-white/10 hover:border-cyan-500/50 transition-colors cursor-pointer"
-                  >
-                    <Image
-                      src={img}
-                      alt={`Vista ${index + 2}`}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ImageGallery images={galleryImages} propertyTitle={getPropertyTitle()} />
 
             {/* Title Section */}
             <div className="space-y-2">

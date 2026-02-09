@@ -211,7 +211,10 @@ export default function MarketplacePage() {
               const progress = getFundingProgress(loan)
               const risk = calculateRiskScore(loan)
               const ltv = getLTV(loan)
-              const imageUrl = propertyImages[index % propertyImages.length]
+              // Use real property photo or fallback to placeholder
+              const imageUrl = loan.property_info?.photos && loan.property_info.photos.length > 0
+                ? loan.property_info.photos[0]
+                : propertyImages[index % propertyImages.length]
 
               return (
                 <div
@@ -226,7 +229,7 @@ export default function MarketplacePage() {
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-700"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent" />
+
 
                     {/* Risk Badge - Minimalist */}
                     <div className="absolute top-4 left-4">

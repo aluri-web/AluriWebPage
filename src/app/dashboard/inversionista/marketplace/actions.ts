@@ -9,6 +9,7 @@ export interface PropertyInfo {
   registration_number?: string
   property_type?: string
   image_url?: string
+  photos?: string[]
 }
 
 export interface WorkflowDates {
