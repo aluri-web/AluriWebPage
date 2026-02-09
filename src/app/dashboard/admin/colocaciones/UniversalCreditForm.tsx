@@ -28,6 +28,7 @@ import {
   InvestorOption,
   DebtorSearchResult
 } from './actions'
+import PropertyPhotoUpload from './PropertyPhotoUpload'
 
 interface InvestorRow {
   investor_id: string
@@ -83,6 +84,7 @@ interface FormData {
   property_city: string
   property_type: string
   commercial_value: number
+  property_photos: string[]
 
   // Investors
   investors: InvestorRow[]
@@ -142,6 +144,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
       property_city: '',
       property_type: 'casa',
       commercial_value: 0,
+      property_photos: [],
       investors: []
     }
   })
@@ -160,6 +163,8 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
   const watchHasCoDebtor = watch('has_co_debtor')
   const watchRateNM = watch('interest_rate_nm')
   const watchDebtorCommission = watch('debtor_commission')
+  const watchPropertyPhotos = watch('property_photos')
+  const watchCode = watch('code')
 
   // Calculate EA from NM: EA = (1 + NM/100)^12 - 1
   useEffect(() => {
@@ -407,7 +412,8 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
         address: formData.property_address,
         city: formData.property_city,
         property_type: formData.property_type,
-        commercial_value: formData.commercial_value
+        commercial_value: formData.commercial_value,
+        photos: formData.property_photos
       },
       investors: formData.investors.map(inv => ({
         investor_id: inv.is_new ? undefined : inv.investor_id,
@@ -457,6 +463,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
         property_city: '',
         property_type: 'casa',
         commercial_value: 0,
+        property_photos: [],
         investors: []
       })
       setDebtorFound(null)
@@ -705,6 +712,17 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                       {ltv.toFixed(1)}%
                     </div>
                   </div>
+                </div>
+
+                {/* Property Photos */}
+                <div className="pt-4 border-t border-slate-700">
+                  <label className="block text-sm text-slate-400 mb-3">Fotos del Inmueble</label>
+                  <PropertyPhotoUpload
+                    photos={watchPropertyPhotos || []}
+                    onChange={(photos) => setValue('property_photos', photos)}
+                    loanCode={watchCode || 'temp'}
+                    maxPhotos={10}
+                  />
                 </div>
               </div>
             </div>

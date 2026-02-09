@@ -253,6 +253,7 @@ export interface PropertyData {
   city: string
   property_type: string
   commercial_value: number
+  photos?: string[]
 }
 
 export interface InvestorParticipation {
@@ -387,7 +388,8 @@ export async function createFullLoanRecord(
       address: data.property.address,
       city: data.property.city,
       property_type: data.property.property_type,
-      commercial_value: data.property.commercial_value
+      commercial_value: data.property.commercial_value,
+      photos: data.property.photos || []
     }
 
     const totalFunded = processedInvestors.reduce((sum, inv) => sum + inv.amount, 0)
