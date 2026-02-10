@@ -19,7 +19,6 @@ const mainNavItems = [
 ]
 
 const accountNavItems = [
-  { href: '/dashboard/inversionista/perfil', label: 'Perfil', icon: User },
   { href: '/dashboard/inversionista/configuracion', label: 'Configuracion', icon: Settings },
 ]
 
