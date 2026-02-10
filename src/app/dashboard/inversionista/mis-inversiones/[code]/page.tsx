@@ -399,7 +399,7 @@ export default async function InvestmentDetailPage({
                 <span className="text-white font-medium">{formatCOP(investedAmount)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500 text-sm">Tasa de interes</span>
+                <span className="text-zinc-500 text-sm">Rentabilidad</span>
                 <span className="text-teal-400 font-medium">{rate.toFixed(1)}% E.A.</span>
               </div>
               <div className="flex justify-between">
