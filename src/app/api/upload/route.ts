@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
-
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
-})
-
-const BUCKET_NAME = process.env.AWS_S3_BUCKET || ''
+import { createClient } from '@/utils/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const loanCode = formData.get('loanCode') as string
+    const loanCode = formData.get('loanCode') as string || 'default'
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -31,31 +21,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size exceeds 5MB' }, { status: 400 })
     }
 
+    const supabase = await createClient()
+
     // Create unique filename
     const timestamp = Date.now()
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_')
-    const path = `properties/${loanCode}/${timestamp}_${sanitizedName}`
+    const path = `${loanCode}/${timestamp}_${sanitizedName}`
 
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    // Upload to Supabase Storage
+    const { data, error } = await supabase
+      .storage
+      .from('properties')
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
 
-    // Upload to S3
-    const command = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: path,
-      Body: buffer,
-      ContentType: file.type,
-    })
+    if (error) {
+      console.error('Error uploading to Supabase:', error)
+      return NextResponse.json({ error: 'Error uploading file: ' + error.message }, { status: 500 })
+    }
 
-    await s3Client.send(command)
+    // Get public URL
+    const { data: { publicUrl } } = supabase
+      .storage
+      .from('properties')
+      .getPublicUrl(path)
 
-    // Construct the public URL
-    const url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${path}`
-
-    return NextResponse.json({ success: true, url })
+    return NextResponse.json({ success: true, url: publicUrl })
   } catch (error) {
-    console.error('Error uploading to S3:', error)
+    console.error('Error in upload route:', error)
     return NextResponse.json({ error: 'Error uploading file' }, { status: 500 })
   }
 }
@@ -68,20 +63,30 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'No URL provided' }, { status: 400 })
     }
 
+    const supabase = await createClient()
+
     // Extract path from URL
-    const urlObj = new URL(url)
-    const path = urlObj.pathname.substring(1) // Remove leading slash
+    // Format: .../storage/v1/object/public/properties/loanCode/filename
+    const urlParts = url.split('/properties/')
+    if (urlParts.length < 2) {
+      return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 })
+    }
 
-    const command = new DeleteObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: path,
-    })
+    const path = urlParts[1]
 
-    await s3Client.send(command)
+    const { error } = await supabase
+      .storage
+      .from('properties')
+      .remove([path])
+
+    if (error) {
+      console.error('Error deleting from Supabase:', error)
+      return NextResponse.json({ error: 'Error deleting file: ' + error.message }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting from S3:', error)
+    console.error('Error in delete route:', error)
     return NextResponse.json({ error: 'Error deleting file' }, { status: 500 })
   }
 }

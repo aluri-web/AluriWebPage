@@ -3,6 +3,7 @@
 import { createClient } from '../../../../utils/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
+import { createLoan } from '@/app/actions/create-loan'
 
 // ========== SEARCH & LOOKUP FUNCTIONS ==========
 
@@ -383,66 +384,54 @@ export async function createFullLoanRecord(
       }
     }
 
-    // 4. Create loan
-    const propertyInfo = {
-      address: data.property.address,
-      city: data.property.city,
-      property_type: data.property.property_type,
-      commercial_value: data.property.commercial_value,
-      photos: data.property.photos || []
+    // 4. Create loan using the new System (createLoan action)
+    // We map the data to the expected LoanParams
+
+    // NOTE: interest_rate_nm is used as "Tasa Mensual" in createLoan
+    // createLoan expects: borrowerId, amount, interestRate, termMonths, startDate, creditCode
+
+    // Date handling: The form doesn't strictly have a start date, we use today or signature date
+    const startDate = new Date().toISOString().split('T')[0]
+
+    const loanResult = await createLoan({
+      borrowerId: primaryDebtorId,
+      amount: data.amount_requested,
+      interestRate: data.interest_rate_nm,
+      termMonths: data.term_months,
+      startDate: startDate,
+      creditCode: data.code
+    })
+
+    if (loanResult.error || !loanResult.loanId) {
+      console.error('Error creating loan via createLoan:', loanResult.error)
+      return { success: false, error: 'Error al crear credito: ' + loanResult.error }
     }
 
-    const totalFunded = processedInvestors.reduce((sum, inv) => sum + inv.amount, 0)
-
-    const { data: loan, error: loanError } = await supabaseAdmin
-      .from('loans')
-      .insert({
-        owner_id: primaryDebtorId,
-        co_debtor_id: coDebtorId,
-        code: data.code,
-        amount_requested: data.amount_requested,
-        amount_funded: totalFunded,
-        interest_rate_nm: data.interest_rate_nm,
-        interest_rate_ea: data.interest_rate_ea,
-        term_months: data.term_months,
-        debtor_commission: data.debtor_commission,
-        aluri_commission_pct: data.aluri_commission_pct,
-        payment_type: 'interest_only',
-        property_info: propertyInfo,
-        status: totalFunded >= data.amount_requested ? 'active' : 'fundraising',
-        workflow_dates: {
-          signature_date: new Date().toISOString().split('T')[0],
-          disbursement_date: new Date().toISOString().split('T')[0],
-          estimated_date: null
-        }
-      })
-      .select('id')
-      .single()
-
-    if (loanError) {
-      console.error('Error creating loan:', loanError.message)
-      return { success: false, error: 'Error al crear credito: ' + loanError.message }
-    }
-
-    const loanId = loan.id
+    const loanId = loanResult.loanId
 
     // 5. Create investments
     if (processedInvestors.length > 0) {
-      const investmentsToInsert = processedInvestors.map(inv => ({
-        loan_id: loanId,
-        investor_id: inv.investor_id,
-        amount_invested: inv.amount,
-        interest_rate_investor: data.interest_rate_ea,
-        status: 'active',
-        confirmed_at: new Date().toISOString()
-      }))
+      const investmentsToInsert = processedInvestors.map(inv => {
+        // Calculate percentage if not provided or valid
+        const percentage = (inv.amount / data.amount_requested) * 100
+
+        return {
+          credito_id: loanId,
+          inversionista_id: inv.investor_id,
+          monto_invertido: inv.amount,
+          porcentaje_participacion: percentage,
+          estado: 'activo',
+          fecha_inversion: new Date().toISOString()
+        }
+      })
 
       const { error: investError } = await supabaseAdmin
-        .from('investments')
+        .from('inversiones')
         .insert(investmentsToInsert)
 
       if (investError) {
         console.error('Error creating investments:', investError.message)
+        // Non-critical error for the loan creation itself, but should be logged/handled
       }
     }
 
