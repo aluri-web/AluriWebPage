@@ -54,6 +54,13 @@ interface FormData {
   debtor_address: string
   debtor_city: string
   is_new_debtor: boolean
+  // New risk profile fields
+  debtor_monthly_income: number
+  debtor_profession: string
+
+  // Contract & Amortization
+  contract_type: 'hipotecario' | 'retroventa'
+  amortization_type: 'francesa' | 'solo_interes'
 
   // Co-Debtor
   has_co_debtor: boolean
@@ -68,6 +75,7 @@ interface FormData {
 
   // Loan
   code: string
+  estado: string // Credit workflow state
   amount_requested: number
   term_months: number
 
@@ -84,6 +92,7 @@ interface FormData {
   property_city: string
   property_type: string
   commercial_value: number
+  warranty_analysis: string
   property_photos: string[]
 
   // Investors
@@ -117,6 +126,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
   } = useForm<FormData>({
     defaultValues: {
       code: nextCode,
+      estado: 'publicado', // Default workflow state
       debtor_cedula: '',
       debtor_id: '',
       debtor_name: '',
@@ -145,7 +155,13 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
       property_type: 'casa',
       commercial_value: 0,
       property_photos: [],
-      investors: []
+      investors: [],
+      // New fields defaults
+      debtor_monthly_income: 0,
+      debtor_profession: '',
+      warranty_analysis: '',
+      contract_type: 'hipotecario',
+      amortization_type: 'francesa'
     }
   })
 
@@ -164,7 +180,11 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
   const watchRateNM = watch('interest_rate_nm')
   const watchDebtorCommission = watch('debtor_commission')
   const watchPropertyPhotos = watch('property_photos')
+
   const watchCode = watch('code')
+  const watchContractType = watch('contract_type')
+  const watchAmortizationType = watch('amortization_type')
+  const watchTermMonths = watch('term_months')
 
   // Calculate EA from NM: EA = (1 + NM/100)^12 - 1
   useEffect(() => {
@@ -185,6 +205,23 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
 
   // Calculate LTV
   const ltv = watchCommercialValue > 0 ? (watchAmountRequested / watchCommercialValue) * 100 : 0
+
+  // Calculate Estimated Payment
+  const calculateEstimatedPayment = () => {
+    const r = (watchRateNM || 0) / 100
+    const n = watchTermMonths || 0
+    const amount = watchAmountRequested || 0
+    if (amount <= 0 || n <= 0) return 0
+
+    if (watchAmortizationType === 'solo_interes') {
+      return amount * r
+    } else {
+      // Default to French
+      if (r === 0) return amount / n
+      return (amount * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1)
+    }
+  }
+  const estimatedPayment = calculateEstimatedPayment()
 
   // Calculate total invested
   const totalInvested = watchInvestors?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0
@@ -426,8 +463,16 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
           city: inv.new_city
         } : undefined,
         amount: inv.amount,
+
         percentage: inv.percentage
-      }))
+      })),
+      // Pass estado and new fields
+      estado: formData.estado, // User-selected initial estado
+      monthly_income: formData.debtor_monthly_income,
+      profession: formData.debtor_profession,
+      warranty_analysis: formData.warranty_analysis,
+      contract_type: formData.contract_type,
+      amortization_type: formData.amortization_type
     })
 
     setIsSubmitting(false)
@@ -436,6 +481,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
       showToast('success', 'Credito creado exitosamente')
       reset({
         code: 'CR-' + (parseInt(formData.code.split('-')[1]) + 1).toString().padStart(3, '0'),
+        estado: 'publicado', // Reset to default estado
         debtor_cedula: '',
         debtor_id: '',
         debtor_name: '',
@@ -464,7 +510,12 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
         property_type: 'casa',
         commercial_value: 0,
         property_photos: [],
-        investors: []
+        investors: [],
+        debtor_monthly_income: 0,
+        debtor_profession: '',
+        warranty_analysis: '',
+        contract_type: 'hipotecario',
+        amortization_type: 'francesa'
       })
       setDebtorFound(null)
       setCoDebtorFound(null)
@@ -484,11 +535,10 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
     <>
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 ${
-          toast.type === 'success'
-            ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
-            : 'bg-red-500/20 border border-red-500/30 text-red-400'
-        }`}>
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 ${toast.type === 'success'
+          ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
+          : 'bg-red-500/20 border border-red-500/30 text-red-400'
+          }`}>
           {toast.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
           <span className="text-sm font-medium">{toast.message}</span>
         </div>
@@ -543,6 +593,19 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                     <label className="block text-sm text-slate-400 mb-1.5">Ciudad</label>
                     <input {...register('debtor_city')} type="text" disabled={debtorFound === true}
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:border-teal-500" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-800">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Ingresos Mensuales ($)</label>
+                    <input {...register('debtor_monthly_income', { valueAsNumber: true })} type="number" min="0" step="100000"
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Profesion / Ocupacion</label>
+                    <input {...register('debtor_profession')} type="text"
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500" />
                   </div>
                 </div>
               </div>
@@ -613,11 +676,21 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                 <h3 className="font-semibold text-white">Datos del Credito</h3>
               </div>
               <div className="p-5 space-y-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm text-slate-400 mb-1.5">Codigo</label>
                     <input {...register('code', { required: true })} type="text"
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white font-mono focus:outline-none focus:border-teal-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Estado Inicial</label>
+                    <select {...register('estado', { required: true })}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500">
+                      <option value="solicitado">Solicitado</option>
+                      <option value="aprobado">Aprobado</option>
+                      <option value="publicado">Publicado</option>
+                      <option value="en_firma">En Firma</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm text-slate-400 mb-1.5">Monto Solicitado</label>
@@ -633,6 +706,34 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
               </div>
             </div>
 
+            {/* Contract & Amortization Type */}
+            <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2">
+                <CreditCard size={18} className="text-teal-400" />
+                <h3 className="font-semibold text-white">Configuracion del Contrato</h3>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Tipo de Contrato</label>
+                    <select {...register('contract_type')}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500">
+                      <option value="hipotecario">Credito Hipotecario</option>
+                      <option value="retroventa">Pacto de Retroventa</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Amortizacion</label>
+                    <select {...register('amortization_type')}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500">
+                      <option value="francesa">Francesa (Cuota Fija)</option>
+                      <option value="solo_interes">Solo Intereses (Balloon)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Financial Data */}
             <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-2">
@@ -643,7 +744,9 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                 {/* Rates */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1.5">Tasa N.M. (%)</label>
+                    <label className="block text-sm text-slate-400 mb-1.5">
+                      {watchContractType === 'retroventa' ? 'Canon de Arrendamiento (%)' : 'Tasa N.M. (%)'}
+                    </label>
                     <input {...register('interest_rate_nm', { required: true, valueAsNumber: true })} type="number" min="0" step="0.01"
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500" />
                   </div>
@@ -666,6 +769,30 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                     <input {...register('aluri_commission_pct')} type="number" readOnly
                       className="w-full px-3 py-2.5 bg-slate-800/50 border border-slate-700 rounded-lg text-teal-400 font-medium cursor-not-allowed" />
                   </div>
+                </div>
+
+                {/* Estimated Payment Display */}
+                <div className="pt-4 border-t border-slate-800 mt-4">
+                  <label className="block text-sm text-center text-slate-400 mb-1.5">
+                    {watchContractType === 'retroventa' ? 'Canon Mensual Estimado' : 'Cuota Mensual Estimada'}
+                  </label>
+                  <div className="text-3xl font-bold text-center text-teal-400">
+                    {formatCurrency(estimatedPayment)}
+                  </div>
+                  <p className="text-xs text-center text-slate-500 mt-1">
+                    {(() => {
+                      if (watchContractType === 'retroventa') {
+                        return watchAmortizationType === 'solo_interes'
+                          ? '(Solo Canon)'
+                          : '(Capital + Canon)'
+                      } else {
+                        // Hipotecario
+                        return watchAmortizationType === 'solo_interes'
+                          ? '(Solo Interes)'
+                          : '(Capital + Interes)'
+                      }
+                    })()}
+                  </p>
                 </div>
               </div>
             </div>
@@ -712,6 +839,12 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                       {ltv.toFixed(1)}%
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm text-slate-400 mb-1.5">Estudio de Titulos / Analisis de Garantia</label>
+                  <textarea {...register('warranty_analysis')} rows={3} placeholder="Detalles sobre el estado legal del inmueble..."
+                    className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500 resize-none" />
                 </div>
 
                 {/* Property Photos */}
@@ -948,7 +1081,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
               ) : (
                 <>
                   <Check size={20} />
-                  Crear Credito Completo
+                  {watchContractType === 'retroventa' ? 'Crear Pacto de Retroventa' : 'Crear Credito Completo'}
                 </>
               )}
             </button>

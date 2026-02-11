@@ -5,6 +5,8 @@ import { Banknote, DollarSign } from 'lucide-react'
 import { LoanTableRow, InvestorOption } from './actions'
 import AddInvestmentModal from './AddInvestmentModal'
 import PaymentModal from './PaymentModal'
+import Link from 'next/link'
+import { MoreHorizontal } from 'lucide-react'
 
 interface LoansTableProps {
   loans: LoanTableRow[]
@@ -232,11 +234,10 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                           onClick={() => openAddInvestmentModal(loan)}
                           disabled={!canAddInvestment}
                           title={canAddInvestment ? 'Agregar inversion' : 'Credito completamente fondeado'}
-                          className={`p-2 rounded-lg border transition-colors ${
-                            canAddInvestment
-                              ? 'border-teal-500/30 text-teal-400 hover:bg-teal-500/10 hover:border-teal-500/50'
-                              : 'border-slate-700 text-slate-600 cursor-not-allowed'
-                          }`}
+                          className={`p-2 rounded-lg border transition-colors ${canAddInvestment
+                            ? 'border-teal-500/30 text-teal-400 hover:bg-teal-500/10 hover:border-teal-500/50'
+                            : 'border-slate-700 text-slate-600 cursor-not-allowed'
+                            }`}
                         >
                           <Banknote size={16} />
                         </button>
@@ -251,6 +252,14 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                             <DollarSign size={16} />
                           </button>
                         )}
+
+                        <Link
+                          href={`/dashboard/admin/colocaciones/${loan.id}`}
+                          title="Ver Detalles y Flujo"
+                          className="p-2 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                        >
+                          <MoreHorizontal size={16} />
+                        </Link>
                       </div>
                     </td>
                   </tr>

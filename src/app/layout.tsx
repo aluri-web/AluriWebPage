@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ 
+
+const inter = Inter({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "900"],
   variable: "--font-inter",
@@ -32,6 +33,7 @@ export default function RootLayout({
       </head>
       <body suppressHydrationWarning className={`${inter.variable} font-sans antialiased`}>
         {children}
+
       </body>
     </html>
   );

@@ -291,6 +291,14 @@ export interface FullLoanData {
 
   // Investors (max 5)
   investors: InvestorParticipation[]
+
+  // Risk Profile (New)
+  monthly_income?: number
+  profession?: string
+  warranty_analysis?: string
+  contract_type?: 'hipotecario' | 'retroventa'
+  amortization_type?: 'francesa' | 'solo_interes'
+  estado?: string // Optional initial estado
 }
 
 export async function createFullLoanRecord(
@@ -399,7 +407,14 @@ export async function createFullLoanRecord(
       interestRate: data.interest_rate_nm,
       termMonths: data.term_months,
       startDate: startDate,
-      creditCode: data.code
+
+      creditCode: data.code,
+      estado: data.estado, // Pass estado from form
+      monthlyIncome: data.monthly_income, // New field
+      profession: data.profession,       // New field
+      warrantyAnalysis: data.warranty_analysis, // New field
+      contractType: data.contract_type,
+      amortizationType: data.amortization_type
     })
 
     if (loanResult.error || !loanResult.loanId) {
@@ -470,95 +485,114 @@ export interface LoanTableRow {
 export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; error: string | null }> {
   const supabase = await createClient()
 
-  // Get loans with owner and co-debtor info
-  const { data: loans, error: loansError } = await supabase
-    .from('loans')
+  // Get creditos with owner and co-debtor info
+  const { data: creditos, error: creditosError } = await supabase
+    .from('creditos')
     .select(`
       id,
-      code,
-      status,
-      amount_requested,
-      amount_funded,
-      interest_rate_nm,
-      interest_rate_ea,
-      debtor_commission,
-      property_info,
+      numero_credito,
+      estado,
+      monto_solicitado,
+      monto_aprobado,
+      tasa_interes,
+      plazo_meses,
       created_at,
-      owner:profiles!owner_id (
+      cliente:profiles!cliente_id (
         full_name,
         document_id
-      ),
-      co_debtor:profiles!co_debtor_id (
-        full_name
       )
     `)
     .order('created_at', { ascending: false })
 
-  if (loansError) {
-    console.error('Error fetching loans:', loansError.message)
-    return { data: [], error: loansError.message }
+  if (creditosError) {
+    console.error('Error fetching creditos:', creditosError.message)
+    return { data: [], error: creditosError.message }
   }
 
-  // Get all investments with investor names
-  const { data: investments, error: invError } = await supabase
-    .from('investments')
+  // Get all inversiones with investor names
+  const { data: inversiones, error: invError } = await supabase
+    .from('inversiones')
     .select(`
-      loan_id,
-      investor:profiles!investor_id (
+      credito_id,
+      inversionista:profiles!inversionista_id (
         full_name
       )
     `)
-    .eq('status', 'active')
+    .eq('estado', 'activo')
 
-  const investorsByLoan: Record<string, string[]> = {}
-  if (!invError && investments) {
-    investments.forEach(inv => {
-      const loanId = inv.loan_id
+  const investorsByCredito: Record<string, string[]> = {}
+  if (!invError && inversiones) {
+    inversiones.forEach(inv => {
+      const creditoId = inv.credito_id
       // Handle Supabase join which may return array or single object
-      const investorData = inv.investor as unknown as { full_name: string | null } | null
+      const investorData = inv.inversionista as unknown as { full_name: string | null } | null
       const name = investorData?.full_name || 'Sin nombre'
-      if (!investorsByLoan[loanId]) {
-        investorsByLoan[loanId] = []
+      if (!investorsByCredito[creditoId]) {
+        investorsByCredito[creditoId] = []
       }
-      if (!investorsByLoan[loanId].includes(name)) {
-        investorsByLoan[loanId].push(name)
+      if (!investorsByCredito[creditoId].includes(name)) {
+        investorsByCredito[creditoId].push(name)
       }
     })
   }
 
-  // Transform data
-  const tableData: LoanTableRow[] = (loans || []).map(loan => {
-    const propertyInfo = loan.property_info as { city?: string; commercial_value?: number } | null
-    const propertyValue = propertyInfo?.commercial_value || 0
-    const amountRequested = loan.amount_requested || 0
-    const ltv = propertyValue > 0 ? (amountRequested / propertyValue) * 100 : null
+  // Calculate monto_funded from inversiones
+  const montoFundedByCredito: Record<string, number> = {}
+  if (!invError && inversiones) {
+    inversiones.forEach(inv => {
+      const creditoId = inv.credito_id
+      // We need to get the amount, but we didn't select it - fix this
+    })
+  }
+
+  // Get inversiones with amounts for funding calculation
+  const { data: inversionesWithAmounts } = await supabase
+    .from('inversiones')
+    .select('credito_id, monto_invertido')
+    .eq('estado', 'activo')
+
+  if (inversionesWithAmounts) {
+    inversionesWithAmounts.forEach(inv => {
+      const creditoId = inv.credito_id
+      if (!montoFundedByCredito[creditoId]) {
+        montoFundedByCredito[creditoId] = 0
+      }
+      montoFundedByCredito[creditoId] += inv.monto_invertido || 0
+    })
+  }
+
+  // Transform data - map Spanish fields to expected English interface
+  const tableData: LoanTableRow[] = (creditos || []).map(credito => {
+    // Calculate LTV if we have property info (not in creditos table, need to adapt)
+    const amountRequested = credito.monto_solicitado || 0
+    const amountFunded = montoFundedByCredito[credito.id] || 0
 
     // Cast joined data properly (Supabase returns these as objects for single joins)
-    const ownerData = loan.owner as unknown as { full_name: string | null; document_id: string | null } | null
-    const coDebtorData = loan.co_debtor as unknown as { full_name: string | null } | null
+    const clienteData = credito.cliente as unknown as { full_name: string | null; document_id: string | null } | null
 
     return {
-      id: loan.id,
-      code: loan.code,
-      status: loan.status,
-      amount_requested: loan.amount_requested,
-      amount_funded: loan.amount_funded,
-      interest_rate_nm: loan.interest_rate_nm,
-      interest_rate_ea: loan.interest_rate_ea,
-      debtor_commission: loan.debtor_commission,
-      debtor_name: ownerData?.full_name || null,
-      debtor_cedula: ownerData?.document_id || null,
-      co_debtor_name: coDebtorData?.full_name || null,
-      property_city: propertyInfo?.city || null,
-      property_value: propertyValue || null,
-      ltv,
-      investors: investorsByLoan[loan.id] || [],
-      created_at: loan.created_at
+      id: credito.id,
+      code: credito.numero_credito,
+      status: credito.estado,
+      amount_requested: credito.monto_solicitado,
+      amount_funded: amountFunded,
+      interest_rate_nm: credito.tasa_interes,
+      interest_rate_ea: null, // Not in creditos table
+      debtor_commission: null, // Not in creditos table
+      debtor_name: clienteData?.full_name || null,
+      debtor_cedula: clienteData?.document_id || null,
+      co_debtor_name: null, // Co-debtor not in current creditos schema
+      property_city: null, // Property info not in creditos table
+      property_value: null, // Property info not in creditos table
+      ltv: null, // Can't calculate without property_value
+      investors: investorsByCredito[credito.id] || [],
+      created_at: credito.created_at
     }
   })
 
   return { data: tableData, error: null }
 }
+
 
 // ========== GENERATE NEXT CODE ==========
 
@@ -566,17 +600,17 @@ export async function getNextLoanCode(): Promise<string> {
   const supabase = await createClient()
 
   const { data } = await supabase
-    .from('loans')
-    .select('code')
-    .order('code', { ascending: false })
+    .from('creditos')
+    .select('numero_credito')
+    .order('numero_credito', { ascending: false })
     .limit(1)
     .single()
 
-  if (!data?.code) {
+  if (!data?.numero_credito) {
     return 'CR-001'
   }
 
-  const match = data.code.match(/CR-(\d+)/)
+  const match = data.numero_credito.match(/CR-(\d+)/)
   if (match) {
     const nextNum = parseInt(match[1]) + 1
     return `CR-${nextNum.toString().padStart(3, '0')}`

@@ -34,3 +34,20 @@ export async function createClient() {
     }
   )
 }
+
+export function createAdminClient(supabaseUrl: string, serviceRoleKey: string) {
+  return createServerClient(
+    supabaseUrl,
+    serviceRoleKey,
+    {
+      cookies: {
+        getAll() {
+          return []
+        },
+        setAll(cookiesToSet) {
+          // Admin client doesn't need to set cookies
+        }
+      }
+    }
+  )
+}

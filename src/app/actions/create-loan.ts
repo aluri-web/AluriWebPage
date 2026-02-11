@@ -10,20 +10,37 @@ interface LoanParams {
     termMonths: number
     startDate: string // YYYY-MM-DD
     creditCode?: string // Optional custom code
+    estado?: string // Optional initial estado (default: 'publicado')
+    // New risk profile fields
+    monthlyIncome?: number
+    profession?: string
+
+    warrantyAnalysis?: string
+    // New types
+    contractType?: 'hipotecario' | 'retroventa'
+    amortizationType?: 'francesa' | 'solo_interes'
 }
 
 export async function createLoan(params: LoanParams) {
     const supabase = await createClient()
-    const { borrowerId, amount, interestRate, termMonths, startDate } = params
+    const { borrowerId, amount, interestRate, termMonths, startDate, estado, monthlyIncome, profession, warrantyAnalysis, contractType, amortizationType } = params
 
-    // 1. Cálculo Financiero (Sistema Francés - Cuota Fija)
+    // 1. Cálculo Financiero
     const i = interestRate / 100
     const n = termMonths
 
-    // Validación: si tasa es 0, división simple. Si no, fórmula de anualidad.
-    const monthlyPayment = i === 0
-        ? amount / n
-        : (amount * i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1)
+    // Determinar cuota según tipo de amortización
+    let monthlyPayment = 0
+
+    if (amortizationType === 'solo_interes') {
+        // Solo intereses: Cuota = Saldo * Tasa
+        monthlyPayment = amount * i
+    } else {
+        // Francesa (Default): Cuota Fija
+        monthlyPayment = i === 0
+            ? amount / n
+            : (amount * i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1)
+    }
 
     // 2. Insertar Cabecera del Crédito
     // Mapping params to DB columns:
@@ -40,12 +57,17 @@ export async function createLoan(params: LoanParams) {
             tasa_interes: interestRate,
             plazo_meses: termMonths,
             fecha_desembolso: new Date(startDate).toISOString(),
-            estado: 'aprobado',
+            estado: estado || 'publicado', // Custom estado or default to workflow-ready state
             saldo_capital: amount,
             saldo_intereses: 0,
             saldo_mora: 0,
             numero_credito: params.creditCode || `CR-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // Custom or generated
-            producto: 'consumo'
+            producto: 'consumo',
+            ingresos_mensuales: monthlyIncome || 0,
+            profesion: profession || null,
+            analisis_garantia: warrantyAnalysis || null,
+            tipo_contrato: contractType || 'hipotecario',
+            tipo_amortizacion: amortizationType || 'francesa'
         })
         .select()
         .single()
@@ -62,8 +84,31 @@ export async function createLoan(params: LoanParams) {
 
     for (let mes = 1; mes <= termMonths; mes++) {
         const interestPart = currentBalance * i
-        const capitalPart = monthlyPayment - interestPart
-        const endingBalance = currentBalance - capitalPart
+
+        let capitalPart = 0
+        let endingBalance = 0
+
+        if (amortizationType === 'solo_interes') {
+            // En solo interés, no se abona a capital hasta el final (o nunca, depende del esquema exacto, 
+            // pero usualmente es balloon al final o renovable.
+            // Asumiremos balloon al final para cerrar el crédito en el plazo)
+            if (mes === termMonths) {
+                capitalPart = currentBalance
+                endingBalance = 0
+                // La cuota final es intereses + todo el capital
+                // Ajustamos monthlyPayment solo para este mes en el registro, 
+                // aunque la variable monthlyPayment la mantuvimos fija arriba.
+                // Mejor estrategia: definir valores por iteración.
+            } else {
+                capitalPart = 0
+                endingBalance = currentBalance
+            }
+        } else {
+            // Francesa
+            capitalPart = monthlyPayment - interestPart
+            endingBalance = currentBalance - capitalPart
+        }
+
 
         // Avanzar un mes para la fecha de pago
         currentDate.setMonth(currentDate.getMonth() + 1)
@@ -76,7 +121,7 @@ export async function createLoan(params: LoanParams) {
             credito_id: loan.id,
             numero_cuota: mes,
             fecha_vencimiento: currentDate.toISOString().split('T')[0],
-            valor_cuota: monthlyPayment,
+            valor_cuota: amortizationType === 'solo_interes' && mes === termMonths ? interestPart + capitalPart : monthlyPayment,
             capital: capitalPart,
             intereses: interestPart,
             saldo_capital: endingBalance < 0 ? 0 : endingBalance, // Evitar negativos por redondeo
