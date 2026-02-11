@@ -22,3 +22,13 @@ dist/
 build/
 .next/
 .vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Sensitive SQL files - DO NOT COMMIT
+CLEANUP_DATABASE.sql
+APPLY_THIS_SQL_TO_SUPABASE.sql
+*_CLEANUP.sql
+*_DELETE.sql
