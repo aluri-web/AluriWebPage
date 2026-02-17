@@ -2,31 +2,27 @@ import { createClient } from '../../../utils/supabase/server'
 import { TrendingUp, Briefcase, Percent, MapPin } from 'lucide-react'
 import PortfolioChart from '../../../components/dashboard/PortfolioChart'
 
-interface PropertyInfo {
-  address?: string
-  city?: string
-  property_type?: string
-  commercial_value?: number
+interface CreditoData {
+  codigo_credito: string
+  estado: string
+  tasa_interes_ea: number | null
+  monto_solicitado: number | null
+  plazo: number | null
+  ciudad_inmueble: string | null
+  direccion_inmueble: string | null
+  tipo_inmueble: string | null
+  valor_comercial: number | null
+  inversiones: { monto_invertido: number; estado: string }[]
 }
 
-interface LoanData {
-  code: string
-  status: string
-  interest_rate_ea: number | null
-  amount_requested: number | null
-  amount_funded: number | null
-  term_months: number | null
-  property_info: PropertyInfo | null
-}
-
-interface Investment {
+interface Inversion {
   id: string
-  amount_invested: number
+  monto_invertido: number
   interest_rate_investor: number | null
-  status: string
+  estado: string
   created_at: string
-  loan_id: string
-  loan: LoanData | null
+  credito_id: string
+  credito: CreditoData | null
 }
 
 export default async function InvestorDashboard() {
@@ -45,38 +41,38 @@ export default async function InvestorDashboard() {
 
   // CONSULTA MANUAL SIN FILTROS (INICIO)
   const { data: investments, error } = await supabase
-    .from('investments')
-    .select('*, loan:loans!inner(*)')
-    .eq('investor_id', user?.id)
-    .eq('status', 'active')
+    .from('inversiones')
+    .select('*, credito:creditos!inner(*, inversiones(monto_invertido, estado))')
+    .eq('inversionista_id', user?.id)
+    .eq('estado', 'activo')
     .order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching investments:', JSON.stringify(error, null, 2))
   }
 
-  const investmentsData = (investments || []) as unknown as Investment[]
+  const investmentsData = (investments || []) as unknown as Inversion[]
 
-  // Calculations - include both active and defaulted loans in active count
-  const totalInvested = investmentsData.reduce((sum, item) => sum + Number(item.amount_invested || 0), 0)
-  const activeProjects = investmentsData.filter(i => 
-    i.loan?.status === 'active' || 
-    i.loan?.status === 'defaulted' || 
-    i.loan?.status === 'fundraising'
+  // Calculations - include both active and defaulted creditos in active count
+  const totalInvested = investmentsData.reduce((sum, item) => sum + Number(item.monto_invertido || 0), 0)
+  const activeProjects = investmentsData.filter(i =>
+    i.credito?.estado === 'activo' ||
+    i.credito?.estado === 'mora' ||
+    i.credito?.estado === 'publicado'
   ).length
 
-  // Calculate weighted average ROI based on interest_rate_investor or loan's interest_rate_ea
+  // Calculate weighted average ROI based on interest_rate_investor or credito's tasa_interes_ea
   const weightedRoi = totalInvested > 0
     ? investmentsData.reduce((acc, item) => {
-        const rate = item.interest_rate_investor || item.loan?.interest_rate_ea || 0
-        return acc + (Number(item.amount_invested) * Number(rate))
+        const rate = item.interest_rate_investor || item.credito?.tasa_interes_ea || 0
+        return acc + (Number(item.monto_invertido) * Number(rate))
       }, 0) / totalInvested
     : 0
 
   // Calculate expected return (simple calculation based on annual rate)
   const totalExpectedReturn = investmentsData.reduce((acc, item) => {
-    const rate = item.interest_rate_investor || item.loan?.interest_rate_ea || 0
-    return acc + (Number(item.amount_invested) * (1 + Number(rate) / 100))
+    const rate = item.interest_rate_investor || item.credito?.tasa_interes_ea || 0
+    return acc + (Number(item.monto_invertido) * (1 + Number(rate) / 100))
   }, 0)
 
   const simulatedCollected = totalExpectedReturn * 0.15
@@ -159,28 +155,30 @@ export default async function InvestorDashboard() {
               </thead>
               <tbody className="text-sm">
                 {investmentsData.map((inv) => {
-                  const loanStatus = inv.loan?.status || 'pending'
-                  const requested = inv.loan?.amount_requested || 0
-                  const funded = inv.loan?.amount_funded || 0
+                  const creditoEstado = inv.credito?.estado || 'pending'
+                  const requested = inv.credito?.monto_solicitado || 0
+                  // Calculate amount_funded from inversiones sub-query
+                  const funded = (inv.credito?.inversiones || [])
+                    .filter(i => i.estado === 'activo' || i.estado === 'pendiente')
+                    .reduce((s, i) => s + (i.monto_invertido || 0), 0)
                   const progress = requested > 0 ? (funded / requested) * 100 : 0
-                  const propertyInfo = inv.loan?.property_info
-                  const propertyDisplay = propertyInfo?.city || propertyInfo?.address || 'Sin ubicacion'
-                  const rate = inv.interest_rate_investor || inv.loan?.interest_rate_ea || 0
+                  const propertyDisplay = inv.credito?.ciudad_inmueble || inv.credito?.direccion_inmueble || 'Sin ubicacion'
+                  const rate = inv.interest_rate_investor || inv.credito?.tasa_interes_ea || 0
 
                   const statusConfig: Record<string, { label: string; class: string }> = {
-                    fundraising: { label: 'Fondeando', class: 'bg-amber-500/20 text-amber-400' },
-                    active: { label: 'Al día', class: 'bg-emerald-500 text-white font-semibold' },
-                    completed: { label: 'Completado', class: 'bg-blue-500/20 text-blue-400' },
-                    defaulted: { label: 'En Mora', class: 'bg-red-500 text-white font-semibold' }
+                    publicado: { label: 'Fondeando', class: 'bg-amber-500/20 text-amber-400' },
+                    activo: { label: 'Al día', class: 'bg-emerald-500 text-white font-semibold' },
+                    finalizado: { label: 'Completado', class: 'bg-blue-500/20 text-blue-400' },
+                    mora: { label: 'En Mora', class: 'bg-red-500 text-white font-semibold' }
                   }
 
-                  const status = statusConfig[loanStatus] || { label: loanStatus, class: 'bg-zinc-500/20 text-zinc-400' }
+                  const status = statusConfig[creditoEstado] || { label: creditoEstado, class: 'bg-zinc-500/20 text-zinc-400' }
 
                   return (
                     <tr key={inv.id} className="border-b border-zinc-700/50 hover:bg-zinc-800/30">
                       <td className="py-4">
                         <span className="px-2 py-1 bg-zinc-800 text-teal-400 text-xs font-mono rounded">
-                          {inv.loan?.code || 'N/A'}
+                          {inv.credito?.codigo_credito || 'N/A'}
                         </span>
                       </td>
                       <td className="py-4">
@@ -190,7 +188,7 @@ export default async function InvestorDashboard() {
                         </div>
                       </td>
                       <td className="py-4 text-white font-medium">
-                        ${Number(inv.amount_invested).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                        ${Number(inv.monto_invertido).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
                       </td>
                       <td className="py-4 text-teal-400">
                         {rate.toFixed(1)}% E.A.

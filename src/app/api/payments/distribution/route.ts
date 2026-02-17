@@ -7,6 +7,8 @@ import { createClient } from '@/utils/supabase/server'
  * Obtiene el resumen de distribución de pagos a inversionistas para un préstamo.
  * Muestra cuánto ha recibido cada inversionista en total y cuánto le corresponde
  * por los pagos registrados.
+ *
+ * DB: creditos + inversiones + transacciones
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -22,57 +24,64 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const supabase = await createClient()
 
-    // Buscar el préstamo por ID o por código
+    // Buscar el crédito por ID o por codigo_credito
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(loanIdParam)
 
-    // Obtener información del préstamo
-    const { data: loan, error: loanError } = await supabase
-      .from('loans')
+    // Status mapping: new DB estado → English API status
+    const statusMap: Record<string, string> = {
+      publicado: 'fundraising',
+      activo: 'active',
+      finalizado: 'completed',
+      mora: 'defaulted'
+    }
+
+    // Obtener información del crédito
+    const { data: credito, error: creditoError } = await supabase
+      .from('creditos')
       .select(`
         id,
-        code,
-        amount_requested,
-        amount_funded,
-        interest_rate_nm,
-        interest_rate_ea,
-        status,
-        owner:profiles!owner_id (
+        codigo_credito,
+        monto_solicitado,
+        tasa_nominal,
+        tasa_interes_ea,
+        estado,
+        owner:profiles!cliente_id (
           id,
           full_name,
           document_id
         )
       `)
-      .eq(isUUID ? 'id' : 'code', loanIdParam)
+      .eq(isUUID ? 'id' : 'codigo_credito', loanIdParam)
       .single()
 
-    if (loanError || !loan) {
+    if (creditoError || !credito) {
       return NextResponse.json(
         { success: false, error: 'Préstamo no encontrado' },
         { status: 404 }
       )
     }
 
-    const loanId = loan.id
-    const loanAmount = loan.amount_requested || 0
+    const creditoId = credito.id
+    const loanAmount = credito.monto_solicitado || 0
 
     // Obtener las inversiones activas
-    const { data: investments, error: invError } = await supabase
-      .from('investments')
+    const { data: inversiones, error: invError } = await supabase
+      .from('inversiones')
       .select(`
         id,
-        investor_id,
-        amount_invested,
+        inversionista_id,
+        monto_invertido,
         interest_rate_investor,
         created_at,
-        investor:profiles!investor_id (
+        investor:profiles!inversionista_id (
           id,
           full_name,
           email,
           document_id
         )
       `)
-      .eq('loan_id', loanId)
-      .eq('status', 'active')
+      .eq('credito_id', creditoId)
+      .eq('estado', 'activo')
 
     if (invError) {
       console.error('Error fetching investments:', invError)
@@ -82,31 +91,49 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       )
     }
 
-    // Obtener el total de pagos del préstamo
-    const { data: payments, error: paymentsError } = await supabase
-      .from('loan_payments')
-      .select('amount_capital, amount_interest, amount_late_fee, amount_total')
-      .eq('loan_id', loanId)
+    // Calculate amount_funded from inversiones
+    const amountFunded = (inversiones || []).reduce(
+      (sum, inv) => sum + (inv.monto_invertido || 0), 0
+    )
 
-    if (paymentsError) {
-      console.error('Error fetching payments:', paymentsError)
+    // Obtener transacciones de pago del crédito
+    const { data: transacciones, error: txError } = await supabase
+      .from('transacciones')
+      .select('tipo_transaccion, monto, referencia_pago')
+      .eq('credito_id', creditoId)
+      .in('tipo_transaccion', ['pago_capital', 'pago_interes', 'pago_mora'])
+
+    if (txError) {
+      console.error('Error fetching payments:', txError)
     }
 
-    // Calcular totales de pagos
-    const totalPayments = (payments || []).reduce(
-      (acc, p) => ({
-        capital: acc.capital + (p.amount_capital || 0),
-        interest: acc.interest + (p.amount_interest || 0),
-        lateFee: acc.lateFee + (p.amount_late_fee || 0),
-        total: acc.total + (p.amount_total || 0)
-      }),
+    // Calcular totales de pagos from transacciones
+    const totalPayments = (transacciones || []).reduce(
+      (acc, tx) => {
+        const monto = tx.monto || 0
+        if (tx.tipo_transaccion === 'pago_capital') {
+          acc.capital += monto
+        } else if (tx.tipo_transaccion === 'pago_interes') {
+          acc.interest += monto
+        } else if (tx.tipo_transaccion === 'pago_mora') {
+          acc.lateFee += monto
+        }
+        acc.total += monto
+        return acc
+      },
       { capital: 0, interest: 0, lateFee: 0, total: 0 }
     )
 
+    // Count unique payments by referencia_pago
+    const uniqueRefs = new Set(
+      (transacciones || []).map(tx => tx.referencia_pago).filter(Boolean)
+    )
+    const paymentsCount = uniqueRefs.size
+
     // Calcular distribución por inversionista
-    const investorDistribution = (investments || []).map(inv => {
+    const investorDistribution = (inversiones || []).map(inv => {
       const percentage = loanAmount > 0
-        ? (inv.amount_invested / loanAmount) * 100
+        ? (inv.monto_invertido / loanAmount) * 100
         : 0
 
       const invData = inv.investor as unknown as {
@@ -122,12 +149,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       const totalEarned = earnedInterest + earnedCapital
 
       return {
-        investor_id: inv.investor_id,
+        investor_id: inv.inversionista_id,
         investor_name: invData?.full_name || 'Sin nombre',
         investor_email: invData?.email || null,
         investor_document: invData?.document_id || null,
         investment_id: inv.id,
-        amount_invested: inv.amount_invested,
+        amount_invested: inv.monto_invertido,
         percentage: Math.round(percentage * 100) / 100,
         investment_date: inv.created_at,
         // Ganancias calculadas
@@ -135,13 +162,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         earned_capital_return: earnedCapital,
         total_earned: totalEarned,
         // ROI calculado
-        roi_percentage: inv.amount_invested > 0
-          ? ((earnedInterest / inv.amount_invested) * 100).toFixed(2)
+        roi_percentage: inv.monto_invertido > 0
+          ? ((earnedInterest / inv.monto_invertido) * 100).toFixed(2)
           : '0.00'
       }
     })
 
-    const ownerData = loan.owner as unknown as {
+    const ownerData = credito.owner as unknown as {
       id: string;
       full_name: string | null;
       document_id: string | null
@@ -150,13 +177,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({
       success: true,
       loan: {
-        id: loan.id,
-        code: loan.code,
-        amount_requested: loan.amount_requested,
-        amount_funded: loan.amount_funded,
-        interest_rate_nm: loan.interest_rate_nm,
-        interest_rate_ea: loan.interest_rate_ea,
-        status: loan.status,
+        id: credito.id,
+        code: credito.codigo_credito,
+        amount_requested: credito.monto_solicitado,
+        amount_funded: amountFunded,
+        interest_rate_nm: credito.tasa_nominal,
+        interest_rate_ea: credito.tasa_interes_ea,
+        status: statusMap[credito.estado] || credito.estado,
         owner: {
           id: ownerData?.id,
           name: ownerData?.full_name,
@@ -168,10 +195,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         total_interest_paid: totalPayments.interest,
         total_late_fees: totalPayments.lateFee,
         total_amount_paid: totalPayments.total,
-        payments_count: payments?.length || 0
+        payments_count: paymentsCount
       },
       investors: investorDistribution,
-      investors_count: investments?.length || 0
+      investors_count: inversiones?.length || 0
     })
 
   } catch (error) {

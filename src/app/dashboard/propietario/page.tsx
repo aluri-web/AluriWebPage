@@ -23,36 +23,53 @@ export default async function PropietarioPanel() {
     .eq('id', user!.id)
     .single()
 
-  // Fetch loans where user is owner
-  const { data: loans } = await supabase
-    .from('loans')
-    .select('id, code, status, amount_requested, amount_funded, property_info, created_at')
-    .eq('owner_id', user!.id)
+  // Fetch creditos where user is owner
+  const { data: creditos } = await supabase
+    .from('creditos')
+    .select('id, codigo_credito, estado, monto_solicitado, ciudad_inmueble, tipo_inmueble, valor_comercial, created_at, inversiones(monto_invertido)')
+    .eq('cliente_id', user!.id)
     .order('created_at', { ascending: false })
 
-  const totalLoans = loans?.length || 0
-  const activeLoans = loans?.filter(l => l.status === 'active' || l.status === 'fundraising').length || 0
-  const totalRequested = loans?.reduce((sum, loan) => sum + (loan.amount_requested || 0), 0) || 0
-  const totalFunded = loans?.reduce((sum, loan) => sum + (loan.amount_funded || 0), 0) || 0
+  // Helper to calculate funded amount from inversiones join
+  const getFunded = (credito: any): number => {
+    const inversiones = credito.inversiones as { monto_invertido: number }[] | null
+    if (!inversiones || !Array.isArray(inversiones)) return 0
+    return inversiones.reduce((sum: number, inv: { monto_invertido: number }) => sum + (inv.monto_invertido || 0), 0)
+  }
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'draft': return 'Borrador'
-      case 'fundraising': return 'En Fondeo'
-      case 'active': return 'Activo'
-      case 'paid': return 'Pagado'
-      case 'defaulted': return 'En Mora'
-      default: return status
+  const totalLoans = creditos?.length || 0
+  const activeLoans = creditos?.filter(c => c.estado === 'activo' || c.estado === 'publicado').length || 0
+  const totalRequested = creditos?.reduce((sum, c) => sum + (c.monto_solicitado || 0), 0) || 0
+  const totalFunded = creditos?.reduce((sum, c) => sum + getFunded(c), 0) || 0
+
+  const getStatusLabel = (estado: string) => {
+    switch (estado) {
+      case 'solicitado': return 'Solicitado'
+      case 'aprobado': return 'Aprobado'
+      case 'publicado': return 'En Fondeo'
+      case 'en_firma': return 'En Firma'
+      case 'firmado': return 'Firmado'
+      case 'activo': return 'Activo'
+      case 'finalizado': return 'Completado'
+      case 'castigado': return 'Castigado'
+      case 'mora': return 'En Mora'
+      case 'anulado': return 'Anulado'
+      default: return estado
     }
   }
 
-  const getStatusClass = (status: string) => {
-    switch (status) {
-      case 'draft': return 'bg-gray-100 text-gray-600 border-gray-200'
-      case 'fundraising': return 'bg-amber-50 text-amber-600 border-amber-200'
-      case 'active': return 'bg-emerald-50 text-emerald-600 border-emerald-200'
-      case 'paid': return 'bg-blue-50 text-blue-600 border-blue-200'
-      case 'defaulted': return 'bg-red-50 text-red-600 border-red-200'
+  const getStatusClass = (estado: string) => {
+    switch (estado) {
+      case 'solicitado': return 'bg-gray-100 text-gray-600 border-gray-200'
+      case 'aprobado': return 'bg-blue-50 text-blue-600 border-blue-200'
+      case 'publicado': return 'bg-amber-50 text-amber-600 border-amber-200'
+      case 'en_firma': return 'bg-purple-50 text-purple-600 border-purple-200'
+      case 'firmado': return 'bg-indigo-50 text-indigo-600 border-indigo-200'
+      case 'activo': return 'bg-emerald-50 text-emerald-600 border-emerald-200'
+      case 'finalizado': return 'bg-teal-50 text-teal-600 border-teal-200'
+      case 'castigado': return 'bg-orange-50 text-orange-600 border-orange-200'
+      case 'mora': return 'bg-red-50 text-red-600 border-red-200'
+      case 'anulado': return 'bg-gray-100 text-gray-400 border-gray-200'
       default: return 'bg-gray-100 text-gray-600 border-gray-200'
     }
   }
@@ -127,30 +144,29 @@ export default async function PropietarioPanel() {
           </Link>
         </div>
 
-        {loans && loans.length > 0 ? (
+        {creditos && creditos.length > 0 ? (
           <div className="space-y-4">
-            {loans.slice(0, 5).map((loan) => {
-              const propertyInfo = loan.property_info as { city?: string; property_type?: string } | null
+            {creditos.slice(0, 5).map((credito) => {
               return (
-                <div key={loan.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <div key={credito.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-emerald-500/10 rounded-full flex items-center justify-center">
                       <FileText size={18} className="text-emerald-600" />
                     </div>
                     <div>
-                      <p className="text-gray-900 font-medium">{loan.code}</p>
+                      <p className="text-gray-900 font-medium">{credito.codigo_credito}</p>
                       <p className="text-gray-500 text-sm">
-                        {propertyInfo?.city || 'Sin ciudad'}
-                        {propertyInfo?.property_type ? ` - ${propertyInfo.property_type}` : ''}
+                        {credito.ciudad_inmueble || 'Sin ciudad'}
+                        {credito.tipo_inmueble ? ` - ${credito.tipo_inmueble}` : ''}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusClass(loan.status)}`}>
-                      {getStatusLabel(loan.status)}
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusClass(credito.estado)}`}>
+                      {getStatusLabel(credito.estado)}
                     </span>
                     <p className="text-gray-500 text-sm mt-1">
-                      {formatCOP(loan.amount_requested)}
+                      {formatCOP(credito.monto_solicitado)}
                     </p>
                   </div>
                 </div>

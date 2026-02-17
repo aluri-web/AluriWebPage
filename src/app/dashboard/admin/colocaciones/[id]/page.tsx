@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CreditCard, User, MoreHorizontal, Settings } from 'lucide-react'
+import { ArrowLeft, CreditCard, User, MoreHorizontal, Settings, MapPin } from 'lucide-react'
 import CreditWorkflow from '../CreditWorkflow'
 
 // Reuse or import this function if it exists, otherwise define locally for now
@@ -82,7 +82,7 @@ export default async function CreditDetailsPage({ params }: { params: Promise<{ 
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                            Crédito #{credit.numero_credito}
+                            Crédito #{credit.codigo_credito}
                             <span className={`text-sm px-3 py-1 rounded-full border ${credit.estado === 'activo' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
                                 credit.estado === 'publicado' ? 'bg-teal-500/10 border-teal-500/20 text-teal-400' :
                                     credit.estado === 'en_firma' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :
@@ -95,7 +95,7 @@ export default async function CreditDetailsPage({ params }: { params: Promise<{ 
                             </span>
                         </h1>
                         <p className="text-slate-400 mt-1">
-                            {credit.profiles?.full_name || 'Cliente desconocido'} • {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(credit.monto_aprobado)}
+                            {credit.profiles?.full_name || 'Cliente desconocido'} • {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(credit.valor_colocado)}
                         </p>
                     </div>
 
@@ -121,23 +121,108 @@ export default async function CreditDetailsPage({ params }: { params: Promise<{ 
                             <div>
                                 <span className="block text-sm text-slate-500 mb-1">Monto Aprobado</span>
                                 <span className="text-lg font-medium text-white">
-                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(credit.monto_aprobado)}
+                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(credit.valor_colocado)}
                                 </span>
                             </div>
                             <div>
                                 <span className="block text-sm text-slate-500 mb-1">Tasa de Interés</span>
-                                <span className="text-lg font-medium text-white">{credit.tasa_interes}% N.M.</span>
+                                <span className="text-lg font-medium text-white">{credit.tasa_nominal}% N.M.</span>
                             </div>
                             <div>
                                 <span className="block text-sm text-slate-500 mb-1">Plazo</span>
-                                <span className="text-lg font-medium text-white">{credit.plazo_meses} Meses</span>
+                                <span className="text-lg font-medium text-white">{credit.plazo} Meses</span>
                             </div>
                             <div>
                                 <span className="block text-sm text-slate-500 mb-1">Tipo de Contrato</span>
                                 <span className="text-lg font-medium text-white capitalize">{credit.tipo_contrato?.replace('_', ' ') || 'N/A'}</span>
                             </div>
+                            <div>
+                                <span className="block text-sm text-slate-500 mb-1">Tipo de Amortización</span>
+                                <span className="text-lg font-medium text-white capitalize">{credit.tipo_amortizacion?.replace('_', ' ') || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <span className="block text-sm text-slate-500 mb-1">Tipo de Liquidación</span>
+                                <span className="text-lg font-medium text-white capitalize">{credit.tipo_liquidacion || 'N/A'}</span>
+                            </div>
+                            {credit.tasa_interes_ea && (
+                                <div>
+                                    <span className="block text-sm text-slate-500 mb-1">Tasa E.A.</span>
+                                    <span className="text-lg font-medium text-white">{credit.tasa_interes_ea}%</span>
+                                </div>
+                            )}
+                            {credit.comision_deudor > 0 && (
+                                <div>
+                                    <span className="block text-sm text-slate-500 mb-1">Comisión Deudor</span>
+                                    <span className="text-lg font-medium text-white">
+                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(credit.comision_deudor)}
+                                    </span>
+                                </div>
+                            )}
+                            {credit.notaria && (
+                                <div>
+                                    <span className="block text-sm text-slate-500 mb-1">Notaría</span>
+                                    <span className="text-lg font-medium text-white">{credit.notaria}</span>
+                                </div>
+                            )}
+                            {credit.costos_notaria > 0 && (
+                                <div>
+                                    <span className="block text-sm text-slate-500 mb-1">Costos de Notaría</span>
+                                    <span className="text-lg font-medium text-white">
+                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(credit.costos_notaria)}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     </div>
+
+                    {/* Property Info Card */}
+                    {(credit.direccion_inmueble || credit.ciudad_inmueble || credit.valor_comercial) && (
+                        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+                            <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-2">
+                                <MapPin size={18} className="text-amber-400" />
+                                <h3 className="font-semibold text-white">Información del Inmueble</h3>
+                            </div>
+                            <div className="p-6 grid grid-cols-2 gap-6">
+                                {credit.direccion_inmueble && (
+                                    <div className="col-span-2">
+                                        <span className="block text-sm text-slate-500 mb-1">Dirección</span>
+                                        <span className="text-lg font-medium text-white">{credit.direccion_inmueble}</span>
+                                    </div>
+                                )}
+                                {credit.ciudad_inmueble && (
+                                    <div>
+                                        <span className="block text-sm text-slate-500 mb-1">Ciudad</span>
+                                        <span className="text-lg font-medium text-white">{credit.ciudad_inmueble}</span>
+                                    </div>
+                                )}
+                                {credit.tipo_inmueble && (
+                                    <div>
+                                        <span className="block text-sm text-slate-500 mb-1">Tipo de Inmueble</span>
+                                        <span className="text-lg font-medium text-white capitalize">{credit.tipo_inmueble}</span>
+                                    </div>
+                                )}
+                                {credit.valor_comercial && (
+                                    <div>
+                                        <span className="block text-sm text-slate-500 mb-1">Avalúo Comercial</span>
+                                        <span className="text-lg font-medium text-teal-400">
+                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(credit.valor_comercial)}
+                                        </span>
+                                    </div>
+                                )}
+                                {credit.ltv != null && (
+                                    <div>
+                                        <span className="block text-sm text-slate-500 mb-1">LTV</span>
+                                        <span className={`text-lg font-medium ${
+                                            credit.ltv > 70 ? 'text-red-400' :
+                                            credit.ltv > 50 ? 'text-amber-400' : 'text-emerald-400'
+                                        }`}>
+                                            {credit.ltv.toFixed(1)}%
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Sidebar */}

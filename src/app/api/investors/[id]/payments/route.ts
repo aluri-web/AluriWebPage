@@ -47,48 +47,61 @@ export async function GET(
       )
     }
 
+    // Status mapping: new DB estado → English API status
+    const statusMap: Record<string, string> = {
+      publicado: 'fundraising',
+      activo: 'active',
+      finalizado: 'completed',
+      mora: 'defaulted'
+    }
+
+    const invStatusMap: Record<string, string> = {
+      activo: 'active',
+      pendiente: 'pending_payment'
+    }
+
     // Obtener todas las inversiones del inversionista
-    const { data: investments, error: investmentsError } = await supabase
-      .from('investments')
+    const { data: inversiones, error: inversionesError } = await supabase
+      .from('inversiones')
       .select(`
         id,
-        loan_id,
-        amount_invested,
-        status,
+        credito_id,
+        monto_invertido,
+        estado,
         created_at,
-        loan:loans!loan_id (
+        credito:creditos!credito_id (
           id,
-          code,
-          amount_requested,
-          status
+          codigo_credito,
+          monto_solicitado,
+          estado
         )
       `)
-      .eq('investor_id', investorId)
+      .eq('inversionista_id', investorId)
 
-    if (investmentsError) {
-      console.error('Error fetching investments:', investmentsError)
+    if (inversionesError) {
+      console.error('Error fetching investments:', inversionesError)
       return NextResponse.json(
         { success: false, error: 'Error al obtener inversiones' },
         { status: 500 }
       )
     }
 
-    // Para cada inversión, obtener los pagos del préstamo
+    // Para cada inversión, obtener los pagos del crédito from transacciones
     const investmentsWithPayments = await Promise.all(
-      (investments || []).map(async (investment) => {
-        const loanData = investment.loan as unknown as {
+      (inversiones || []).map(async (inversion) => {
+        const creditoData = inversion.credito as unknown as {
           id: string
-          code: string
-          amount_requested: number
-          status: string
+          codigo_credito: string
+          monto_solicitado: number
+          estado: string
         } | null
 
-        if (!loanData) {
+        if (!creditoData) {
           return {
-            investment_id: investment.id,
-            loan_id: investment.loan_id,
+            investment_id: inversion.id,
+            loan_id: inversion.credito_id,
             loan_code: 'N/A',
-            amount_invested: investment.amount_invested,
+            amount_invested: inversion.monto_invertido,
             percentage: 0,
             payments: [],
             total_earned: 0
@@ -96,19 +109,51 @@ export async function GET(
         }
 
         // Calcular porcentaje de participación
-        const percentage = loanData.amount_requested > 0
-          ? (investment.amount_invested / loanData.amount_requested) * 100
+        const percentage = creditoData.monto_solicitado > 0
+          ? (inversion.monto_invertido / creditoData.monto_solicitado) * 100
           : 0
 
-        // Obtener pagos del préstamo
-        const { data: payments } = await supabase
-          .from('loan_payments')
-          .select('id, payment_date, amount_capital, amount_interest, amount_late_fee, amount_total')
-          .eq('loan_id', investment.loan_id)
-          .order('payment_date', { ascending: false })
+        // Obtener transacciones de pago del crédito
+        const { data: transacciones } = await supabase
+          .from('transacciones')
+          .select('id, tipo_transaccion, monto, fecha_transaccion, referencia_pago')
+          .eq('credito_id', inversion.credito_id)
+          .in('tipo_transaccion', ['pago_capital', 'pago_interes', 'pago_mora'])
+          .order('fecha_transaccion', { ascending: false })
+
+        // Group transacciones by referencia_pago to reconstruct payments
+        const paymentGroups: Record<string, {
+          id: string;
+          payment_date: string;
+          amount_capital: number;
+          amount_interest: number;
+          amount_late_fee: number;
+          amount_total: number;
+        }> = {}
+
+        for (const tx of (transacciones || [])) {
+          const ref = tx.referencia_pago || tx.id
+          if (!paymentGroups[ref]) {
+            paymentGroups[ref] = {
+              id: ref,
+              payment_date: tx.fecha_transaccion,
+              amount_capital: 0,
+              amount_interest: 0,
+              amount_late_fee: 0,
+              amount_total: 0
+            }
+          }
+          const group = paymentGroups[ref]
+          if (tx.tipo_transaccion === 'pago_capital') group.amount_capital += tx.monto || 0
+          else if (tx.tipo_transaccion === 'pago_interes') group.amount_interest += tx.monto || 0
+          else if (tx.tipo_transaccion === 'pago_mora') group.amount_late_fee += tx.monto || 0
+          group.amount_total = group.amount_capital + group.amount_interest + group.amount_late_fee
+        }
+
+        const groupedPayments = Object.values(paymentGroups)
 
         // Calcular lo que le corresponde al inversionista de cada pago
-        const paymentsWithShare = (payments || []).map(payment => ({
+        const paymentsWithShare = groupedPayments.map(payment => ({
           payment_id: payment.id,
           payment_date: payment.payment_date,
           loan_total: payment.amount_total,
@@ -120,11 +165,11 @@ export async function GET(
         const totalEarned = paymentsWithShare.reduce((sum, p) => sum + p.investor_total, 0)
 
         return {
-          investment_id: investment.id,
-          loan_id: investment.loan_id,
-          loan_code: loanData.code,
-          loan_status: loanData.status,
-          amount_invested: investment.amount_invested,
+          investment_id: inversion.id,
+          loan_id: inversion.credito_id,
+          loan_code: creditoData.codigo_credito,
+          loan_status: statusMap[creditoData.estado] || creditoData.estado,
+          amount_invested: inversion.monto_invertido,
           percentage: Math.round(percentage * 100) / 100,
           payments: paymentsWithShare,
           payments_count: paymentsWithShare.length,

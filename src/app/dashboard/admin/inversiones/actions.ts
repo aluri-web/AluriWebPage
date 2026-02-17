@@ -1,19 +1,21 @@
 'use server'
 
 import { createClient } from '../../../../utils/supabase/server'
+import { createAdminClient } from '../../../../utils/supabase/server'
+import { revalidatePath } from 'next/cache'
 
 export interface PendingInvestment {
   id: string
-  amount_invested: number
+  monto_invertido: number
   created_at: string
   investor: {
     full_name: string | null
     email: string | null
     document_id: string | null
   } | null
-  loan: {
-    code: string
-    amount_requested: number | null
+  credito: {
+    codigo_credito: string
+    monto_solicitado: number | null
   } | null
 }
 
@@ -21,22 +23,22 @@ export async function getPendingInvestments(): Promise<{ data: PendingInvestment
   const supabase = await createClient()
 
   const { data, error } = await supabase
-    .from('investments')
+    .from('inversiones')
     .select(`
       id,
-      amount_invested,
+      monto_invertido,
       created_at,
-      investor:profiles!investor_id (
+      investor:profiles!inversionista_id (
         full_name,
         email,
         document_id
       ),
-      loan:loans!loan_id (
-        code,
-        amount_requested
+      credito:creditos!credito_id (
+        codigo_credito,
+        monto_solicitado
       )
     `)
-    .eq('status', 'pending_payment')
+    .eq('estado', 'pendiente')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -45,4 +47,62 @@ export async function getPendingInvestments(): Promise<{ data: PendingInvestment
   }
 
   return { data: data as unknown as PendingInvestment[], error: null }
+}
+
+export async function approveInvestment(investmentId: string): Promise<{ success: boolean; error?: string }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { success: false, error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const { error } = await supabase
+    .from('inversiones')
+    .update({
+      estado: 'activo',
+      confirmed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', investmentId)
+
+  if (error) {
+    console.error('Error approving investment:', error.message)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/dashboard/admin/inversiones')
+  revalidatePath('/dashboard/admin/colocaciones')
+  return { success: true }
+}
+
+export async function rejectInvestment(investmentId: string): Promise<{ success: boolean; error?: string }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { success: false, error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const { error } = await supabase
+    .from('inversiones')
+    .update({
+      estado: 'rechazado',
+      rejected_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', investmentId)
+
+  if (error) {
+    console.error('Error rejecting investment:', error.message)
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/dashboard/admin/inversiones')
+  revalidatePath('/dashboard/admin/colocaciones')
+  return { success: true }
 }
