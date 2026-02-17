@@ -24,6 +24,9 @@ interface Credito {
   direccion_inmueble: string | null
   tipo_inmueble: string | null
   valor_comercial: number | null
+  saldo_capital: number | null
+  saldo_intereses: number | null
+  fecha_ultimo_pago: string | null
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
 }
