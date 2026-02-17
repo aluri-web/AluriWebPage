@@ -32,9 +32,11 @@ interface PaymentResponse {
  *
  * Registra un pago del propietario y calcula la distribución a los inversionistas.
  *
+ * DB: creditos + inversiones + transacciones
+ *
  * Body:
  * {
- *   "loan_id": "uuid-del-loan" o "LOAN-001" (código),
+ *   "loan_id": "uuid-del-credito" o "CRE-001" (codigo_credito),
  *   "payment_date": "2024-01-15",
  *   "amount_capital": 1000000,
  *   "amount_interest": 500000,
@@ -74,43 +76,43 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
 
     const supabase = await createClient()
 
-    // Verificar que el préstamo existe (buscar por ID o por código)
+    // Verificar que el crédito existe (buscar por ID o por codigo_credito)
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.loan_id)
 
-    const { data: loan, error: loanError } = await supabase
-      .from('loans')
-      .select('id, code, owner_id, amount_requested')
-      .eq(isUUID ? 'id' : 'code', body.loan_id)
+    const { data: credito, error: creditoError } = await supabase
+      .from('creditos')
+      .select('id, codigo_credito, cliente_id, monto_solicitado')
+      .eq(isUUID ? 'id' : 'codigo_credito', body.loan_id)
       .single()
 
-    if (loanError || !loan) {
+    if (creditoError || !credito) {
       return NextResponse.json(
         { success: false, total_amount: 0, distribution: [], error: 'Préstamo no encontrado' },
         { status: 404 }
       )
     }
 
-    const loanId = loan.id
-    const loanAmount = loan.amount_requested || 0
+    const creditoId = credito.id
+    const loanAmount = credito.monto_solicitado || 0
 
-    // Obtener las inversiones activas para este préstamo
-    const { data: investments, error: investmentsError } = await supabase
-      .from('investments')
+    // Obtener las inversiones activas para este crédito
+    const { data: inversiones, error: inversionesError } = await supabase
+      .from('inversiones')
       .select(`
         id,
-        investor_id,
-        amount_invested,
-        investor:profiles!investor_id (
+        inversionista_id,
+        monto_invertido,
+        investor:profiles!inversionista_id (
           id,
           full_name,
           email
         )
       `)
-      .eq('loan_id', loanId)
-      .eq('status', 'active')
+      .eq('credito_id', creditoId)
+      .eq('estado', 'activo')
 
-    if (investmentsError) {
-      console.error('Error fetching investments:', investmentsError)
+    if (inversionesError) {
+      console.error('Error fetching investments:', inversionesError)
       return NextResponse.json(
         { success: false, total_amount: 0, distribution: [], error: 'Error al obtener inversiones' },
         { status: 500 }
@@ -118,13 +120,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
     }
 
     // Calcular la distribución a cada inversionista
-    const distribution: InvestorPayment[] = (investments || []).map(investment => {
-      // Calcular porcentaje basado en monto invertido vs monto total del loan
+    const distribution: InvestorPayment[] = (inversiones || []).map(inversion => {
+      // Calcular porcentaje basado en monto invertido vs monto total del crédito
       const percentage = loanAmount > 0
-        ? (investment.amount_invested / loanAmount) * 100
+        ? (inversion.monto_invertido / loanAmount) * 100
         : 0
 
-      const investorData = investment.investor as unknown as {
+      const investorData = inversion.investor as unknown as {
         id: string;
         full_name: string | null;
         email: string | null
@@ -136,7 +138,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
       const investorTotal = investorInterest + investorCapital
 
       return {
-        investor_id: investment.investor_id,
+        investor_id: inversion.inversionista_id,
         investor_name: investorData?.full_name || 'Sin nombre',
         percentage: Math.round(percentage * 100) / 100, // Redondear a 2 decimales
         amount_interest: investorInterest,
@@ -145,31 +147,63 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
       }
     })
 
-    // Registrar el pago en la tabla loan_payments
-    const { data: payment, error: paymentError } = await supabase
-      .from('loan_payments')
-      .insert({
-        loan_id: loanId,
-        payment_date: body.payment_date,
-        amount_capital: amountCapital,
-        amount_interest: amountInterest,
-        amount_late_fee: amountLateFee,
-        amount_total: totalAmount
-      })
-      .select('id')
-      .single()
+    // Registrar el pago en la tabla transacciones (1-3 rows per payment with shared referencia_pago)
+    const referenciaPago = `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`
 
-    if (paymentError) {
-      console.error('Error registering payment:', paymentError)
+    // Build transaction rows for each non-zero amount type
+    const transactionRows: {
+      credito_id: string;
+      tipo_transaccion: string;
+      monto: number;
+      fecha_transaccion: string;
+      referencia_pago: string;
+    }[] = []
+
+    if (amountCapital > 0) {
+      transactionRows.push({
+        credito_id: creditoId,
+        tipo_transaccion: 'pago_capital',
+        monto: amountCapital,
+        fecha_transaccion: body.payment_date,
+        referencia_pago: referenciaPago
+      })
+    }
+
+    if (amountInterest > 0) {
+      transactionRows.push({
+        credito_id: creditoId,
+        tipo_transaccion: 'pago_interes',
+        monto: amountInterest,
+        fecha_transaccion: body.payment_date,
+        referencia_pago: referenciaPago
+      })
+    }
+
+    if (amountLateFee > 0) {
+      transactionRows.push({
+        credito_id: creditoId,
+        tipo_transaccion: 'pago_mora',
+        monto: amountLateFee,
+        fecha_transaccion: body.payment_date,
+        referencia_pago: referenciaPago
+      })
+    }
+
+    const { error: txError } = await supabase
+      .from('transacciones')
+      .insert(transactionRows)
+
+    if (txError) {
+      console.error('Error registering payment:', txError)
       return NextResponse.json(
-        { success: false, total_amount: 0, distribution: [], error: 'Error al registrar el pago: ' + paymentError.message },
+        { success: false, total_amount: 0, distribution: [], error: 'Error al registrar el pago: ' + txError.message },
         { status: 500 }
       )
     }
 
     return NextResponse.json({
       success: true,
-      payment_id: payment.id,
+      payment_id: referenciaPago,
       total_amount: totalAmount,
       distribution
     })
@@ -187,6 +221,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
  * GET /api/payments?loan_id=uuid
  *
  * Obtiene el historial de pagos de un préstamo con la distribución a inversionistas.
+ *
+ * DB: creditos + transacciones (grouped by referencia_pago) + inversiones
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -202,63 +238,97 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const supabase = await createClient()
 
-    // Buscar el préstamo por ID o por código
+    // Buscar el crédito por ID o por codigo_credito
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(loanIdParam)
 
-    const { data: loan, error: loanError } = await supabase
-      .from('loans')
-      .select('id, code, amount_requested')
-      .eq(isUUID ? 'id' : 'code', loanIdParam)
+    const { data: credito, error: creditoError } = await supabase
+      .from('creditos')
+      .select('id, codigo_credito, monto_solicitado')
+      .eq(isUUID ? 'id' : 'codigo_credito', loanIdParam)
       .single()
 
-    if (loanError || !loan) {
+    if (creditoError || !credito) {
       return NextResponse.json(
         { success: false, error: 'Préstamo no encontrado' },
         { status: 404 }
       )
     }
 
-    const loanId = loan.id
-    const loanAmount = loan.amount_requested || 0
+    const creditoId = credito.id
+    const loanAmount = credito.monto_solicitado || 0
 
-    // Obtener los pagos del préstamo
-    const { data: payments, error: paymentsError } = await supabase
-      .from('loan_payments')
-      .select('id, payment_date, amount_capital, amount_interest, amount_late_fee, amount_total, created_at')
-      .eq('loan_id', loanId)
-      .order('payment_date', { ascending: false })
+    // Obtener las transacciones de pago del crédito
+    const { data: transacciones, error: txError } = await supabase
+      .from('transacciones')
+      .select('id, tipo_transaccion, monto, fecha_transaccion, referencia_pago, created_at')
+      .eq('credito_id', creditoId)
+      .in('tipo_transaccion', ['pago_capital', 'pago_interes', 'pago_mora'])
+      .order('fecha_transaccion', { ascending: false })
 
-    if (paymentsError) {
-      console.error('Error fetching payments:', paymentsError)
+    if (txError) {
+      console.error('Error fetching payments:', txError)
       return NextResponse.json(
         { success: false, error: 'Error al obtener pagos' },
         { status: 500 }
       )
     }
 
+    // Group transacciones by referencia_pago to reconstruct payments
+    const paymentGroups: Record<string, {
+      id: string;
+      payment_date: string;
+      amount_capital: number;
+      amount_interest: number;
+      amount_late_fee: number;
+      amount_total: number;
+      created_at: string;
+    }> = {}
+
+    for (const tx of (transacciones || [])) {
+      const ref = tx.referencia_pago || tx.id
+      if (!paymentGroups[ref]) {
+        paymentGroups[ref] = {
+          id: ref,
+          payment_date: tx.fecha_transaccion,
+          amount_capital: 0,
+          amount_interest: 0,
+          amount_late_fee: 0,
+          amount_total: 0,
+          created_at: tx.created_at
+        }
+      }
+      const group = paymentGroups[ref]
+      if (tx.tipo_transaccion === 'pago_capital') group.amount_capital += tx.monto || 0
+      else if (tx.tipo_transaccion === 'pago_interes') group.amount_interest += tx.monto || 0
+      else if (tx.tipo_transaccion === 'pago_mora') group.amount_late_fee += tx.monto || 0
+      group.amount_total = group.amount_capital + group.amount_interest + group.amount_late_fee
+    }
+
+    const payments = Object.values(paymentGroups)
+
     // Obtener las inversiones para calcular distribución
-    const { data: investments } = await supabase
-      .from('investments')
+    const { data: inversiones } = await supabase
+      .from('inversiones')
       .select(`
-        investor_id,
-        amount_invested,
-        investor:profiles!investor_id (
+        inversionista_id,
+        monto_invertido,
+        investor:profiles!inversionista_id (
           full_name
         )
       `)
-      .eq('loan_id', loanId)
-      .eq('status', 'active')
+      .eq('credito_id', creditoId)
+      .eq('estado', 'activo')
 
     // Añadir la distribución calculada a cada pago
-    const paymentsWithDistribution = (payments || []).map(payment => {
-      const distribution = (investments || []).map(inv => {
+    const paymentsWithDistribution = payments.map(payment => {
+      const distribution = (inversiones || []).map(inv => {
         const percentage = loanAmount > 0
-          ? (inv.amount_invested / loanAmount) * 100
+          ? (inv.monto_invertido / loanAmount) * 100
           : 0
         const invData = inv.investor as unknown as { full_name: string | null } | null
 
         return {
-          investor_id: inv.investor_id,
+          investor_id: inv.inversionista_id,
           investor_name: invData?.full_name || 'Sin nombre',
           percentage: Math.round(percentage * 100) / 100,
           amount_interest: Math.round((payment.amount_interest * percentage) / 100),
@@ -275,9 +345,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({
       success: true,
       loan_id: loanIdParam,
-      loan_code: loan.code,
+      loan_code: credito.codigo_credito,
       payments: paymentsWithDistribution,
-      total_payments: payments?.length || 0
+      total_payments: payments.length
     })
 
   } catch (error) {

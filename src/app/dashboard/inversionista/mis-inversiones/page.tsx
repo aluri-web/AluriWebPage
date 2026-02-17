@@ -4,41 +4,36 @@ import Link from 'next/link'
 import PortfolioChart from '../../../../components/dashboard/PortfolioChart'
 import InvestmentsTabs from './InvestmentsTabs'
 
-// Property info from JSON column
-interface PropertyInfo {
-  address?: string
-  city?: string
-  property_type?: string
-  commercial_value?: number
+// Transaction record from transacciones table
+interface Transaccion {
+  tipo_transaccion: string
+  monto: number
 }
 
-// Payment record from loan_payments table
-interface LoanPayment {
-  amount_capital: number
-  amount_interest: number
+// Updated interface with new creditos schema
+interface Credito {
+  codigo_credito: string
+  estado: string
+  tasa_interes_ea: number | null
+  monto_solicitado: number | null
+  plazo: number | null
+  ciudad_inmueble: string | null
+  direccion_inmueble: string | null
+  tipo_inmueble: string | null
+  valor_comercial: number | null
+  transacciones: Transaccion[]
+  inversiones: { monto_invertido: number; estado: string }[]
 }
 
-// Updated interface with correct column names
-interface Loan {
-  code: string
-  status: string
-  interest_rate_ea: number | null
-  amount_requested: number | null
-  amount_funded: number | null
-  term_months: number | null
-  property_info: PropertyInfo | null
-  loan_payments: LoanPayment[]
-}
-
-interface Investment {
+interface Inversion {
   id: string
-  amount_invested: number
+  monto_invertido: number
   interest_rate_investor: number | null
-  status: string
+  estado: string
   created_at: string
   confirmed_at: string | null
-  loan_id: string
-  loan: Loan | null
+  credito_id: string
+  credito: Credito | null
 }
 
 // Helper: Format currency as COP
@@ -56,64 +51,72 @@ export default async function MisInversionesPage() {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch ALL investments with loan payments for real progress tracking
+  // Fetch ALL inversiones with transacciones for real progress tracking
   const { data: rawData, error } = await supabase
-    .from('investments')
+    .from('inversiones')
     .select(`
       *,
-      loan:loans!inner (
+      credito:creditos!inner (
         *,
-        loan_payments (
-          amount_capital,
-          amount_interest
+        transacciones (
+          tipo_transaccion,
+          monto
+        ),
+        inversiones (
+          monto_invertido,
+          estado
         )
       )
     `)
-    .eq('investor_id', user?.id)
-    .eq('status', 'active')
+    .eq('inversionista_id', user?.id)
+    .eq('estado', 'activo')
     .order('created_at', { ascending: false })
 
   if (error) {
     console.error('Error fetching investments:', JSON.stringify(error, null, 2))
   }
 
-  const investments = (rawData || []) as unknown as Investment[]
+  const investments = (rawData || []) as unknown as Inversion[]
 
-  // Filter for KPI calculations (active + defaulted loan status)
+  // Filter for KPI calculations (activo + mora credito status)
   const activeInvestments = investments.filter(inv =>
-    inv.loan?.status === 'active' || inv.loan?.status === 'defaulted'
+    inv.credito?.estado === 'activo' || inv.credito?.estado === 'mora'
   )
 
   // KPI Calculations
   const cantidadInversiones = investments.length
   const cantidadActivas = activeInvestments.length
-  const montoInvertidoTotal = investments.reduce((sum, inv) => sum + Number(inv.amount_invested || 0), 0)
+  const montoInvertidoTotal = investments.reduce((sum, inv) => sum + Number(inv.monto_invertido || 0), 0)
 
-  // Calculate weighted average rate using interest_rate_investor or loan's interest_rate_ea
+  // Calculate weighted average rate using interest_rate_investor or credito's tasa_interes_ea
   const rentabilidadPromedio = montoInvertidoTotal > 0
     ? investments.reduce((acc, inv) => {
-        const rate = inv.interest_rate_investor || inv.loan?.interest_rate_ea || 0
-        return acc + (Number(inv.amount_invested) * Number(rate))
+        const rate = inv.interest_rate_investor || inv.credito?.tasa_interes_ea || 0
+        return acc + (Number(inv.monto_invertido) * Number(rate))
       }, 0) / montoInvertidoTotal
     : 0
 
-  // Calculate REAL collected amounts based on loan_payments (pro-rated by participation)
+  // Calculate REAL collected amounts based on transacciones (pro-rated by participation)
   let totalCapitalRecuperado = 0
   let totalInteresesGanados = 0
 
   investments.forEach(inv => {
-    const loan = inv.loan
-    if (!loan || !loan.loan_payments) return
+    const credito = inv.credito
+    if (!credito || !credito.transacciones) return
 
-    const amountRequested = loan.amount_requested || 0
-    const amountInvested = inv.amount_invested || 0
+    const montoSolicitado = credito.monto_solicitado || 0
+    const montoInvertido = inv.monto_invertido || 0
 
     // Calculate investor's share (participation percentage)
-    const share = amountRequested > 0 ? amountInvested / amountRequested : 0
+    const share = montoSolicitado > 0 ? montoInvertido / montoSolicitado : 0
 
-    // Sum all payments for this loan
-    const totalLoanCapital = loan.loan_payments.reduce((sum, p) => sum + (p.amount_capital || 0), 0)
-    const totalLoanInterest = loan.loan_payments.reduce((sum, p) => sum + (p.amount_interest || 0), 0)
+    // Sum payments by tipo_transaccion
+    const totalLoanCapital = credito.transacciones
+      .filter(t => t.tipo_transaccion === 'pago_capital')
+      .reduce((sum, t) => sum + (t.monto || 0), 0)
+    const totalLoanInterest = credito.transacciones
+      .filter(t => t.tipo_transaccion === 'pago_interes')
+      .reduce((sum, t) => sum + (t.monto || 0), 0)
 
     // Pro-rate by investor's share
     totalCapitalRecuperado += totalLoanCapital * share

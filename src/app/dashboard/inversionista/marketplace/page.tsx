@@ -1,16 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getActiveLoans, MarketplaceLoan } from './actions'
+import { getActiveLoans, MarketplaceCredito } from './actions'
 import { Store, MapPin, Calendar, Shield, Clock, DollarSign, Search, SlidersHorizontal, X } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 
 // Risk calculation helper
-const calculateRiskScore = (loan: MarketplaceLoan) => {
-  const ltv = loan.property_info?.commercial_value && loan.amount_requested
-    ? (loan.amount_requested / loan.property_info.commercial_value) * 100
-    : 50
+const calculateRiskScore = (loan: MarketplaceCredito) => {
+  const ltv = loan.ltv ?? 50
 
   if (ltv <= 40) return { score: 'A1', label: 'Bajo Riesgo', borderColor: 'border-teal-400/50', textColor: 'text-teal-400', bgColor: 'bg-teal-400/10' }
   if (ltv <= 55) return { score: 'A2', label: 'Riesgo Moderado', borderColor: 'border-teal-400/50', textColor: 'text-teal-400', bgColor: 'bg-teal-400/10' }
@@ -29,8 +27,8 @@ const propertyImages = [
 ]
 
 export default function MarketplacePage() {
-  const [loans, setLoans] = useState<MarketplaceLoan[]>([])
-  const [filteredLoans, setFilteredLoans] = useState<MarketplaceLoan[]>([])
+  const [loans, setLoans] = useState<MarketplaceCredito[]>([])
+  const [filteredLoans, setFilteredLoans] = useState<MarketplaceCredito[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -55,9 +53,9 @@ export default function MarketplacePage() {
 
     if (searchTerm) {
       filtered = filtered.filter(loan =>
-        loan.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        loan.property_info?.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        loan.property_info?.property_type?.toLowerCase().includes(searchTerm.toLowerCase())
+        loan.codigo_credito.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        loan.ciudad_inmueble?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        loan.tipo_inmueble?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -92,24 +90,24 @@ export default function MarketplacePage() {
     return formatCurrency(amount)
   }
 
-  const getPropertyTitle = (loan: MarketplaceLoan) => {
-    const propertyType = loan.property_info?.property_type || 'Inmueble'
-    const city = loan.property_info?.city || 'Colombia'
+  const getPropertyTitle = (loan: MarketplaceCredito) => {
+    const propertyType = loan.tipo_inmueble || 'Inmueble'
+    const city = loan.ciudad_inmueble || 'Colombia'
     return `${propertyType} ${city}`
   }
 
-  const getFundingProgress = (loan: MarketplaceLoan) => {
-    const requested = loan.amount_requested || 0
-    const funded = loan.amount_funded || 0
+  const getFundingProgress = (loan: MarketplaceCredito) => {
+    const requested = loan.monto_solicitado || 0
+    const funded = (loan.inversiones || [])
+      .filter(i => i.estado === 'activo' || i.estado === 'pendiente')
+      .reduce((s, i) => s + (i.monto_invertido || 0), 0)
     if (requested === 0) return 0
     return Math.min((funded / requested) * 100, 100)
   }
 
-  const getLTV = (loan: MarketplaceLoan) => {
-    const commercialValue = loan.property_info?.commercial_value
-    const amountRequested = loan.amount_requested
-    if (!commercialValue || !amountRequested) return '-'
-    return `${((amountRequested / commercialValue) * 100).toFixed(0)}%`
+  const getLTV = (loan: MarketplaceCredito) => {
+    if (loan.ltv == null) return '-'
+    return `${loan.ltv.toFixed(0)}%`
   }
 
   const getPaymentFrequency = () => {
@@ -212,9 +210,7 @@ export default function MarketplacePage() {
               const risk = calculateRiskScore(loan)
               const ltv = getLTV(loan)
               // Use real property photo or fallback to placeholder
-              const imageUrl = loan.property_info?.photos && loan.property_info.photos.length > 0
-                ? loan.property_info.photos[0]
-                : propertyImages[index % propertyImages.length]
+              const imageUrl = propertyImages[index % propertyImages.length]
 
               return (
                 <div
@@ -241,7 +237,7 @@ export default function MarketplacePage() {
                     {/* Rate overlay on image */}
                     <div className="absolute bottom-4 right-4 text-right">
                       <p className="text-3xl font-bold text-teal-400 drop-shadow-lg">
-                        {loan.interest_rate_ea ? `${loan.interest_rate_ea}%` : '-'}
+                        {loan.tasa_interes_ea ? `${loan.tasa_interes_ea}%` : '-'}
                         <span className="text-sm font-normal text-white/70 ml-1">E.A.</span>
                       </p>
                     </div>
@@ -254,10 +250,10 @@ export default function MarketplacePage() {
                       {getPropertyTitle(loan)}
                     </h3>
 
-                    {loan.property_info?.city && (
+                    {loan.ciudad_inmueble && (
                       <p className="text-gray-500 text-sm flex items-center gap-1.5 mb-5">
                         <MapPin size={13} />
-                        {loan.property_info.city}, Colombia
+                        {loan.ciudad_inmueble}, Colombia
                       </p>
                     )}
 
@@ -269,11 +265,11 @@ export default function MarketplacePage() {
                       </div>
                       <div>
                         <p className="text-gray-600 text-xs uppercase tracking-wider mb-1">Plazo</p>
-                        <p className="text-white font-semibold">{loan.term_months ? `${loan.term_months}m` : '-'}</p>
+                        <p className="text-white font-semibold">{loan.plazo ? `${loan.plazo}m` : '-'}</p>
                       </div>
                       <div>
                         <p className="text-gray-600 text-xs uppercase tracking-wider mb-1">Monto</p>
-                        <p className="text-white font-semibold">{formatCompactCurrency(loan.amount_requested)}</p>
+                        <p className="text-white font-semibold">{formatCompactCurrency(loan.monto_solicitado)}</p>
                       </div>
                       <div>
                         <p className="text-gray-600 text-xs uppercase tracking-wider mb-1">Pago</p>

@@ -19,34 +19,34 @@ export default async function AdminDashboard() {
     .from('profiles')
     .select('*', { count: 'exact', head: true })
 
-  // 2. Créditos Activos (status = 'active' o 'fundraising')
+  // 2. Créditos Activos (estado = 'activo' o 'publicado')
   const { count: activeLoans } = await supabase
-    .from('loans')
+    .from('creditos')
     .select('*', { count: 'exact', head: true })
-    .in('status', ['active', 'fundraising'])
+    .in('estado', ['activo', 'publicado'])
 
-  // 3. Capital Total (suma de amount_funded de todos los loans)
-  const { data: loansData } = await supabase
-    .from('loans')
-    .select('amount_funded')
+  // 3. Capital Total (suma de monto_invertido de todas las inversiones)
+  const { data: inversionesData } = await supabase
+    .from('inversiones')
+    .select('monto_invertido')
 
-  const totalCapital = loansData?.reduce((sum, loan) => sum + (loan.amount_funded || 0), 0) || 0
+  const totalCapital = inversionesData?.reduce((sum, inv) => sum + (inv.monto_invertido || 0), 0) || 0
 
-  // 4. Créditos En Mora (status = 'defaulted')
+  // 4. Créditos En Mora (estado = 'mora')
   const { count: defaultedLoans } = await supabase
-    .from('loans')
+    .from('creditos')
     .select('*', { count: 'exact', head: true })
-    .eq('status', 'defaulted')
+    .eq('estado', 'mora')
 
   // 5. Actividad Reciente - últimas inversiones
   const { data: recentInvestments } = await supabase
-    .from('investments')
+    .from('inversiones')
     .select(`
       id,
-      amount_invested,
+      monto_invertido,
       created_at,
-      investor:profiles!investor_id (full_name, email),
-      loan:loans!loan_id (code, property_info)
+      investor:profiles!inversionista_id (full_name, email),
+      credito:creditos!credito_id (codigo_credito, ciudad_inmueble)
     `)
     .order('created_at', { ascending: false })
     .limit(5)
@@ -111,7 +111,7 @@ export default async function AdminDashboard() {
             {recentInvestments.map((investment) => {
               // Supabase puede devolver objeto o array dependiendo de la relación
               const investorData = investment.investor
-              const loanData = investment.loan
+              const creditoData = investment.credito
 
               // Extraer datos del inversor
               const investorName = Array.isArray(investorData)
@@ -119,14 +119,14 @@ export default async function AdminDashboard() {
                 : (investorData as { full_name?: string; email?: string } | null)?.full_name ||
                   (investorData as { full_name?: string; email?: string } | null)?.email
 
-              // Extraer datos del préstamo
-              const loanCode = Array.isArray(loanData)
-                ? loanData[0]?.code
-                : (loanData as { code?: string } | null)?.code
+              // Extraer datos del crédito
+              const creditoCode = Array.isArray(creditoData)
+                ? creditoData[0]?.codigo_credito
+                : (creditoData as { codigo_credito?: string } | null)?.codigo_credito
 
-              const loanCity = Array.isArray(loanData)
-                ? loanData[0]?.property_info?.city
-                : (loanData as { property_info?: { city?: string } } | null)?.property_info?.city
+              const creditoCity = Array.isArray(creditoData)
+                ? creditoData[0]?.ciudad_inmueble
+                : (creditoData as { ciudad_inmueble?: string } | null)?.ciudad_inmueble
 
               return (
                 <div key={investment.id} className="flex items-center justify-between p-4 bg-slate-700/50 rounded-xl">
@@ -139,13 +139,13 @@ export default async function AdminDashboard() {
                         {investorName || 'Usuario'}
                       </p>
                       <p className="text-slate-400 text-sm">
-                        Invirtió en {loanCode || 'Crédito'}
-                        {loanCity ? ` - ${loanCity}` : ''}
+                        Invirtió en {creditoCode || 'Crédito'}
+                        {creditoCity ? ` - ${creditoCity}` : ''}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-emerald-400 font-bold">{formatCOP(investment.amount_invested)}</p>
+                    <p className="text-emerald-400 font-bold">{formatCOP(investment.monto_invertido)}</p>
                     <p className="text-slate-500 text-xs">
                       {new Date(investment.created_at).toLocaleDateString('es-CO', {
                         day: 'numeric',

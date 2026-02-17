@@ -19,11 +19,24 @@ interface LoanParams {
     // New types
     contractType?: 'hipotecario' | 'retroventa'
     amortizationType?: 'francesa' | 'solo_interes'
+    liquidationType?: 'anticipada' | 'vencida'
+    commercialValue?: number
+    // Financial
+    interestRateEa?: number
+    debtorCommission?: number
+    aluriCommissionPct?: number
+    // Co-debtor
+    coDebtorId?: string
+    // Property
+    propertyAddress?: string
+    propertyCity?: string
+    propertyType?: string
+    propertyPhotos?: string[]
 }
 
 export async function createLoan(params: LoanParams) {
     const supabase = await createClient()
-    const { borrowerId, amount, interestRate, termMonths, startDate, estado, monthlyIncome, profession, warrantyAnalysis, contractType, amortizationType } = params
+    const { borrowerId, amount, interestRate, termMonths, startDate, estado, monthlyIncome, profession, warrantyAnalysis, contractType, amortizationType, liquidationType, commercialValue, interestRateEa, debtorCommission, aluriCommissionPct, coDebtorId, propertyAddress, propertyCity, propertyType, propertyPhotos } = params
 
     // 1. Cálculo Financiero
     const i = interestRate / 100
@@ -45,29 +58,40 @@ export async function createLoan(params: LoanParams) {
     // 2. Insertar Cabecera del Crédito
     // Mapping params to DB columns:
     // - monto_solicitado <- amount
-    // - monto_aprobado <- amount (initial assumption)
+    // - valor_colocado <- amount (initial assumption)
     // - fecha_desembolso <- startDate
-    // - numero_credito <- Generated
+    // - codigo_credito <- Generated
     const { data: loan, error: loanError } = await supabase
         .from('creditos')
         .insert({
             cliente_id: borrowerId,
             monto_solicitado: amount,
-            monto_aprobado: amount,
-            tasa_interes: interestRate,
-            plazo_meses: termMonths,
+            valor_colocado: amount,
+            tasa_nominal: interestRate,
+            plazo: termMonths,
             fecha_desembolso: new Date(startDate).toISOString(),
             estado: estado || 'publicado', // Custom estado or default to workflow-ready state
             saldo_capital: amount,
             saldo_intereses: 0,
             saldo_mora: 0,
-            numero_credito: params.creditCode || `CR-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // Custom or generated
+            codigo_credito: params.creditCode || `CR-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // Custom or generated
             producto: 'consumo',
             ingresos_mensuales: monthlyIncome || 0,
             profesion: profession || null,
-            analisis_garantia: warrantyAnalysis || null,
+            clase: warrantyAnalysis || null,
             tipo_contrato: contractType || 'hipotecario',
-            tipo_amortizacion: amortizationType || 'francesa'
+            tipo_amortizacion: amortizationType || 'francesa',
+            tipo_liquidacion: liquidationType || 'vencida',
+            valor_comercial: commercialValue || null,
+            tasa_interes_ea: interestRateEa || null,
+            comision_deudor: debtorCommission || 0,
+            comision_aluri_pct: aluriCommissionPct || 0,
+            co_deudor_id: coDebtorId || null,
+            direccion_inmueble: propertyAddress || null,
+            ciudad_inmueble: propertyCity || null,
+            tipo_inmueble: propertyType || null,
+            fotos_inmueble: propertyPhotos || [],
+            ltv: commercialValue && commercialValue > 0 ? Math.round((amount / commercialValue) * 10000) / 100 : null
         })
         .select()
         .single()

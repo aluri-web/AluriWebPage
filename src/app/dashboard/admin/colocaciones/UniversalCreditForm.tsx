@@ -61,6 +61,7 @@ interface FormData {
   // Contract & Amortization
   contract_type: 'hipotecario' | 'retroventa'
   amortization_type: 'francesa' | 'solo_interes'
+  liquidation_type: 'anticipada' | 'vencida'
 
   // Co-Debtor
   has_co_debtor: boolean
@@ -161,7 +162,8 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
       debtor_profession: '',
       warranty_analysis: '',
       contract_type: 'hipotecario',
-      amortization_type: 'francesa'
+      amortization_type: 'francesa',
+      liquidation_type: 'vencida'
     }
   })
 
@@ -472,7 +474,9 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
       profession: formData.debtor_profession,
       warranty_analysis: formData.warranty_analysis,
       contract_type: formData.contract_type,
-      amortization_type: formData.amortization_type
+      amortization_type: formData.amortization_type,
+      liquidation_type: formData.liquidation_type,
+      commercial_value: formData.commercial_value
     })
 
     setIsSubmitting(false)
@@ -515,7 +519,8 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
         debtor_profession: '',
         warranty_analysis: '',
         contract_type: 'hipotecario',
-        amortization_type: 'francesa'
+        amortization_type: 'francesa',
+        liquidation_type: 'vencida'
       })
       setDebtorFound(null)
       setCoDebtorFound(null)
@@ -713,7 +718,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                 <h3 className="font-semibold text-white">Configuracion del Contrato</h3>
               </div>
               <div className="p-5 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm text-slate-400 mb-1.5">Tipo de Contrato</label>
                     <select {...register('contract_type')}
@@ -728,6 +733,14 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500">
                       <option value="francesa">Francesa (Cuota Fija)</option>
                       <option value="solo_interes">Solo Intereses (Balloon)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Tipo de Liquidacion</label>
+                    <select {...register('liquidation_type')}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500">
+                      <option value="vencida">Vencida</option>
+                      <option value="anticipada">Anticipada</option>
                     </select>
                   </div>
                 </div>

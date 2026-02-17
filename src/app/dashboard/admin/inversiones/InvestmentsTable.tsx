@@ -3,8 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, X, Loader2, AlertCircle, Banknote } from 'lucide-react'
-import { approveInvestment, rejectInvestment } from '../creditos/actions'
-import { PendingInvestment } from './actions'
+import { approveInvestment, rejectInvestment, PendingInvestment } from './actions'
 
 interface InvestmentsTableProps {
   investments: PendingInvestment[]
@@ -153,12 +152,12 @@ export default function InvestmentsTable({ investments }: InvestmentsTableProps)
                     </td>
                     <td className="px-6 py-4">
                       <span className="px-2 py-1 bg-slate-800 text-slate-300 text-xs font-mono rounded">
-                        {investment.loan?.code || '-'}
+                        {investment.credito?.codigo_credito || '-'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="text-sm font-semibold text-amber-400">
-                        {formatCurrency(investment.amount_invested)}
+                        {formatCurrency(investment.monto_invertido)}
                       </span>
                     </td>
                     <td className="px-6 py-4">

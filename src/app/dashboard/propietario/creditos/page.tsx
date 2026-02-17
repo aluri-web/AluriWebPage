@@ -11,54 +11,65 @@ function formatCOP(value: number): string {
   }).format(value)
 }
 
-interface PropertyInfo {
-  city?: string
-  department?: string
-  address?: string
-  property_type?: string
-  property_value?: number
-  matricula?: string
-}
-
 export default async function CreditosPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Fetch loans where user is owner
-  const { data: loans } = await supabase
-    .from('loans')
+  // Fetch creditos where user is owner, with inversiones for funded amount
+  const { data: creditos } = await supabase
+    .from('creditos')
     .select(`
       id,
-      code,
-      status,
-      amount_requested,
-      amount_funded,
-      interest_rate_nm,
-      interest_rate_ea,
-      property_info,
-      created_at
+      codigo_credito,
+      estado,
+      monto_solicitado,
+      tasa_nominal,
+      tasa_interes_ea,
+      ciudad_inmueble,
+      direccion_inmueble,
+      tipo_inmueble,
+      valor_comercial,
+      created_at,
+      inversiones(monto_invertido)
     `)
-    .eq('owner_id', user!.id)
+    .eq('cliente_id', user!.id)
     .order('created_at', { ascending: false })
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'draft': return 'Borrador'
-      case 'fundraising': return 'En Fondeo'
-      case 'active': return 'Activo'
-      case 'paid': return 'Pagado'
-      case 'defaulted': return 'En Mora'
-      default: return status
+  // Helper to calculate funded amount from inversiones join
+  const getFunded = (credito: any): number => {
+    const inversiones = credito.inversiones as { monto_invertido: number }[] | null
+    if (!inversiones || !Array.isArray(inversiones)) return 0
+    return inversiones.reduce((sum: number, inv: { monto_invertido: number }) => sum + (inv.monto_invertido || 0), 0)
+  }
+
+  const getStatusLabel = (estado: string) => {
+    switch (estado) {
+      case 'solicitado': return 'Solicitado'
+      case 'aprobado': return 'Aprobado'
+      case 'publicado': return 'En Fondeo'
+      case 'en_firma': return 'En Firma'
+      case 'firmado': return 'Firmado'
+      case 'activo': return 'Activo'
+      case 'finalizado': return 'Completado'
+      case 'castigado': return 'Castigado'
+      case 'mora': return 'En Mora'
+      case 'anulado': return 'Anulado'
+      default: return estado
     }
   }
 
-  const getStatusClass = (status: string) => {
-    switch (status) {
-      case 'draft': return 'bg-gray-100 text-gray-600 border-gray-200'
-      case 'fundraising': return 'bg-amber-50 text-amber-600 border-amber-200'
-      case 'active': return 'bg-emerald-50 text-emerald-600 border-emerald-200'
-      case 'paid': return 'bg-blue-50 text-blue-600 border-blue-200'
-      case 'defaulted': return 'bg-red-50 text-red-600 border-red-200'
+  const getStatusClass = (estado: string) => {
+    switch (estado) {
+      case 'solicitado': return 'bg-gray-100 text-gray-600 border-gray-200'
+      case 'aprobado': return 'bg-blue-50 text-blue-600 border-blue-200'
+      case 'publicado': return 'bg-amber-50 text-amber-600 border-amber-200'
+      case 'en_firma': return 'bg-purple-50 text-purple-600 border-purple-200'
+      case 'firmado': return 'bg-indigo-50 text-indigo-600 border-indigo-200'
+      case 'activo': return 'bg-emerald-50 text-emerald-600 border-emerald-200'
+      case 'finalizado': return 'bg-teal-50 text-teal-600 border-teal-200'
+      case 'castigado': return 'bg-orange-50 text-orange-600 border-orange-200'
+      case 'mora': return 'bg-red-50 text-red-600 border-red-200'
+      case 'anulado': return 'bg-gray-100 text-gray-400 border-gray-200'
       default: return 'bg-gray-100 text-gray-600 border-gray-200'
     }
   }
@@ -100,16 +111,16 @@ export default async function CreditosPage() {
       </header>
 
       {/* Credits List */}
-      {loans && loans.length > 0 ? (
+      {creditos && creditos.length > 0 ? (
         <div className="space-y-6">
-          {loans.map((loan) => {
-            const propertyInfo = loan.property_info as PropertyInfo | null
-            const fundingProgress = loan.amount_requested > 0
-              ? Math.round((loan.amount_funded / loan.amount_requested) * 100)
+          {creditos.map((credito) => {
+            const amountFunded = getFunded(credito)
+            const fundingProgress = credito.monto_solicitado > 0
+              ? Math.round((amountFunded / credito.monto_solicitado) * 100)
               : 0
 
             return (
-              <div key={loan.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div key={credito.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 {/* Card Header */}
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-center justify-between">
@@ -119,19 +130,19 @@ export default async function CreditosPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-3">
-                          <h3 className="text-lg font-semibold text-gray-900">{loan.code}</h3>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusClass(loan.status)}`}>
-                            {getStatusLabel(loan.status)}
+                          <h3 className="text-lg font-semibold text-gray-900">{credito.codigo_credito}</h3>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusClass(credito.estado)}`}>
+                            {getStatusLabel(credito.estado)}
                           </span>
                         </div>
                         <p className="text-gray-500 text-sm mt-1">
-                          {propertyInfo?.city || 'Sin ubicacion'}{propertyInfo?.department ? `, ${propertyInfo.department}` : ''}
+                          {credito.ciudad_inmueble || 'Sin ubicacion'}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-400">Creado</p>
-                      <p className="text-sm text-gray-600">{formatDate(loan.created_at)}</p>
+                      <p className="text-sm text-gray-600">{formatDate(credito.created_at)}</p>
                     </div>
                   </div>
                 </div>
@@ -145,7 +156,7 @@ export default async function CreditosPage() {
                         <Hash size={14} />
                         <span>Codigo</span>
                       </div>
-                      <p className="text-gray-900 font-semibold">{loan.code}</p>
+                      <p className="text-gray-900 font-semibold">{credito.codigo_credito}</p>
                     </div>
 
                     {/* Estado */}
@@ -154,7 +165,7 @@ export default async function CreditosPage() {
                         <Calendar size={14} />
                         <span>Estado</span>
                       </div>
-                      <p className="text-gray-900 font-semibold">{getStatusLabel(loan.status)}</p>
+                      <p className="text-gray-900 font-semibold">{getStatusLabel(credito.estado)}</p>
                     </div>
 
                     {/* Valor Inmueble */}
@@ -164,8 +175,8 @@ export default async function CreditosPage() {
                         <span>Valor Inmueble</span>
                       </div>
                       <p className="text-gray-900 font-semibold">
-                        {propertyInfo?.property_value
-                          ? formatCOP(propertyInfo.property_value)
+                        {credito.valor_comercial
+                          ? formatCOP(credito.valor_comercial)
                           : 'No registrado'}
                       </p>
                     </div>
@@ -176,7 +187,7 @@ export default async function CreditosPage() {
                         <DollarSign size={14} />
                         <span>Monto Solicitado</span>
                       </div>
-                      <p className="text-emerald-600 font-semibold">{formatCOP(loan.amount_requested)}</p>
+                      <p className="text-emerald-600 font-semibold">{formatCOP(credito.monto_solicitado)}</p>
                     </div>
                   </div>
 
@@ -188,7 +199,7 @@ export default async function CreditosPage() {
                         <Building2 size={14} />
                         <span>Tipo de Predio</span>
                       </div>
-                      <p className="text-gray-900">{getPropertyTypeLabel(propertyInfo?.property_type)}</p>
+                      <p className="text-gray-900">{getPropertyTypeLabel(credito.tipo_inmueble)}</p>
                     </div>
 
                     {/* Tasa EA */}
@@ -197,16 +208,16 @@ export default async function CreditosPage() {
                         <TrendingUp size={14} />
                         <span>Tasa EA</span>
                       </div>
-                      <p className="text-gray-900">{loan.interest_rate_ea ? `${loan.interest_rate_ea}%` : '-'}</p>
+                      <p className="text-gray-900">{credito.tasa_interes_ea ? `${credito.tasa_interes_ea}%` : '-'}</p>
                     </div>
 
-                    {/* Matricula */}
+                    {/* Direccion */}
                     <div>
                       <div className="flex items-center gap-2 text-gray-400 text-sm mb-1">
                         <Hash size={14} />
-                        <span>Matricula</span>
+                        <span>Direccion</span>
                       </div>
-                      <p className="text-gray-900">{propertyInfo?.matricula || 'No registrada'}</p>
+                      <p className="text-gray-900">{credito.direccion_inmueble || 'No registrada'}</p>
                     </div>
 
                     {/* Monto Fondeado */}
@@ -215,12 +226,12 @@ export default async function CreditosPage() {
                         <DollarSign size={14} />
                         <span>Monto Fondeado</span>
                       </div>
-                      <p className="text-gray-900">{formatCOP(loan.amount_funded)}</p>
+                      <p className="text-gray-900">{formatCOP(amountFunded)}</p>
                     </div>
                   </div>
 
                   {/* Funding Progress Bar */}
-                  {(loan.status === 'fundraising' || loan.status === 'active') && (
+                  {(credito.estado === 'publicado' || credito.estado === 'activo') && (
                     <div className="mt-6 pt-6 border-t border-gray-100">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-gray-500">Progreso de Fondeo</span>
@@ -233,8 +244,8 @@ export default async function CreditosPage() {
                         />
                       </div>
                       <div className="flex justify-between mt-2 text-xs text-gray-400">
-                        <span>{formatCOP(loan.amount_funded)} fondeado</span>
-                        <span>{formatCOP(loan.amount_requested)} objetivo</span>
+                        <span>{formatCOP(amountFunded)} fondeado</span>
+                        <span>{formatCOP(credito.monto_solicitado)} objetivo</span>
                       </div>
                     </div>
                   )}

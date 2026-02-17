@@ -13,11 +13,11 @@ export interface Database {
         Row: {
           id: string
           cliente_id: string
-          numero_credito: string
+          codigo_credito: string
           monto_solicitado: number
-          monto_aprobado: number
-          tasa_interes: number
-          plazo_meses: number
+          valor_colocado: number
+          tasa_nominal: number
+          plazo: number
           fecha_desembolso: string | null
           fecha_firma_programada: string | null
           fecha_primer_pago: string | null
@@ -35,11 +35,11 @@ export interface Database {
         Insert: {
           id?: string
           cliente_id: string
-          numero_credito: string
+          codigo_credito: string
           monto_solicitado: number
-          monto_aprobado: number
-          tasa_interes: number
-          plazo_meses: number
+          valor_colocado: number
+          tasa_nominal: number
+          plazo: number
           fecha_desembolso?: string | null
           fecha_firma_programada?: string | null
           fecha_primer_pago?: string | null
@@ -57,11 +57,11 @@ export interface Database {
         Update: {
           id?: string
           cliente_id?: string
-          numero_credito?: string
+          codigo_credito?: string
           monto_solicitado?: number
-          monto_aprobado?: number
-          tasa_interes?: number
-          plazo_meses?: number
+          valor_colocado?: number
+          tasa_nominal?: number
+          plazo?: number
           fecha_desembolso?: string | null
           fecha_firma_programada?: string | null
           fecha_primer_pago?: string | null

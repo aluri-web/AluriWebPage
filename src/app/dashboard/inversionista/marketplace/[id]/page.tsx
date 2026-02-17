@@ -21,30 +21,25 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
     notFound()
   }
 
+  // Calculate amount_funded from inversiones sub-query
+  const amountFunded = (loan.inversiones || [])
+    .filter(i => i.estado === 'activo' || i.estado === 'pendiente')
+    .reduce((s, i) => s + (i.monto_invertido || 0), 0)
+
   const getPropertyTitle = () => {
-    const propertyType = loan.property_info?.property_type || 'Remodelación'
+    const propertyType = loan.tipo_inmueble || 'Remodelación'
     return propertyType
   }
 
   const getPropertySubtitle = () => {
-    return loan.property_info?.city || 'Norte'
+    return loan.ciudad_inmueble || 'Norte'
   }
 
-  // Calculate LTV
-  const calculateLTV = () => {
-    const commercialValue = loan.property_info?.commercial_value
-    const amountRequested = loan.amount_requested
-    if (!commercialValue || !amountRequested) return 0
-    return (amountRequested / commercialValue) * 100
-  }
-
-  const ltv = calculateLTV()
+  const ltv = loan.ltv ?? 0
   const ltvString = ltv > 0 ? `${ltv.toFixed(1)}%` : '-'
 
-  // Gallery images - use real photos from database or fallback to placeholders
-  const galleryImages = loan.property_info?.photos && loan.property_info.photos.length > 0 
-    ? loan.property_info.photos
-    : [
+  // Gallery images - fallback to placeholders
+  const galleryImages = [
         'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&h=800&fit=crop&q=80',
         'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&h=300&fit=crop&q=80',
         'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=400&h=300&fit=crop&q=80',
@@ -71,7 +66,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
                 ABIERTO PARA FONDEO
               </span>
               <span className="px-3 py-1.5 bg-white/5 text-gray-400 text-xs font-mono rounded-lg border border-white/10">
-                ID: {loan.code}
+                ID: {loan.codigo_credito}
               </span>
             </div>
           </div>
@@ -87,7 +82,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
 
             {/* Title Section */}
             <div className="space-y-2">
-              <p className="text-cyan-400 text-sm font-medium">Solicitud #{loan.code}</p>
+              <p className="text-cyan-400 text-sm font-medium">Solicitud #{loan.codigo_credito}</p>
               <h1 className="text-3xl font-bold text-white tracking-tight">
                 {getPropertyTitle()} {getPropertySubtitle()}
               </h1>
@@ -98,24 +93,24 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
 
             {/* Bento Metrics */}
             <BentoMetrics
-              commercialValue={loan.property_info?.commercial_value || null}
-              amountRequested={loan.amount_requested}
+              commercialValue={loan.valor_comercial || null}
+              amountRequested={loan.monto_solicitado}
               ltv={ltvString}
-              interestRateEa={loan.interest_rate_ea}
+              interestRateEa={loan.tasa_interes_ea}
             />
 
             {/* Location Section */}
             <div className="bg-[#111] border border-white/5 rounded-2xl overflow-hidden">
               <div className="p-4 border-b border-white/5 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-white tracking-wide">Ubicación</h2>
-                <span className="text-gray-500 text-sm">{loan.property_info?.city || 'Medellín'}, CO</span>
+                <span className="text-gray-500 text-sm">{loan.ciudad_inmueble || 'Medellín'}, CO</span>
               </div>
               <div className="h-48 bg-[#0d0d0d] flex items-center justify-center relative">
                 <div className="text-center">
                   <div className="w-12 h-12 bg-cyan-500/20 rounded-full flex items-center justify-center mx-auto mb-2 border border-cyan-500/30">
                     <MapPin size={20} className="text-cyan-400" />
                   </div>
-                  <p className="text-gray-500 text-sm">{loan.property_info?.address || 'Dirección Verificada'}</p>
+                  <p className="text-gray-500 text-sm">{loan.direccion_inmueble || 'Dirección Verificada'}</p>
                 </div>
                 {/* Map grid overlay */}
                 <div className="absolute inset-0 opacity-[0.03]" style={{
@@ -128,8 +123,8 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
             {/* Risk Analysis */}
             <RiskAnalysis
               ltv={ltv}
-              propertyType={loan.property_info?.property_type}
-              city={loan.property_info?.city}
+              propertyType={loan.tipo_inmueble}
+              city={loan.ciudad_inmueble}
             />
 
             {/* Verified Badges Section */}
@@ -144,7 +139,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
               </div>
               <div className="flex items-center gap-2">
                 <Building2 size={18} className="text-cyan-400" />
-                <span className="text-gray-400 text-sm">{loan.property_info?.property_type || 'Residencial'}</span>
+                <span className="text-gray-400 text-sm">{loan.tipo_inmueble || 'Residencial'}</span>
               </div>
             </div>
           </div>
@@ -153,10 +148,10 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
           <div className="lg:col-span-1">
             <InvestmentPanel
               loanId={loan.id}
-              amountRequested={loan.amount_requested || 0}
-              amountFunded={loan.amount_funded || 0}
-              interestRateEa={loan.interest_rate_ea}
-              termMonths={loan.term_months}
+              amountRequested={loan.monto_solicitado || 0}
+              amountFunded={amountFunded}
+              interestRateEa={loan.tasa_interes_ea}
+              termMonths={loan.plazo}
             />
           </div>
         </div>

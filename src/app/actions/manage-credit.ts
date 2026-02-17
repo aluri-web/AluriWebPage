@@ -27,9 +27,13 @@ interface UpdateStatusParams {
         fecha_firma_programada?: string
         fecha_desembolso?: string
     }
+    extraData?: {
+        notaria?: string
+        costos_notaria?: number
+    }
 }
 
-export async function updateCreditStatus({ creditId, newStatus, fechas }: UpdateStatusParams) {
+export async function updateCreditStatus({ creditId, newStatus, fechas, extraData }: UpdateStatusParams) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -85,6 +89,15 @@ export async function updateCreditStatus({ creditId, newStatus, fechas }: Update
             }
             if (fechas.fecha_desembolso) {
                 updateData.fecha_desembolso = fechas.fecha_desembolso
+            }
+        }
+
+        if (extraData) {
+            if (extraData.notaria) {
+                updateData.notaria = extraData.notaria
+            }
+            if (extraData.costos_notaria !== undefined) {
+                updateData.costos_notaria = extraData.costos_notaria
             }
         }
 

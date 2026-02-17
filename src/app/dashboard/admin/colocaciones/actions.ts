@@ -298,6 +298,8 @@ export interface FullLoanData {
   warranty_analysis?: string
   contract_type?: 'hipotecario' | 'retroventa'
   amortization_type?: 'francesa' | 'solo_interes'
+  liquidation_type?: 'anticipada' | 'vencida'
+  commercial_value?: number
   estado?: string // Optional initial estado
 }
 
@@ -414,7 +416,17 @@ export async function createFullLoanRecord(
       profession: data.profession,       // New field
       warrantyAnalysis: data.warranty_analysis, // New field
       contractType: data.contract_type,
-      amortizationType: data.amortization_type
+      amortizationType: data.amortization_type,
+      liquidationType: data.liquidation_type,
+      commercialValue: data.commercial_value,
+      interestRateEa: data.interest_rate_ea,
+      debtorCommission: data.debtor_commission,
+      aluriCommissionPct: data.aluri_commission_pct,
+      coDebtorId: coDebtorId || undefined,
+      propertyAddress: data.property?.address,
+      propertyCity: data.property?.city,
+      propertyType: data.property?.property_type,
+      propertyPhotos: data.property?.photos
     })
 
     if (loanResult.error || !loanResult.loanId) {
@@ -478,6 +490,8 @@ export interface LoanTableRow {
   property_city: string | null
   property_value: number | null
   ltv: number | null
+  risk_score: string | null
+  risk_label: string | null
   investors: string[]
   created_at: string
 }
@@ -490,12 +504,20 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
     .from('creditos')
     .select(`
       id,
-      numero_credito,
+      codigo_credito,
       estado,
       monto_solicitado,
-      monto_aprobado,
-      tasa_interes,
-      plazo_meses,
+      valor_colocado,
+      tasa_nominal,
+      tasa_interes_ea,
+      plazo,
+      valor_comercial,
+      ltv,
+      comision_deudor,
+      comision_aluri_pct,
+      ciudad_inmueble,
+      direccion_inmueble,
+      co_deudor_id,
       created_at,
       cliente:profiles!cliente_id (
         full_name,
@@ -561,30 +583,60 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
     })
   }
 
+  // Get co-debtor names
+  const coDebtorIds = (creditos || [])
+    .map(c => c.co_deudor_id)
+    .filter((id): id is string => !!id)
+
+  const coDebtorNames: Record<string, string> = {}
+  if (coDebtorIds.length > 0) {
+    const { data: coDebtors } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', coDebtorIds)
+
+    if (coDebtors) {
+      coDebtors.forEach(cd => {
+        coDebtorNames[cd.id] = cd.full_name || 'Sin nombre'
+      })
+    }
+  }
+
+  // Risk calculation helper (same logic as investor marketplace)
+  const calculateRisk = (ltv: number | null): { score: string | null; label: string | null } => {
+    if (ltv === null) return { score: null, label: null }
+    if (ltv <= 40) return { score: 'A1', label: 'Bajo Riesgo' }
+    if (ltv <= 55) return { score: 'A2', label: 'Riesgo Moderado' }
+    if (ltv <= 70) return { score: 'B1', label: 'Riesgo Medio' }
+    return { score: 'B2', label: 'Riesgo Alto' }
+  }
+
   // Transform data - map Spanish fields to expected English interface
   const tableData: LoanTableRow[] = (creditos || []).map(credito => {
-    // Calculate LTV if we have property info (not in creditos table, need to adapt)
-    const amountRequested = credito.monto_solicitado || 0
     const amountFunded = montoFundedByCredito[credito.id] || 0
+    const ltv = (credito as any).ltv ?? null
+    const risk = calculateRisk(ltv)
 
     // Cast joined data properly (Supabase returns these as objects for single joins)
     const clienteData = credito.cliente as unknown as { full_name: string | null; document_id: string | null } | null
 
     return {
       id: credito.id,
-      code: credito.numero_credito,
+      code: credito.codigo_credito,
       status: credito.estado,
       amount_requested: credito.monto_solicitado,
       amount_funded: amountFunded,
-      interest_rate_nm: credito.tasa_interes,
-      interest_rate_ea: null, // Not in creditos table
-      debtor_commission: null, // Not in creditos table
+      interest_rate_nm: credito.tasa_nominal,
+      interest_rate_ea: credito.tasa_interes_ea || null,
+      debtor_commission: credito.comision_deudor || null,
       debtor_name: clienteData?.full_name || null,
       debtor_cedula: clienteData?.document_id || null,
-      co_debtor_name: null, // Co-debtor not in current creditos schema
-      property_city: null, // Property info not in creditos table
-      property_value: null, // Property info not in creditos table
-      ltv: null, // Can't calculate without property_value
+      co_debtor_name: credito.co_deudor_id ? (coDebtorNames[credito.co_deudor_id] || null) : null,
+      property_city: credito.ciudad_inmueble || null,
+      property_value: credito.valor_comercial || null,
+      ltv: ltv ? Math.round(ltv * 10) / 10 : null,
+      risk_score: risk.score,
+      risk_label: risk.label,
       investors: investorsByCredito[credito.id] || [],
       created_at: credito.created_at
     }
@@ -601,16 +653,16 @@ export async function getNextLoanCode(): Promise<string> {
 
   const { data } = await supabase
     .from('creditos')
-    .select('numero_credito')
-    .order('numero_credito', { ascending: false })
+    .select('codigo_credito')
+    .order('codigo_credito', { ascending: false })
     .limit(1)
     .single()
 
-  if (!data?.numero_credito) {
+  if (!data?.codigo_credito) {
     return 'CR-001'
   }
 
-  const match = data.numero_credito.match(/CR-(\d+)/)
+  const match = data.codigo_credito.match(/CR-(\d+)/)
   if (match) {
     const nextNum = parseInt(match[1]) + 1
     return `CR-${nextNum.toString().padStart(3, '0')}`
@@ -659,19 +711,26 @@ export async function addInvestmentToLoan(
   }
 
   try {
-    // 1. Get loan to validate capacity
-    const { data: loan, error: loanError } = await supabaseAdmin
-      .from('loans')
-      .select('id, code, amount_requested, amount_funded, interest_rate_ea')
+    // 1. Get credito to validate capacity
+    const { data: credito, error: creditoError } = await supabaseAdmin
+      .from('creditos')
+      .select('id, codigo_credito, monto_solicitado, tasa_interes_ea')
       .eq('id', data.loan_id)
       .single()
 
-    if (loanError || !loan) {
+    if (creditoError || !credito) {
       return { success: false, error: 'Credito no encontrado.' }
     }
 
-    const requested = loan.amount_requested || 0
-    const funded = loan.amount_funded || 0
+    // Calculate current funded amount from inversiones
+    const { data: existingInversiones } = await supabaseAdmin
+      .from('inversiones')
+      .select('monto_invertido')
+      .eq('credito_id', data.loan_id)
+      .in('estado', ['activo', 'pendiente'])
+
+    const funded = (existingInversiones || []).reduce((sum, inv) => sum + (inv.monto_invertido || 0), 0)
+    const requested = credito.monto_solicitado || 0
     const remaining = requested - funded
 
     if (data.amount > remaining) {
@@ -704,16 +763,16 @@ export async function addInvestmentToLoan(
       return { success: false, error: 'No se pudo obtener el ID del inversionista.' }
     }
 
-    // 3. Create investment
+    // 3. Create investment in inversiones table
     const { data: investment, error: investError } = await supabaseAdmin
-      .from('investments')
+      .from('inversiones')
       .insert({
-        loan_id: data.loan_id,
-        investor_id: investorId,
-        amount_invested: data.amount,
-        interest_rate_investor: loan.interest_rate_ea,
-        status: 'active',
-        created_at: data.investment_date,
+        credito_id: data.loan_id,
+        inversionista_id: investorId,
+        monto_invertido: data.amount,
+        interest_rate_investor: credito.tasa_interes_ea,
+        estado: 'activo',
+        fecha_inversion: data.investment_date,
         confirmed_at: data.investment_date
       })
       .select('id')
@@ -724,25 +783,7 @@ export async function addInvestmentToLoan(
       return { success: false, error: 'Error al crear inversion: ' + investError.message }
     }
 
-    // 4. Update loan amount_funded
-    const newFunded = funded + data.amount
-    const newStatus = newFunded >= requested ? 'active' : 'fundraising'
-
-    const { error: updateError } = await supabaseAdmin
-      .from('loans')
-      .update({
-        amount_funded: newFunded,
-        status: newStatus
-      })
-      .eq('id', data.loan_id)
-
-    if (updateError) {
-      console.error('Error updating loan:', updateError.message)
-      // Don't fail - investment was created
-    }
-
     revalidatePath('/dashboard/admin/colocaciones')
-    revalidatePath('/dashboard/admin/creditos')
 
     return { success: true, investmentId: investment.id }
 
@@ -764,11 +805,18 @@ export interface LoanForModal {
 }
 
 export async function getLoanById(loanId: string): Promise<{ data: LoanForModal | null; error: string | null }> {
-  const supabase = await createClient()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { data: null, error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
 
   const { data, error } = await supabase
-    .from('loans')
-    .select('id, code, amount_requested, amount_funded, interest_rate_ea')
+    .from('creditos')
+    .select('id, codigo_credito, monto_solicitado, tasa_interes_ea')
     .eq('id', loanId)
     .single()
 
@@ -776,17 +824,24 @@ export async function getLoanById(loanId: string): Promise<{ data: LoanForModal 
     return { data: null, error: error?.message || 'Credito no encontrado.' }
   }
 
-  const requested = data.amount_requested || 0
-  const funded = data.amount_funded || 0
+  // Calculate funded amount from inversiones
+  const { data: inversiones } = await supabase
+    .from('inversiones')
+    .select('monto_invertido')
+    .eq('credito_id', loanId)
+    .in('estado', ['activo', 'pendiente'])
+
+  const requested = data.monto_solicitado || 0
+  const funded = (inversiones || []).reduce((sum, inv) => sum + (inv.monto_invertido || 0), 0)
 
   return {
     data: {
       id: data.id,
-      code: data.code,
+      code: data.codigo_credito,
       amount_requested: requested,
       amount_funded: funded,
       remaining: requested - funded,
-      interest_rate_ea: data.interest_rate_ea
+      interest_rate_ea: data.tasa_interes_ea
     },
     error: null
   }
@@ -823,29 +878,56 @@ export async function registerLoanPayment(
   }
 
   try {
-    // Insert payment record
-    const { data: payment, error: paymentError } = await supabase
-      .from('loan_payments')
-      .insert({
-        loan_id: data.loan_id,
-        payment_date: data.payment_date,
-        amount_capital: data.amount_capital,
-        amount_interest: data.amount_interest,
-        amount_late_fee: data.amount_late_fee,
-        amount_total: totalAmount
-      })
-      .select('id')
-      .single()
+    // Generate a shared reference for this payment group
+    const referenciaPago = `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    const transacciones = []
 
-    if (paymentError) {
-      console.error('Error registering payment:', paymentError.message)
-      return { success: false, error: 'Error al registrar pago: ' + paymentError.message }
+    if (data.amount_capital > 0) {
+      transacciones.push({
+        credito_id: data.loan_id,
+        tipo_transaccion: 'pago_capital',
+        concepto: 'Abono a capital',
+        monto: data.amount_capital,
+        fecha_transaccion: new Date().toISOString(),
+        fecha_aplicacion: data.payment_date,
+        referencia_pago: referenciaPago,
+      })
+    }
+    if (data.amount_interest > 0) {
+      transacciones.push({
+        credito_id: data.loan_id,
+        tipo_transaccion: 'pago_interes',
+        concepto: 'Pago de intereses',
+        monto: data.amount_interest,
+        fecha_transaccion: new Date().toISOString(),
+        fecha_aplicacion: data.payment_date,
+        referencia_pago: referenciaPago,
+      })
+    }
+    if (data.amount_late_fee > 0) {
+      transacciones.push({
+        credito_id: data.loan_id,
+        tipo_transaccion: 'pago_mora',
+        concepto: 'Pago de mora',
+        monto: data.amount_late_fee,
+        fecha_transaccion: new Date().toISOString(),
+        fecha_aplicacion: data.payment_date,
+        referencia_pago: referenciaPago,
+      })
+    }
+
+    const { error: txnError } = await supabase
+      .from('transacciones')
+      .insert(transacciones)
+
+    if (txnError) {
+      console.error('Error registering payment:', txnError.message)
+      return { success: false, error: 'Error al registrar pago: ' + txnError.message }
     }
 
     revalidatePath('/dashboard/admin/colocaciones')
-    revalidatePath('/dashboard/admin/pagos')
 
-    return { success: true, paymentId: payment.id }
+    return { success: true, paymentId: referenciaPago }
 
   } catch (error) {
     console.error('Unexpected error:', error)
@@ -866,18 +948,48 @@ export interface LoanPayment {
 }
 
 export async function getPaymentsForLoan(loanId: string): Promise<{ data: LoanPayment[]; error: string | null }> {
-  const supabase = await createClient()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  const { data, error } = await supabase
-    .from('loan_payments')
-    .select('id, payment_date, amount_capital, amount_interest, amount_late_fee, amount_total, created_at')
-    .eq('loan_id', loanId)
-    .order('payment_date', { ascending: false })
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { data: [], error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const { data: txns, error } = await supabase
+    .from('transacciones')
+    .select('id, tipo_transaccion, monto, fecha_aplicacion, referencia_pago, created_at')
+    .eq('credito_id', loanId)
+    .in('tipo_transaccion', ['pago_capital', 'pago_interes', 'pago_mora'])
+    .order('fecha_aplicacion', { ascending: false })
 
   if (error) {
     console.error('Error fetching payments:', error.message)
     return { data: [], error: error.message }
   }
 
-  return { data: data as LoanPayment[], error: null }
+  // Aggregate transactions by referencia_pago into payment records
+  const grouped = new Map<string, LoanPayment>()
+  for (const txn of txns || []) {
+    const ref = txn.referencia_pago || txn.id
+    if (!grouped.has(ref)) {
+      grouped.set(ref, {
+        id: ref,
+        payment_date: txn.fecha_aplicacion,
+        amount_capital: 0,
+        amount_interest: 0,
+        amount_late_fee: 0,
+        amount_total: 0,
+        created_at: txn.created_at,
+      })
+    }
+    const payment = grouped.get(ref)!
+    if (txn.tipo_transaccion === 'pago_capital') payment.amount_capital += txn.monto
+    else if (txn.tipo_transaccion === 'pago_interes') payment.amount_interest += txn.monto
+    else if (txn.tipo_transaccion === 'pago_mora') payment.amount_late_fee += txn.monto
+    payment.amount_total += txn.monto
+  }
+
+  return { data: Array.from(grouped.values()), error: null }
 }

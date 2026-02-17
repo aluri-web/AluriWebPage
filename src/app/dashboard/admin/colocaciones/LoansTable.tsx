@@ -65,6 +65,27 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     return <span className={`font-medium ${color}`}>{ltv.toFixed(1)}%</span>
   }
 
+  const getRiskBadge = (score: string | null) => {
+    if (!score) return <span className="text-slate-500">-</span>
+    const styles: Record<string, string> = {
+      'A1': 'bg-teal-400/10 text-teal-400 border-teal-400/30',
+      'A2': 'bg-teal-400/10 text-teal-400 border-teal-400/30',
+      'B1': 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+      'B2': 'bg-red-500/10 text-red-400 border-red-500/30',
+    }
+    const labels: Record<string, string> = {
+      'A1': 'Bajo',
+      'A2': 'Moderado',
+      'B1': 'Medio',
+      'B2': 'Alto',
+    }
+    return (
+      <span className={`px-2 py-1 text-xs font-medium rounded border ${styles[score] || ''}`}>
+        {score} - {labels[score] || score}
+      </span>
+    )
+  }
+
   const openAddInvestmentModal = (loan: LoanTableRow) => {
     setSelectedLoan(loan)
     setIsModalOpen(true)
@@ -97,7 +118,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     <>
       <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1500px]">
+          <table className="w-full min-w-[1600px]">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-800/50">
                 <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
@@ -123,6 +144,9 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                 </th>
                 <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   LTV
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Riesgo
                 </th>
                 <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Tasa NM
@@ -184,6 +208,9 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                     </td>
                     <td className="px-3 py-3 text-sm text-right">
                       {getLtvBadge(loan.ltv)}
+                    </td>
+                    <td className="px-3 py-3 text-sm text-center">
+                      {getRiskBadge(loan.risk_score)}
                     </td>
                     <td className="px-3 py-3 text-sm text-slate-300 text-right">
                       {loan.interest_rate_nm ? `${loan.interest_rate_nm}%` : '-'}

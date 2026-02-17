@@ -10,11 +10,11 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto"; -- For gen_random_uuid() if needed, t
 CREATE TABLE IF NOT EXISTS public.creditos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     cliente_id UUID REFERENCES public.profiles(id) NOT NULL,
-    numero_credito VARCHAR(50) UNIQUE NOT NULL,
+    codigo_credito VARCHAR(50) UNIQUE NOT NULL,
     monto_solicitado NUMERIC(15,2) NOT NULL,
-    monto_aprobado NUMERIC(15,2) NOT NULL,
-    tasa_interes NUMERIC(5,2) NOT NULL,
-    plazo_meses INTEGER NOT NULL,
+    valor_colocado NUMERIC(15,2) NOT NULL,
+    tasa_nominal NUMERIC(5,2) NOT NULL,
+    plazo INTEGER NOT NULL,
     fecha_desembolso TIMESTAMP WITH TIME ZONE,
     fecha_primer_pago DATE,
     fecha_ultimo_pago DATE,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS public.creditos (
 
 CREATE INDEX IF NOT EXISTS idx_creditos_cliente ON public.creditos(cliente_id);
 CREATE INDEX IF NOT EXISTS idx_creditos_estado ON public.creditos(estado);
-CREATE INDEX IF NOT EXISTS idx_creditos_numero ON public.creditos(numero_credito);
+CREATE INDEX IF NOT EXISTS idx_creditos_codigo ON public.creditos(codigo_credito);
 CREATE INDEX IF NOT EXISTS idx_creditos_fecha_desembolso ON public.creditos(fecha_desembolso);
 
 ALTER TABLE public.creditos ENABLE ROW LEVEL SECURITY;

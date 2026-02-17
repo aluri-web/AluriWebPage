@@ -13,40 +13,36 @@ const propertyImages = [
   'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=80',
 ]
 
-interface PropertyInfo {
-  address?: string
-  city?: string
-  property_type?: string
-  commercial_value?: number
+// Transaction record from transacciones table
+interface Transaccion {
+  tipo_transaccion: string
+  monto: number
 }
 
-// Payment record from loan_payments table
-interface LoanPayment {
-  amount_capital: number
-  amount_interest: number
-}
-
-interface Loan {
-  code: string
-  status: string
-  interest_rate_ea: number | null
-  amount_requested: number | null
-  amount_funded: number | null
-  term_months: number | null
-  property_info: PropertyInfo | null
+interface Credito {
+  codigo_credito: string
+  estado: string
+  tasa_interes_ea: number | null
+  monto_solicitado: number | null
+  plazo: number | null
+  ciudad_inmueble: string | null
+  direccion_inmueble: string | null
+  tipo_inmueble: string | null
+  valor_comercial: number | null
   created_at: string
-  loan_payments: LoanPayment[]
+  transacciones: Transaccion[]
+  inversiones: { monto_invertido: number; estado: string }[]
 }
 
-interface Investment {
+interface Inversion {
   id: string
-  amount_invested: number
+  monto_invertido: number
   interest_rate_investor: number | null
-  status: string
+  estado: string
   created_at: string
   confirmed_at: string | null
-  loan_id: string
-  loan: Loan | null
+  credito_id: string
+  credito: Credito | null
 }
 
 // Helper: Format currency as COP
@@ -80,34 +76,40 @@ export default async function InvestmentDetailPage({
     notFound()
   }
 
-  // Fetch investment by loan code using !inner join to filter directly
+  // Fetch inversion by credito codigo_credito using !inner join to filter directly
   const { data: investments, error } = await supabase
-    .from('investments')
+    .from('inversiones')
     .select(`
       id,
-      amount_invested,
+      monto_invertido,
       interest_rate_investor,
-      status,
+      estado,
       created_at,
       confirmed_at,
-      loan_id,
-      loan:loans!inner (
-        code,
-        status,
-        interest_rate_ea,
-        amount_requested,
-        amount_funded,
-        term_months,
-        property_info,
+      credito_id,
+      credito:creditos!inner (
+        codigo_credito,
+        estado,
+        tasa_interes_ea,
+        monto_solicitado,
+        plazo,
+        ciudad_inmueble,
+        direccion_inmueble,
+        tipo_inmueble,
+        valor_comercial,
         created_at,
-        loan_payments (
-          amount_capital,
-          amount_interest
+        transacciones (
+          tipo_transaccion,
+          monto
+        ),
+        inversiones (
+          monto_invertido,
+          estado
         )
       )
     `)
-    .eq('investor_id', user.id)
-    .eq('loan.code', code)
+    .eq('inversionista_id', user.id)
+    .eq('credito.codigo_credito', code)
 
   if (error) {
     console.error('Error fetching investment:', error.message)
@@ -121,33 +123,38 @@ export default async function InvestmentDetailPage({
     notFound()
   }
 
-  const investment = rawData as unknown as Investment
-  const loan = investment.loan
+  const investment = rawData as unknown as Inversion
+  const credito = investment.credito
 
   // Calculate values
-  const investedAmount = Number(investment.amount_invested || 0)
-  const rate = investment.interest_rate_investor || loan?.interest_rate_ea || 0
-  const termMonths = loan?.term_months || 12
+  const investedAmount = Number(investment.monto_invertido || 0)
+  const rate = investment.interest_rate_investor || credito?.tasa_interes_ea || 0
+  const termMonths = credito?.plazo || 12
   const expectedAnnualReturn = investedAmount * (rate / 100)
 
-  // Property info
-  const propertyInfo = loan?.property_info
-  const propertyCity = propertyInfo?.city || 'Colombia'
-  const propertyAddress = propertyInfo?.address || 'Direccion no disponible'
-  const propertyType = propertyInfo?.property_type || 'urbano'
-  const propertyValue = propertyInfo?.commercial_value || 0
+  // Property info from separate columns
+  const propertyCity = credito?.ciudad_inmueble || 'Colombia'
+  const propertyAddress = credito?.direccion_inmueble || 'Direccion no disponible'
+  const propertyType = credito?.tipo_inmueble || 'urbano'
+  const propertyValue = credito?.valor_comercial || 0
 
-  // Loan funding (for reference)
-  const requested = loan?.amount_requested || 0
-  const funded = loan?.amount_funded || 0
+  // Credito funding (calculated from inversiones sub-query)
+  const requested = credito?.monto_solicitado || 0
+  const funded = (credito?.inversiones || [])
+    .filter(i => i.estado === 'activo' || i.estado === 'pendiente')
+    .reduce((s, i) => s + (i.monto_invertido || 0), 0)
 
-  // Calculate capital recovery progress from actual payments
+  // Calculate capital recovery progress from actual transacciones
   const participationPercentage = requested > 0 ? investedAmount / requested : 0
 
-  // Sum all payments for this loan
-  const payments = loan?.loan_payments || []
-  const totalLoanCapitalPaid = payments.reduce((sum, p) => sum + (p.amount_capital || 0), 0)
-  const totalLoanInterestPaid = payments.reduce((sum, p) => sum + (p.amount_interest || 0), 0)
+  // Sum transacciones by tipo_transaccion
+  const transacciones = credito?.transacciones || []
+  const totalLoanCapitalPaid = transacciones
+    .filter(t => t.tipo_transaccion === 'pago_capital')
+    .reduce((sum, t) => sum + (t.monto || 0), 0)
+  const totalLoanInterestPaid = transacciones
+    .filter(t => t.tipo_transaccion === 'pago_interes')
+    .reduce((sum, t) => sum + (t.monto || 0), 0)
 
   // Pro-rate by investor's share
   const capitalRecuperado = totalLoanCapitalPaid * participationPercentage
@@ -157,18 +164,18 @@ export default async function InvestmentDetailPage({
   const recoveryProgress = investedAmount > 0 ? (capitalRecuperado / investedAmount) * 100 : 0
 
   // Status configuration
-  const loanStatus = loan?.status || 'pending'
+  const creditoEstado = credito?.estado || 'pending'
   const statusConfig: Record<string, { label: string; bgClass: string; textClass: string }> = {
-    fundraising: { label: 'Fondeando', bgClass: 'bg-amber-500/10', textClass: 'text-amber-400' },
-    active: { label: 'Activo', bgClass: 'bg-emerald-500/10', textClass: 'text-emerald-400' },
-    completed: { label: 'Completado', bgClass: 'bg-blue-500/10', textClass: 'text-blue-400' },
-    defaulted: { label: 'En Mora', bgClass: 'bg-red-500/10', textClass: 'text-red-400' }
+    publicado: { label: 'Fondeando', bgClass: 'bg-amber-500/10', textClass: 'text-amber-400' },
+    activo: { label: 'Activo', bgClass: 'bg-emerald-500/10', textClass: 'text-emerald-400' },
+    finalizado: { label: 'Completado', bgClass: 'bg-blue-500/10', textClass: 'text-blue-400' },
+    mora: { label: 'En Mora', bgClass: 'bg-red-500/10', textClass: 'text-red-400' }
   }
-  const status = statusConfig[loanStatus] || { label: loanStatus, bgClass: 'bg-zinc-500/10', textClass: 'text-zinc-400' }
+  const status = statusConfig[creditoEstado] || { label: creditoEstado, bgClass: 'bg-zinc-500/10', textClass: 'text-zinc-400' }
 
   // Investment date
   const investmentDate = investment.confirmed_at || investment.created_at
-  const loanStartDate = loan?.created_at
+  const creditoStartDate = credito?.created_at
 
   return (
     <div className="text-white p-8">
@@ -184,7 +191,7 @@ export default async function InvestmentDetailPage({
 
         <div className="flex items-center gap-3 mb-2">
           <span className="px-3 py-1 bg-zinc-800 text-teal-400 text-sm font-mono rounded">
-            {loan?.code || 'N/A'}
+            {credito?.codigo_credito || 'N/A'}
           </span>
           <span className={`px-3 py-1 rounded text-sm font-medium ${status.bgClass} ${status.textClass}`}>
             {status.label}
@@ -339,7 +346,7 @@ export default async function InvestmentDetailPage({
                 </div>
                 <div>
                   <p className="text-zinc-500 text-xs">Inicio del Credito</p>
-                  <p className="text-white font-medium">{formatDate(loanStartDate || null)}</p>
+                  <p className="text-white font-medium">{formatDate(creditoStartDate || null)}</p>
                 </div>
               </div>
             </div>
@@ -356,10 +363,10 @@ export default async function InvestmentDetailPage({
               <div>
                 <span className={`font-medium ${status.textClass}`}>{status.label}</span>
                 <p className="text-zinc-500 text-xs mt-0.5">
-                  {loanStatus === 'active' && 'Credito activo generando rendimientos'}
-                  {loanStatus === 'fundraising' && 'En proceso de recaudacion'}
-                  {loanStatus === 'completed' && 'Credito finalizado exitosamente'}
-                  {loanStatus === 'defaulted' && 'Credito en proceso de recuperacion'}
+                  {creditoEstado === 'activo' && 'Credito activo generando rendimientos'}
+                  {creditoEstado === 'publicado' && 'En proceso de recaudacion'}
+                  {creditoEstado === 'finalizado' && 'Credito finalizado exitosamente'}
+                  {creditoEstado === 'mora' && 'Credito en proceso de recuperacion'}
                 </p>
               </div>
             </div>

@@ -3,68 +3,65 @@
 import { createClient } from '../../../../../utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-export interface PropertyInfo {
-  address?: string
-  city?: string
-  commercial_value?: number
-  registration_number?: string
-  property_type?: string
-  image_url?: string
-  photos?: string[]
-}
-
-export interface WorkflowDates {
-  signature_date?: string | null
-  disbursement_date?: string | null
-  estimated_date?: string | null
-}
-
-export interface LoanOpportunity {
+export interface CreditoOpportunity {
   id: string
-  code: string
-  amount_requested: number
-  amount_funded: number
-  interest_rate_ea: number | null
-  interest_rate_nm: number | null
-  term_months: number | null
-  payment_type: string | null
-  property_info: PropertyInfo | null
-  workflow_dates: WorkflowDates | null
+  codigo_credito: string
+  monto_solicitado: number
+  tasa_interes_ea: number | null
+  tasa_nominal: number | null
+  plazo: number | null
+  tipo_amortizacion: string | null
+  ciudad_inmueble: string | null
+  direccion_inmueble: string | null
+  tipo_inmueble: string | null
+  valor_comercial: number | null
+  ltv: number | null
+  fecha_firma_programada: string | null
+  fecha_desembolso: string | null
+  inversiones: { monto_invertido: number; estado: string }[]
   owner: {
     full_name: string | null
   } | null
 }
 
-export async function getLoanDetail(loanId: string): Promise<{ data: LoanOpportunity | null; error: string | null }> {
+export async function getLoanDetail(loanId: string): Promise<{ data: CreditoOpportunity | null; error: string | null }> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
-    .from('loans')
+    .from('creditos')
     .select(`
       id,
-      code,
-      amount_requested,
-      amount_funded,
-      interest_rate_ea,
-      interest_rate_nm,
-      term_months,
-      payment_type,
-      property_info,
-      workflow_dates,
-      owner:profiles!owner_id (
+      codigo_credito,
+      monto_solicitado,
+      tasa_interes_ea,
+      tasa_nominal,
+      plazo,
+      tipo_amortizacion,
+      ciudad_inmueble,
+      direccion_inmueble,
+      tipo_inmueble,
+      valor_comercial,
+      ltv,
+      fecha_firma_programada,
+      fecha_desembolso,
+      inversiones (
+        monto_invertido,
+        estado
+      ),
+      owner:profiles!cliente_id (
         full_name
       )
     `)
     .eq('id', loanId)
-    .eq('status', 'fundraising')
+    .eq('estado', 'publicado')
     .single()
 
   if (error) {
-    console.error('Error fetching loan detail:', error.message)
+    console.error('Error fetching credito detail:', error.message)
     return { data: null, error: error.message }
   }
 
-  return { data: data as unknown as LoanOpportunity, error: null }
+  return { data: data as unknown as CreditoOpportunity, error: null }
 }
 
 export async function investInLoan(
@@ -85,24 +82,26 @@ export async function investInLoan(
     return { success: false, message: '', error: 'El monto debe ser mayor a 0.' }
   }
 
-  // Verify the loan exists and is in fundraising status
-  const { data: loan, error: loanError } = await supabase
-    .from('loans')
-    .select('id, status, amount_requested, amount_funded')
+  // Verify the credito exists and is in publicado status
+  const { data: credito, error: creditoError } = await supabase
+    .from('creditos')
+    .select('id, estado, monto_solicitado, inversiones(monto_invertido, estado)')
     .eq('id', loanId)
     .single()
 
-  if (loanError || !loan) {
+  if (creditoError || !credito) {
     return { success: false, message: '', error: 'Oportunidad no encontrada.' }
   }
 
-  if (loan.status !== 'fundraising') {
+  if (credito.estado !== 'publicado') {
     return { success: false, message: '', error: 'Esta oportunidad ya no está disponible para inversión.' }
   }
 
   // Check if investment amount exceeds remaining amount
-  const amountRequested = loan.amount_requested || 0
-  const amountFunded = loan.amount_funded || 0
+  const amountRequested = credito.monto_solicitado || 0
+  const amountFunded = ((credito as any).inversiones || [])
+    .filter((i: any) => i.estado === 'activo' || i.estado === 'pendiente')
+    .reduce((s: number, i: any) => s + (i.monto_invertido || 0), 0)
   const remainingAmount = amountRequested - amountFunded
 
   if (amount > remainingAmount) {
@@ -113,18 +112,18 @@ export async function investInLoan(
     }
   }
 
-  // Insert investment with pending_payment status
+  // Insert inversion with pendiente status
   const { error: insertError } = await supabase
-    .from('investments')
+    .from('inversiones')
     .insert({
-      loan_id: loanId,
-      investor_id: user.id,
-      amount_invested: amount,
-      status: 'pending_payment'
+      credito_id: loanId,
+      inversionista_id: user.id,
+      monto_invertido: amount,
+      estado: 'pendiente'
     })
 
   if (insertError) {
-    console.error('Error creating investment:', insertError.message)
+    console.error('Error creating inversion:', insertError.message)
     return { success: false, message: '', error: 'Error al crear la inversión: ' + insertError.message }
   }
 

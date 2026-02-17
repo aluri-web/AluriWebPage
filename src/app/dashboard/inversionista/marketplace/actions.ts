@@ -2,55 +2,52 @@
 
 import { createClient } from '../../../../utils/supabase/server'
 
-export interface PropertyInfo {
-  address?: string
-  city?: string
-  commercial_value?: number
-  registration_number?: string
-  property_type?: string
-  image_url?: string
-  photos?: string[]
-}
-
-export interface WorkflowDates {
-  signature_date?: string | null
-  disbursement_date?: string | null
-  estimated_date?: string | null
-}
-
-export interface MarketplaceLoan {
+export interface MarketplaceCredito {
   id: string
-  code: string
-  amount_requested: number
-  amount_funded: number
-  interest_rate_ea: number | null
-  term_months: number | null
-  property_info: PropertyInfo | null
-  workflow_dates: WorkflowDates | null
+  codigo_credito: string
+  monto_solicitado: number
+  tasa_interes_ea: number | null
+  plazo: number | null
+  ciudad_inmueble: string | null
+  direccion_inmueble: string | null
+  tipo_inmueble: string | null
+  valor_comercial: number | null
+  ltv: number | null
+  fecha_firma_programada: string | null
+  fecha_desembolso: string | null
+  inversiones: { monto_invertido: number; estado: string }[]
 }
 
-export async function getActiveLoans(): Promise<{ data: MarketplaceLoan[]; error: string | null }> {
+export async function getActiveLoans(): Promise<{ data: MarketplaceCredito[]; error: string | null }> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
-    .from('loans')
+    .from('creditos')
     .select(`
       id,
-      code,
-      amount_requested,
-      amount_funded,
-      interest_rate_ea,
-      term_months,
-      property_info,
-      workflow_dates
+      codigo_credito,
+      monto_solicitado,
+      tasa_interes_ea,
+      plazo,
+      ciudad_inmueble,
+      direccion_inmueble,
+      tipo_inmueble,
+      valor_comercial,
+      ltv,
+      fecha_firma_programada,
+      fecha_desembolso,
+      inversiones (
+        monto_invertido,
+        estado
+      )
     `)
-    .eq('status', 'fundraising')
+    .eq('estado', 'publicado')
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching active loans:', error.message)
+    console.error('Error fetching active creditos:', error.message)
     return { data: [], error: error.message }
   }
 
-  return { data: data as MarketplaceLoan[], error: null }
+  return { data: data as unknown as MarketplaceCredito[], error: null }
 }

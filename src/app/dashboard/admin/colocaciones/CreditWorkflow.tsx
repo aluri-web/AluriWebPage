@@ -13,10 +13,11 @@ type Credit = {
     id: string
     estado: string
     monto_solicitado: number
-    monto_aprobado: number
+    valor_colocado: number
     fecha_firma_programada?: string | null
     fecha_desembolso?: string | null
-    // ... other fields
+    notaria?: string | null
+    costos_notaria?: number | null
 }
 
 interface CreditWorkflowProps {
@@ -36,13 +37,15 @@ export default function CreditWorkflow({ credit }: CreditWorkflowProps) {
     const [selectedDate, setSelectedDate] = useState<string>('')
     const [error, setError] = useState<string | null>(null)
     const [successMessage, setSuccessMessage] = useState<string | null>(null)
+    const [notaria, setNotaria] = useState(credit.notaria || '')
+    const [costosNotaria, setCostosNotaria] = useState<number>(credit.costos_notaria || 0)
 
     // Determine current step index
     const currentStepIndex = STEPS.findIndex(s => s.id === credit.estado)
     const isFinished = credit.estado === 'finalizado'
     const isCancelled = ['castigado', 'anulado'].includes(credit.estado)
 
-    const handleStatusUpdate = async (newStatus: string, dateField?: 'fecha_firma_programada' | 'fecha_desembolso') => {
+    const handleStatusUpdate = async (newStatus: string, dateField?: 'fecha_firma_programada' | 'fecha_desembolso', extraData?: { notaria?: string; costos_notaria?: number }) => {
         // Clear previous messages
         setError(null)
         setSuccessMessage(null)
@@ -70,7 +73,8 @@ export default function CreditWorkflow({ credit }: CreditWorkflowProps) {
             const result = await updateCreditStatus({
                 creditId: credit.id,
                 newStatus: newStatus as any,
-                fechas
+                fechas,
+                extraData
             })
 
             if (result.success) {
@@ -199,15 +203,37 @@ export default function CreditWorkflow({ credit }: CreditWorkflowProps) {
                 )}
 
                 {credit.estado === 'en_firma' && (
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <p className="text-slate-300 text-sm">
-                                Firma programada para: <span className="text-teal-400 font-medium">
-                                    {credit.fecha_firma_programada ? format(new Date(credit.fecha_firma_programada), 'PPpp', { locale: es }) : 'N/A'}
-                                </span>
-                            </p>
+                    <div className="space-y-4">
+                        <p className="text-slate-300 text-sm">
+                            Firma programada para: <span className="text-teal-400 font-medium">
+                                {credit.fecha_firma_programada ? format(new Date(credit.fecha_firma_programada), 'PPpp', { locale: es }) : 'N/A'}
+                            </span>
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1.5">Notaria</label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Notaria 25 de Bogota"
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-500"
+                                    value={notaria}
+                                    onChange={(e) => setNotaria(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-1.5">Costos de Notaria (COP)</label>
+                                <input
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-500"
+                                    value={costosNotaria || ''}
+                                    onChange={(e) => setCostosNotaria(Number(e.target.value))}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex justify-end">
                             <button
-                                onClick={() => handleStatusUpdate('firmado')}
+                                onClick={() => handleStatusUpdate('firmado', undefined, { notaria, costos_notaria: costosNotaria })}
                                 disabled={loading}
                                 className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
                             >

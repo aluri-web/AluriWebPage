@@ -6,9 +6,9 @@ export default async function InversionesPage() {
   const { data: investments, error } = await getPendingInvestments()
 
   // Calculate stats
-  const totalPendingAmount = investments.reduce((sum, inv) => sum + (inv.amount_invested || 0), 0)
+  const totalPendingAmount = investments.reduce((sum, inv) => sum + (inv.monto_invertido || 0), 0)
   const uniqueInvestors = new Set(investments.map(inv => inv.investor?.email)).size
-  const uniqueLoans = new Set(investments.map(inv => inv.loan?.code)).size
+  const uniqueLoans = new Set(investments.map(inv => inv.credito?.codigo_credito)).size
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-CO', {
