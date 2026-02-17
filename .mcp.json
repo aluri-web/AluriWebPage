@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "payments": {
+      "command": "node",
+      "args": ["./mcp-payments-server/dist/index.js"],
+      "env": {
+        "API_BASE_URL": "http://localhost:3000/api"
+      }
+    }
+  }
+}
