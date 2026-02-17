@@ -31,4 +31,4 @@ next-env.d.ts
 CLEANUP_DATABASE.sql
 APPLY_THIS_SQL_TO_SUPABASE.sql
 *_CLEANUP.sql
-*_DELETE.sql
+*_DELETE.sqlnul
