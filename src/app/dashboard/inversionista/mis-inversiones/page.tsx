@@ -8,6 +8,7 @@ import InvestmentsTabs from './InvestmentsTabs'
 interface Transaccion {
   tipo_transaccion: string
   monto: number
+  fecha_aplicacion: string | null
 }
 
 // Updated interface with new creditos schema
@@ -16,6 +17,7 @@ interface Credito {
   estado: string
   tasa_interes_ea: number | null
   monto_solicitado: number | null
+  valor_colocado: number | null
   plazo: number | null
   ciudad_inmueble: string | null
   direccion_inmueble: string | null
