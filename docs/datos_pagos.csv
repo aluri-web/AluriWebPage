@@ -1,0 +1,96 @@
+# Crédito;Deudor;Fecha;Valor;CONCEPTO
+CR001;Camilo Vela;4/3/2025;$4,935,162;DESCUENTO EN GIRO
+CR001;Camilo Vela;4/4/2025;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;4/5/2025;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;4/6/2025;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;4/7/2025;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;4/8/2025;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;4/9/2025;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;6/10/2025;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;4/11/2025;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;4/12/2025;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;4/1/2026;$4,935,200;Consignación efectivo
+CR001;Camilo Vela;4/2/2026;$4,935,200;Consignación efectivo
+CR002;Jesus Giraldo;11/4/2025;$4,850,581;DESCUENTO EN GIRO
+CR002;Jesus Giraldo;11/6/2025;$7,800,000;Consignación efectivo
+CR002;Jesus Giraldo;14/7/2025;$5,000,000;Consignación efectivo
+CR002;Jesus Giraldo;15/8/2025;$5,000,000;Consignación efectivo
+CR002;Jesus Giraldo;16/10/2025;$1,500,000;Consignación efectivo
+CR002;Jesus Giraldo;11/11/2025;$1,000,000;Consignación efectivo
+CR002;Jesus Giraldo;18/11/2025;$1,000,000;Consignación efectivo
+CR002;Jesus Giraldo;25/11/2025;$1,000,000;Consignación efectivo
+CR002;Jesus Giraldo;2/12/2025;$1,000,000;Consignación efectivo
+CR002;Jesus Giraldo;9/12/2025;$1,000,000;Consignación efectivo
+CR002;Jesus Giraldo;16/12/2025;$1,000,000;Consignación efectivo
+CR002;Jesus Giraldo;22/12/2025;$1,500,000;Consignación efectivo
+CR002;Jesus Giraldo;30/12/2025;$1,500,000;Consignación efectivo
+CR002;Jesus Giraldo;6/1/2026;$1,500,000;Consignación efectivo
+CR002;Jesus Giraldo;16/1/2026;$1,500,000;Consignación efectivo
+CR003;Sandra Valdes;5/5/2025;$1,244,462;DESCUENTO EN GIRO
+CR003;Sandra Valdes;4/6/2025;$1,244,400;Consignación efectivo
+CR003;Sandra Valdes;15/7/2025;$1,244,400;Consignación efectivo
+CR003;Sandra Valdes;1/8/2025;$1,244,400;Consignación efectivo
+CR003;Sandra Valdes;15/9/2025;$1,244,400;Consignación efectivo
+CR003;Sandra Valdes;15/10/2025;$1,244,400;Consignación efectivo
+CR003;Sandra Valdes;28/11/2025;$1,244,400;Consignación efectivo
+CR003;Sandra Valdes;29/12/2025;$1,374,000;Consignación efectivo
+CR003;Sandra Valdes;15/1/2026;$622,200;Consignación efectivo
+CR003;Sandra Valdes;30/1/2026;$622,200;Consignación efectivo
+CR004;Juan Ramiro Gomez;11/6/2025;$2,000,000;DESCUENTO EN GIRO
+CR004;Juan Ramiro Gomez;11/7/2025;$2,000,000;Consignación efectivo
+CR004;Juan Ramiro Gomez;11/10/2025;$3,000,000;Consignación efectivo
+CR004;Juan Ramiro Gomez;20/11/2025;$2,000,000;Consignación efectivo
+CR004;Juan Ramiro Gomez;5/12/2025;$5,000,000;Consignación efectivo
+CR004;Juan Ramiro Gomez;11/12/2025;$250,000;Condonación Mora
+CR004;Juan Ramiro Gomez;20/1/2026;$100,000,000;Consignación efectivo
+CR005;Hugo Sebastian Lozano;23/7/2025;$3,000,000;DESCUENTO EN GIRO
+CR005;Hugo Sebastian Lozano;23/8/2025;$3,000,000;Consignación efectivo
+CR005;Hugo Sebastian Lozano;23/9/2025;$3,000,000;Consignación efectivo
+CR005;Hugo Sebastian Lozano;23/10/2025;$3,000,000;Consignación efectivo
+CR005;Hugo Sebastian Lozano;24/11/2025;$3,000,000;Consignación efectivo
+CR005;Hugo Sebastian Lozano;24/12/2025;$3,000,000;Consignación efectivo
+CR005;Hugo Sebastian Lozano;24/1/2026;$3,000,000;Consignación efectivo
+CR006;Benjamin Rodriguez;16/9/2025;$4,567,700;Consignación efectivo
+CR006;Benjamin Rodriguez;16/10/2025;$4,567,700;Consignación efectivo
+CR006;Benjamin Rodriguez;17/11/2025;$4,569,000;Consignación efectivo
+CR006;Benjamin Rodriguez;16/12/2025;$4,568,000;Consignación efectivo
+CR006;Benjamin Rodriguez;16/1/2026;$4,568,000;Consignación efectivo
+CR007;Jhon Lozano;30/7/2025;$682,000;DESCUENTO EN GIRO
+CR007;Jhon Lozano;30/8/2025;$682,000;Consignación efectivo
+CR007;Jhon Lozano;30/9/2025;$682,000;Consignación efectivo
+CR007;Jhon Lozano;29/10/2025;$10,682,000;Consignación efectivo
+CR007;Jhon Lozano;27/11/2025;$682,000;Consignación efectivo
+CR007;Jhon Lozano;29/12/2025;$682,000;Consignación efectivo
+CR007;Jhon Lozano;26/1/2026;$682,500;Consignación efectivo
+CR008;William Quintero;10/10/2025;$1,763,848;DESCUENTO EN GIRO
+CR008;William Quintero;8/11/2025;$1,763,848;Consignación efectivo
+CR008;William Quintero;10/12/2025;$1,763,847;Consignación efectivo
+CR008;William Quintero;9/1/2026;$1,763,847;Consignación efectivo
+CR009;Construcciones Rodriguez;29/10/2025;$1,800,000;DESCUENTO EN GIRO
+CR009;Construcciones Rodriguez;1/12/2025;$1,808,624;Consignación efectivo
+CR009;Construcciones Rodriguez;29/12/2025;$1,800,000;Consignación efectivo
+CR009;Construcciones Rodriguez;29/1/2026;$1,800,000;Consignación efectivo
+CR010;Alejandro Rincon;10/12/2025;$3,263,685;Consignación efectivo
+CR010;Alejandro Rincon;10/1/2026;$3,264,000;Consignación efectivo
+CR010;Alejandro Rincon;23/1/2026;$2,176,000;Consignación efectivo
+CR011;Miguel Rojas;12/12/2025;$5,006,250;DESCUENTO EN GIRO
+CR011;Miguel Rojas;12/1/2026;$5,006,250;Consignación efectivo
+CR012;Jorge Humberto Alzate;3/12/2025;$1,095,700;DESCUENTO EN GIRO
+CR012;Jorge Humberto Alzate;3/1/2026;$1,095,700;Consignación efectivo
+CR013;Edwin Bernal;15/12/2025;$3,504,374;DESCUENTO EN GIRO
+CR013;Edwin Bernal;14/1/2026;$3,504,400;Consignación efectivo
+CR014;Construcciones Vela;26/11/2025;$5,628,759;DESCUENTO EN GIRO
+CR014;Construcciones Vela;26/12/2025;$5,628,800;Consignación efectivo
+CR014;Construcciones Vela;26/1/2026;$5,628,800;Consignación efectivo
+CR015;Guillermo de Backer;19/12/2025;$2,185,926;DESCUENTO EN GIRO
+CR015;Guillermo de Backer;19/1/2026;$2,185,950;Consignación efectivo
+CR016;Francisco alonso Cardona;8/1/2026;$1,524,309;DESCUENTO EN GIRO
+CR017;Janeth Forero;8/1/2026;$2,759,620;DESCUENTO EN GIRO
+CR018;Holding Club Cybercard;23/12/2025;$9,025,000;DESCUENTO EN GIRO
+CR018;Holding Club Cybercard;26/1/2026;$9,045,000;Consignación efectivo
+CR019;Holding Club Cybercard;28/1/2026;$9,025,000;DESCUENTO EN GIRO
+CR016;Francisco alonso Cardona;8/2/2026;$1,524,309;Consignación efectivo
+CR003;Sandra Valdes;13/2/2026;$622,200;Consignación efectivo
+CR008;William Quintero;11/2/2026;$1,763,847;Consignación efectivo
+CR010;Alejandro Rincon;11/2/2026;$1,088,000;Consignación efectivo
+CR011;Miguel Rojas;11/2/2026;$5,006,250;Consignación efectivo

@@ -8,13 +8,17 @@ import Link from 'next/link'
 interface Transaccion {
   tipo_transaccion: string
   monto: number
+  fecha_aplicacion: string | null
 }
 
 interface Credito {
   codigo_credito: string
   estado: string
+  estado_credito: string | null
   tasa_interes_ea: number | null
+  tasa_nominal: number | null
   monto_solicitado: number | null
+  valor_colocado: number | null
   plazo: number | null
   ciudad_inmueble: string | null
   direccion_inmueble: string | null
@@ -65,8 +69,12 @@ function calculateInvestmentProgress(inv: Inversion): {
   const capitalRecuperado = totalLoanCapital * share
   const interesesGanados = totalLoanInterest * share
 
-  // Progress = capital recovered / amount invested (for bullet loans, stays at 0% until final payment)
-  const progressPercent = montoInvertido > 0 ? (capitalRecuperado / montoInvertido) * 100 : 0
+  // Progress = capital recovered / amount invested
+  // If credit is fully paid (estado_credito = 'pagado'), show 100% regardless of split
+  const estadoCredito = credito.estado_credito || ''
+  const progressPercent = estadoCredito === 'pagado'
+    ? 100
+    : montoInvertido > 0 ? (capitalRecuperado / montoInvertido) * 100 : 0
 
   return { share, capitalRecuperado, interesesGanados, progressPercent }
 }

@@ -88,7 +88,7 @@ function mapEstado(csvEstado: string | undefined): string {
 // Mapear tipo_amortizacion del CSV al enum de la DB
 function mapTipoAmortizacion(value: string | undefined): string {
   const v = (value || '').trim().toLowerCase();
-  if (v.includes('solo') || v.includes('interes')) return 'solo_interes';
+  if (v.includes('solo')) return 'solo_interes';
   return 'francesa'; // "Capital e intereses" = francesa
 }
 
