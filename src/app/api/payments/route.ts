@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 // Tipos para la API
 interface PaymentRequest {
@@ -27,10 +27,58 @@ interface PaymentResponse {
   error?: string
 }
 
+// Helper function para verificar autenticación admin
+async function verifyAdminAuth(request: NextRequest): Promise<{
+  success: boolean
+  supabase?: ReturnType<typeof createSupabaseClient>
+  error?: string
+  status?: number
+}> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+    return { success: false, error: 'Configuración del servidor incompleta', status: 500 }
+  }
+
+  const authHeader = request.headers.get('Authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { success: false, error: 'No autorizado. Se requiere token de autenticación.', status: 401 }
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+
+  const supabaseAuth = createSupabaseClient(supabaseUrl, anonKey)
+  const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+
+  if (authError || !user) {
+    return { success: false, error: 'Token inválido o expirado', status: 401 }
+  }
+
+  const supabase = createSupabaseClient(supabaseUrl, serviceRoleKey)
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || !profile || profile.role !== 'admin') {
+    return { success: false, error: 'Acceso denegado. Se requiere rol de administrador.', status: 403 }
+  }
+
+  return { success: true, supabase }
+}
+
 /**
  * POST /api/payments
  *
  * Registra un pago del propietario y calcula la distribución a los inversionistas.
+ * REQUIERE: Autenticación con rol 'admin'
+ *
+ * Headers requeridos:
+ * - Authorization: Bearer <token>
  *
  * DB: creditos + inversiones + transacciones
  *
@@ -45,6 +93,16 @@ interface PaymentResponse {
  */
 export async function POST(request: NextRequest): Promise<NextResponse<PaymentResponse>> {
   try {
+    // Verificar autenticación admin
+    const authResult = await verifyAdminAuth(request)
+    if (!authResult.success || !authResult.supabase) {
+      return NextResponse.json(
+        { success: false, total_amount: 0, distribution: [], error: authResult.error },
+        { status: authResult.status || 500 }
+      )
+    }
+
+    const supabase = authResult.supabase
     const body: PaymentRequest = await request.json()
 
     // Validaciones
@@ -73,8 +131,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
         { status: 400 }
       )
     }
-
-    const supabase = await createClient()
 
     // Verificar que el crédito existe (buscar por ID o por codigo_credito)
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.loan_id)
@@ -221,11 +277,25 @@ export async function POST(request: NextRequest): Promise<NextResponse<PaymentRe
  * GET /api/payments?loan_id=uuid
  *
  * Obtiene el historial de pagos de un préstamo con la distribución a inversionistas.
+ * REQUIERE: Autenticación con rol 'admin'
+ *
+ * Headers requeridos:
+ * - Authorization: Bearer <token>
  *
  * DB: creditos + transacciones (grouped by referencia_pago) + inversiones
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
+    // Verificar autenticación admin
+    const authResult = await verifyAdminAuth(request)
+    if (!authResult.success || !authResult.supabase) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status || 500 }
+      )
+    }
+
+    const supabase = authResult.supabase
     const { searchParams } = new URL(request.url)
     const loanIdParam = searchParams.get('loan_id')
 
@@ -235,8 +305,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         { status: 400 }
       )
     }
-
-    const supabase = await createClient()
 
     // Buscar el crédito por ID o por codigo_credito
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(loanIdParam)

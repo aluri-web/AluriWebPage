@@ -6,43 +6,73 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
  *
  * Obtiene las columnas de una tabla de la base de datos directamente
  * del information_schema de PostgreSQL.
+ *
+ * REQUIERE: Autenticación con rol 'admin'
+ *
+ * Headers requeridos:
+ * - Authorization: Bearer <token>
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const { searchParams } = new URL(request.url)
-    const table = searchParams.get('table') || 'creditos'
-
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-    if (!supabaseUrl || !serviceRoleKey) {
+    if (!supabaseUrl || !serviceRoleKey || !anonKey) {
       return NextResponse.json(
         { success: false, error: 'Configuración del servidor incompleta' },
         { status: 500 }
       )
     }
 
+    // 1. Verificar autenticación
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { success: false, error: 'No autorizado. Se requiere token de autenticación.' },
+        { status: 401 }
+      )
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+
+    // 2. Verificar el token y obtener el usuario
+    const supabaseAuth = createSupabaseClient(supabaseUrl, anonKey)
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Token inválido o expirado' },
+        { status: 401 }
+      )
+    }
+
+    // 3. Verificar que el usuario sea admin
     const supabase = createSupabaseClient(supabaseUrl, serviceRoleKey)
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile || profile.role !== 'admin') {
+      return NextResponse.json(
+        { success: false, error: 'Acceso denegado. Se requiere rol de administrador.' },
+        { status: 403 }
+      )
+    }
+
+    // 4. Procesar la solicitud (usuario autenticado como admin)
+    const { searchParams } = new URL(request.url)
+    const table = searchParams.get('table') || 'creditos'
 
     // Consultar information_schema para obtener las columnas de la tabla
     const { data: columns, error } = await supabase
       .rpc('get_table_columns', { table_name: table })
 
     if (error) {
-      // Si la función RPC no existe, intentar consulta directa
-      // Usamos una función que debe existir en Supabase
-      const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=*&limit=0`, {
-        headers: {
-          'apikey': serviceRoleKey,
-          'Authorization': `Bearer ${serviceRoleKey}`,
-          'Prefer': 'return=representation'
-        }
-      })
-
-      // Obtener los headers que contienen información del schema
-      const contentRange = response.headers.get('content-range')
-
-      // Intentar obtener el schema del OpenAPI
+      // Si la función RPC no existe, intentar obtener el schema del OpenAPI
       const schemaResponse = await fetch(`${supabaseUrl}/rest/v1/?apikey=${serviceRoleKey}`)
 
       if (schemaResponse.ok) {
