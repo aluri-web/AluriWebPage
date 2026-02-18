@@ -4,7 +4,8 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 // Helper function para verificar autenticación admin
 async function verifyAdminAuth(request: NextRequest): Promise<{
   success: boolean
-  supabase?: ReturnType<typeof createSupabaseClient>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase?: any
   error?: string
   status?: number
 }> {
