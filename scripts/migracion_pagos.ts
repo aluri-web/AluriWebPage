@@ -303,8 +303,13 @@ async function migrate() {
           lastPaymentDate = pago.fechaDate;
         }
 
+        // Para créditos pagados: saldo liquidado completamente
+        if (creditoDB.estado_credito === 'pagado') {
+          saldoIntereses = 0;
+          saldoCapital = 0;
+        }
         // Para créditos activos: acumular intereses hasta hoy
-        if (creditoDB.estado_credito !== 'pagado') {
+        else {
           const hoy = new Date();
           const mesesHoy = monthsOfInterestDue(fechaBase, hoy, esAnticipada);
           for (let m = mesesAcumulados; m < mesesHoy; m++) {
@@ -316,17 +321,19 @@ async function migrate() {
           }
           mesesAcumulados = Math.max(mesesAcumulados, mesesHoy);
 
-          // Interés parcial del mes actual (días desde último corte mensual hasta hoy)
-          if (lastPaymentDate) {
-            const baseDay = fechaBase.getDate();
-            const todayDay = hoy.getDate();
-            const daysPartial = todayDay >= baseDay ? todayDay - baseDay : 0;
-            if (daysPartial > 0) {
-              const partialInterest = esSoloInteres
-                ? Math.round(interesMensualEsperado * daysPartial / 30)
-                : Math.round(saldoCapital * tasaMensual * daysPartial / 30);
-              saldoIntereses += partialInterest;
-            }
+          // Interés parcial: días desde el último corte mensual hasta hoy
+          // Calcular fecha del último corte mensual
+          const offsetAnticipada = esAnticipada ? 1 : 0;
+          const lastBoundary = new Date(fechaBase);
+          lastBoundary.setMonth(lastBoundary.getMonth() + mesesAcumulados - offsetAnticipada);
+          const diasParciales = Math.max(0, Math.round(
+            (hoy.getTime() - lastBoundary.getTime()) / (24 * 60 * 60 * 1000)
+          ));
+          if (diasParciales > 0 && diasParciales < 30) {
+            const partialInterest = esSoloInteres
+              ? Math.round(interesMensualEsperado * diasParciales / 30)
+              : Math.round(saldoCapital * tasaMensual * diasParciales / 30);
+            saldoIntereses += partialInterest;
           }
         }
 
