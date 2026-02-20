@@ -29,6 +29,7 @@ interface Credito {
   direccion_inmueble: string | null
   tipo_inmueble: string | null
   valor_comercial: number | null
+  tipo_amortizacion: string | null
   created_at: string
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
@@ -97,6 +98,7 @@ export default async function InvestmentDetailPage({
         direccion_inmueble,
         tipo_inmueble,
         valor_comercial,
+        tipo_amortizacion,
         created_at,
         transacciones (
           tipo_transaccion,
@@ -246,7 +248,7 @@ export default async function InvestmentDetailPage({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-6">
               <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Monto Invertido</p>
                 <p className="text-2xl font-bold text-white">{formatCOP(investedAmount)}</p>
@@ -258,6 +260,12 @@ export default async function InvestmentDetailPage({
               <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Plazo</p>
                 <p className="text-2xl font-bold text-white">{termMonths} <span className="text-sm font-normal text-zinc-500">meses</span></p>
+              </div>
+              <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
+                <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Tipo de Credito</p>
+                <p className="text-lg font-bold text-white">
+                  {credito?.tipo_amortizacion === 'solo_interes' ? 'Solo Intereses' : 'Capital e Intereses'}
+                </p>
               </div>
               <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Retorno Esperado</p>
