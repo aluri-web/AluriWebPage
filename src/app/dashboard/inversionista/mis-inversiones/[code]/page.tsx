@@ -31,7 +31,7 @@ interface Credito {
   tipo_inmueble: string | null
   valor_comercial: number | null
   tipo_amortizacion: string | null
-  created_at: string
+  fecha_desembolso: string | null
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
 }
@@ -41,6 +41,7 @@ interface Inversion {
   monto_invertido: number
   interest_rate_investor: number | null
   estado: string
+  fecha_inversion: string | null
   created_at: string
   confirmed_at: string | null
   credito_id: string
@@ -86,6 +87,7 @@ export default async function InvestmentDetailPage({
       monto_invertido,
       interest_rate_investor,
       estado,
+      fecha_inversion,
       created_at,
       confirmed_at,
       credito_id,
@@ -101,7 +103,7 @@ export default async function InvestmentDetailPage({
         tipo_inmueble,
         valor_comercial,
         tipo_amortizacion,
-        created_at,
+        fecha_desembolso,
         transacciones (
           tipo_transaccion,
           monto
@@ -180,8 +182,8 @@ export default async function InvestmentDetailPage({
   const status = statusConfig[creditoEstado] || { label: creditoEstado, bgClass: 'bg-zinc-500/10', textClass: 'text-zinc-400' }
 
   // Investment date
-  const investmentDate = investment.confirmed_at || investment.created_at
-  const creditoStartDate = credito?.created_at
+  const investmentDate = investment.fecha_inversion || investment.confirmed_at || investment.created_at
+  const creditoStartDate = credito?.fecha_desembolso || null
 
   return (
     <div className="text-white p-8">

@@ -1,6 +1,13 @@
 import { createClient } from '../../../utils/supabase/server'
-import { TrendingUp, Briefcase, Percent, MapPin } from 'lucide-react'
+import { TrendingUp, Briefcase, Percent, Activity } from 'lucide-react'
 import PortfolioChart from '../../../components/dashboard/PortfolioChart'
+
+interface TransaccionData {
+  tipo_transaccion: string
+  monto: number
+  fecha_transaccion: string
+  referencia_pago: string | null
+}
 
 interface CreditoData {
   codigo_credito: string
@@ -13,6 +20,7 @@ interface CreditoData {
   tipo_inmueble: string | null
   valor_comercial: number | null
   inversiones: { monto_invertido: number; estado: string }[]
+  transacciones: TransaccionData[]
 }
 
 interface Inversion {
@@ -42,7 +50,7 @@ export default async function InvestorDashboard() {
   // CONSULTA MANUAL SIN FILTROS (INICIO)
   const { data: investments, error } = await supabase
     .from('inversiones')
-    .select('*, credito:creditos!inner(*, inversiones(monto_invertido, estado))')
+    .select('*, credito:creditos!inner(*, inversiones(monto_invertido, estado), transacciones(tipo_transaccion, monto, fecha_transaccion, referencia_pago))')
     .eq('inversionista_id', user?.id)
     .eq('estado', 'activo')
     .order('created_at', { ascending: false })
@@ -76,6 +84,24 @@ export default async function InvestorDashboard() {
   }, 0)
 
   const simulatedCollected = totalExpectedReturn * 0.15
+
+  // Extract recent activities from all transacciones, pro-rated by investor share
+  const recentActivities = investmentsData
+    .flatMap(inv => {
+      const credito = inv.credito
+      if (!credito?.transacciones) return []
+      const montoSolicitado = credito.monto_solicitado || 0
+      const share = montoSolicitado > 0 ? inv.monto_invertido / montoSolicitado : 0
+      return credito.transacciones.map(tx => ({
+        codigoCredito: credito.codigo_credito,
+        tipo: tx.tipo_transaccion,
+        monto: Math.round(tx.monto * share),
+        fecha: tx.fecha_transaccion,
+        referencia: tx.referencia_pago,
+      }))
+    })
+    .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+    .slice(0, 10)
 
   return (
     <div className="text-white p-8">
@@ -136,80 +162,51 @@ export default async function InvestorDashboard() {
         </div>
       </div>
 
-      {/* Investments Table */}
+      {/* Recent Activity */}
       <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
-        <h2 className="text-lg font-semibold mb-6 text-white">Mis Inversiones</h2>
+        <h2 className="text-lg font-semibold mb-6 text-white">Ultimas Actividades</h2>
 
-        {investmentsData.length > 0 ? (
+        {recentActivities.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="text-zinc-500 text-sm border-b border-zinc-700">
-                  <th className="pb-4 font-medium">CODIGO</th>
-                  <th className="pb-4 font-medium">INMUEBLE</th>
-                  <th className="pb-4 font-medium">MI INVERSION</th>
-                  <th className="pb-4 font-medium">TASA</th>
-                  <th className="pb-4 font-medium">PROGRESO</th>
-                  <th className="pb-4 font-medium">ESTADO</th>
+                  <th className="pb-4 font-medium">FECHA</th>
+                  <th className="pb-4 font-medium">CREDITO</th>
+                  <th className="pb-4 font-medium">TIPO</th>
+                  <th className="pb-4 font-medium text-right">MONTO</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {investmentsData.map((inv) => {
-                  const creditoEstado = inv.credito?.estado || 'pending'
-                  const requested = inv.credito?.monto_solicitado || 0
-                  // Calculate amount_funded from inversiones sub-query
-                  const funded = (inv.credito?.inversiones || [])
-                    .filter(i => i.estado === 'activo' || i.estado === 'pendiente')
-                    .reduce((s, i) => s + (i.monto_invertido || 0), 0)
-                  const progress = requested > 0 ? (funded / requested) * 100 : 0
-                  const propertyDisplay = inv.credito?.ciudad_inmueble || inv.credito?.direccion_inmueble || 'Sin ubicacion'
-                  const rate = inv.interest_rate_investor || inv.credito?.tasa_interes_ea || 0
-
-                  const statusConfig: Record<string, { label: string; class: string }> = {
-                    publicado: { label: 'Fondeando', class: 'bg-amber-500/20 text-amber-400' },
-                    activo: { label: 'Al día', class: 'bg-emerald-500 text-white font-semibold' },
-                    finalizado: { label: 'Completado', class: 'bg-blue-500/20 text-blue-400' },
-                    mora: { label: 'En Mora', class: 'bg-red-500 text-white font-semibold' }
+                {recentActivities.map((act, i) => {
+                  const tipoConfig: Record<string, { label: string; class: string }> = {
+                    pago_capital: { label: 'Capital', class: 'bg-blue-500/20 text-blue-400' },
+                    pago_interes: { label: 'Intereses', class: 'bg-amber-500/20 text-amber-400' },
+                    pago_mora: { label: 'Mora', class: 'bg-red-500/20 text-red-400' },
                   }
+                  const tipo = tipoConfig[act.tipo] || { label: act.tipo, class: 'bg-zinc-500/20 text-zinc-400' }
 
-                  const status = statusConfig[creditoEstado] || { label: creditoEstado, class: 'bg-zinc-500/20 text-zinc-400' }
+                  const fechaFormatted = new Date(act.fecha).toLocaleDateString('es-CO', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })
 
                   return (
-                    <tr key={inv.id} className="border-b border-zinc-700/50 hover:bg-zinc-800/30">
+                    <tr key={`${act.referencia}-${act.tipo}-${i}`} className="border-b border-zinc-700/50 hover:bg-zinc-800/30">
+                      <td className="py-4 text-zinc-400">{fechaFormatted}</td>
                       <td className="py-4">
                         <span className="px-2 py-1 bg-zinc-800 text-teal-400 text-xs font-mono rounded">
-                          {inv.credito?.codigo_credito || 'N/A'}
+                          {act.codigoCredito}
                         </span>
                       </td>
                       <td className="py-4">
-                        <div className="flex items-center gap-2">
-                          <MapPin size={14} className="text-zinc-500" />
-                          <span className="text-white">{propertyDisplay}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 text-white font-medium">
-                        ${Number(inv.monto_invertido).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
-                      </td>
-                      <td className="py-4 text-teal-400">
-                        {rate.toFixed(1)}% E.A.
-                      </td>
-                      <td className="py-4">
-                        <div className="w-24">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-zinc-500">{progress.toFixed(0)}%</span>
-                          </div>
-                          <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${progress >= 100 ? 'bg-emerald-500' : 'bg-teal-500'}`}
-                              style={{ width: `${Math.min(100, progress)}%` }}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4">
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${status.class}`}>
-                          {status.label}
+                        <span className={`px-3 py-1 rounded text-xs font-medium ${tipo.class}`}>
+                          {tipo.label}
                         </span>
+                      </td>
+                      <td className="py-4 text-right text-white font-medium">
+                        ${act.monto.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
                       </td>
                     </tr>
                   )
@@ -218,10 +215,9 @@ export default async function InvestorDashboard() {
             </table>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 text-zinc-500">
-            <Briefcase size={48} className="mb-4 opacity-50" />
-            <p>No se encontraron inversiones activas.</p>
-            <p className="text-sm mt-2">Explora el marketplace para comenzar a invertir.</p>
+          <div className="flex flex-col items-center justify-center h-48 text-zinc-500">
+            <Activity size={48} className="mb-4 opacity-50" />
+            <p>No se han registrado pagos aun.</p>
           </div>
         )}
       </div>
