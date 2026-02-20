@@ -22,6 +22,7 @@ interface Transaccion {
 interface Credito {
   codigo_credito: string
   estado: string
+  estado_credito: string | null
   tasa_interes_ea: number | null
   monto_solicitado: number | null
   plazo: number | null
@@ -91,6 +92,7 @@ export default async function InvestmentDetailPage({
       credito:creditos!inner (
         codigo_credito,
         estado,
+        estado_credito,
         tasa_interes_ea,
         monto_solicitado,
         plazo,
@@ -165,11 +167,13 @@ export default async function InvestmentDetailPage({
   // Progress = capital recovered / amount invested
   const recoveryProgress = investedAmount > 0 ? (capitalRecuperado / investedAmount) * 100 : 0
 
-  // Status configuration
-  const creditoEstado = credito?.estado || 'pending'
+  // Status configuration — estado_credito 'pagado' tiene prioridad sobre estado general
+  const estadoCredito = credito?.estado_credito || ''
+  const creditoEstado = estadoCredito === 'pagado' ? 'pagado' : (credito?.estado || 'pending')
   const statusConfig: Record<string, { label: string; bgClass: string; textClass: string }> = {
     publicado: { label: 'Fondeando', bgClass: 'bg-amber-500/10', textClass: 'text-amber-400' },
     activo: { label: 'Activo', bgClass: 'bg-emerald-500/10', textClass: 'text-emerald-400' },
+    pagado: { label: 'Pagado', bgClass: 'bg-blue-500/10', textClass: 'text-blue-400' },
     finalizado: { label: 'Completado', bgClass: 'bg-blue-500/10', textClass: 'text-blue-400' },
     mora: { label: 'En Mora', bgClass: 'bg-red-500/10', textClass: 'text-red-400' }
   }

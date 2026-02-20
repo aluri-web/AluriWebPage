@@ -108,13 +108,16 @@ export default function InvestmentsTabs({ investments }: InvestmentsTabsProps) {
   const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active')
 
   // Filter investments by credito estado
-  // Active portfolio includes both 'activo' (al día) and 'mora' (en mora)
+  // Active portfolio: créditos activos o en mora, que NO estén pagados
   const activeInvestments = investments.filter(
-    (inv) => inv.credito?.estado === 'activo' || inv.credito?.estado === 'mora'
+    (inv) => (inv.credito?.estado === 'activo' || inv.credito?.estado === 'mora')
+      && inv.credito?.estado_credito !== 'pagado'
   )
-  // Pending/Historical: publicado and finalizado only (mora goes to active portfolio)
+  // Historical: publicado, finalizado, o pagados
   const pendingInvestments = investments.filter(
-    (inv) => inv.credito?.estado === 'publicado' || inv.credito?.estado === 'finalizado'
+    (inv) => inv.credito?.estado === 'publicado'
+      || inv.credito?.estado === 'finalizado'
+      || inv.credito?.estado_credito === 'pagado'
   )
 
   const getMoraBadge = (credito: Credito | null) => {
