@@ -27,6 +27,7 @@ interface Credito {
   saldo_capital: number | null
   saldo_intereses: number | null
   fecha_ultimo_pago: string | null
+  en_mora: boolean | null
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
 }
@@ -116,18 +117,26 @@ export default function InvestmentsTabs({ investments }: InvestmentsTabsProps) {
     (inv) => inv.credito?.estado === 'publicado' || inv.credito?.estado === 'finalizado'
   )
 
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { label: string; bgClass: string; textClass: string }> = {
-      publicado: { label: 'Fondeando', bgClass: 'bg-amber-500/20', textClass: 'text-amber-400' },
-      activo: { label: 'Al día', bgClass: 'bg-emerald-500', textClass: 'text-white' },
-      finalizado: { label: 'Completado', bgClass: 'bg-blue-500/20', textClass: 'text-blue-400' },
-      mora: { label: 'En Mora', bgClass: 'bg-red-500', textClass: 'text-white' }
+  const getMoraBadge = (credito: Credito | null) => {
+    if (!credito) return null
+    const estadoCredito = credito.estado_credito || ''
+    if (estadoCredito === 'pagado') {
+      return (
+        <span className="px-2 py-1 rounded text-xs font-semibold bg-blue-500/20 text-blue-400">
+          Pagado
+        </span>
+      )
     }
-    const statusConfig = config[status] || { label: status, bgClass: 'bg-zinc-500/20', textClass: 'text-zinc-400' }
-
+    if (credito.en_mora) {
+      return (
+        <span className="px-2 py-1 rounded text-xs font-semibold bg-red-500 text-white">
+          Sí
+        </span>
+      )
+    }
     return (
-      <span className={`px-2 py-1 rounded text-xs font-semibold ${statusConfig.bgClass} ${statusConfig.textClass}`}>
-        {statusConfig.label}
+      <span className="px-2 py-1 rounded text-xs font-semibold bg-emerald-500 text-white">
+        No
       </span>
     )
   }
@@ -182,9 +191,9 @@ export default function InvestmentsTabs({ investments }: InvestmentsTabsProps) {
 
       {/* Tab Content */}
       {activeTab === 'active' ? (
-        <ActiveInvestmentsTable investments={activeInvestments} getStatusBadge={getStatusBadge} />
+        <ActiveInvestmentsTable investments={activeInvestments} getMoraBadge={getMoraBadge} />
       ) : (
-        <PendingInvestmentsTable investments={pendingInvestments} getStatusBadge={getStatusBadge} />
+        <PendingInvestmentsTable investments={pendingInvestments} getMoraBadge={getMoraBadge} />
       )}
     </div>
   )
@@ -193,10 +202,10 @@ export default function InvestmentsTabs({ investments }: InvestmentsTabsProps) {
 // Tab 1: Portafolio Activo - Shows active investments with payment info
 function ActiveInvestmentsTable({
   investments,
-  getStatusBadge
+  getMoraBadge
 }: {
   investments: Inversion[]
-  getStatusBadge: (status: string) => JSX.Element
+  getMoraBadge: (credito: Credito | null) => JSX.Element | null
 }) {
   if (investments.length === 0) {
     return (
@@ -218,7 +227,7 @@ function ActiveInvestmentsTable({
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Inmueble</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase">Mi Inversion</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase">Tasa</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Estado</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Mora</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Progreso / Ganancias</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Acciones</th>
             </tr>
@@ -228,7 +237,6 @@ function ActiveInvestmentsTable({
               const credito = inv.credito
               const propertyDisplay = credito?.ciudad_inmueble || credito?.direccion_inmueble || 'Sin ubicacion'
               const rate = inv.interest_rate_investor || credito?.tasa_interes_ea || 0
-              const creditoEstado = credito?.estado || 'pending'
 
               // Calculate real progress from payments
               const { capitalRecuperado, interesesGanados, progressPercent } = calculateInvestmentProgress(inv)
@@ -253,7 +261,7 @@ function ActiveInvestmentsTable({
                     <span className="text-teal-400 font-medium">{rate.toFixed(1)}% E.A.</span>
                   </td>
                   <td className="px-4 py-4 text-center">
-                    {getStatusBadge(creditoEstado)}
+                    {getMoraBadge(credito)}
                   </td>
                   <td className="px-4 py-4">
                     <div className="w-36">
@@ -306,10 +314,10 @@ function ActiveInvestmentsTable({
 // Tab 2: En Fondeo / Historico - Shows publicado and finalizado investments
 function PendingInvestmentsTable({
   investments,
-  getStatusBadge
+  getMoraBadge
 }: {
   investments: Inversion[]
-  getStatusBadge: (status: string) => JSX.Element
+  getMoraBadge: (credito: Credito | null) => JSX.Element | null
 }) {
   if (investments.length === 0) {
     return (
@@ -329,7 +337,7 @@ function PendingInvestmentsTable({
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Codigo</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Inmueble</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase">Mi Inversion</th>
-              <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Estado</th>
+              <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Mora</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Progreso Fondeo</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Fecha</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Acciones</th>
@@ -339,7 +347,6 @@ function PendingInvestmentsTable({
             {investments.map((inv) => {
               const credito = inv.credito
               const propertyDisplay = credito?.ciudad_inmueble || credito?.direccion_inmueble || 'Sin ubicacion'
-              const creditoEstado = credito?.estado || 'pending'
 
               // Calculate funding progress from inversiones sub-query
               const requested = credito?.monto_solicitado || 0
@@ -367,7 +374,7 @@ function PendingInvestmentsTable({
                     <span className="text-white font-medium">{formatCOP(inv.monto_invertido)}</span>
                   </td>
                   <td className="px-4 py-4 text-center">
-                    {getStatusBadge(creditoEstado)}
+                    {getMoraBadge(credito)}
                   </td>
                   <td className="px-4 py-4">
                     <div className="w-32">

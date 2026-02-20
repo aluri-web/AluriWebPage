@@ -99,20 +99,12 @@ const tools: Tool[] = [
           type: "string",
           description: "Fecha del pago en formato YYYY-MM-DD",
         },
-        monto_capital: {
+        monto: {
           type: "number",
-          description: "Monto abonado a capital (reduce la deuda principal)",
-        },
-        monto_interes: {
-          type: "number",
-          description: "Monto de intereses pagados (ganancia para inversionistas)",
-        },
-        monto_mora: {
-          type: "number",
-          description: "Monto de mora u otros cargos (opcional, default: 0)",
+          description: "Monto total del pago. Se distribuye automáticamente en cascada: primero mora, luego intereses, y el sobrante a capital.",
         },
       },
-      required: ["credito_id", "fecha_pago", "monto_capital", "monto_interes"],
+      required: ["credito_id", "fecha_pago", "monto"],
     },
   },
   {
@@ -270,20 +262,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "registrar_pago": {
-        const { credito_id, fecha_pago, monto_capital, monto_interes, monto_mora } = args as {
+        const { credito_id, fecha_pago, monto } = args as {
           credito_id: string;
           fecha_pago: string;
-          monto_capital: number;
-          monto_interes: number;
-          monto_mora?: number;
+          monto: number;
         };
 
         const result = await apiRequest("/pagos", "POST", {
           credito_id,
           fecha_pago,
-          monto_capital,
-          monto_interes,
-          monto_mora: monto_mora || 0,
+          monto,
         }, true);
 
         return {

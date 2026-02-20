@@ -5,9 +5,19 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 interface SolicitudPago {
   credito_id: string
   fecha_pago: string
-  monto_capital: number
+  monto: number // Monto total del pago — se distribuye automáticamente: mora → intereses → capital
+}
+
+interface AplicacionPago {
+  monto_mora: number
   monto_interes: number
-  monto_mora?: number
+  monto_capital: number
+  saldo_mora_anterior: number
+  saldo_intereses_anterior: number
+  saldo_capital_anterior: number
+  saldo_mora_nuevo: number
+  saldo_intereses_nuevo: number
+  saldo_capital_nuevo: number
 }
 
 interface PagoInversionista {
@@ -23,6 +33,7 @@ interface RespuestaPago {
   success: boolean
   pago_id?: string
   monto_total: number
+  aplicacion?: AplicacionPago
   distribucion: PagoInversionista[]
   error?: string
 }
@@ -76,21 +87,24 @@ async function verificarAuthAdmin(request: NextRequest): Promise<{
  * POST /api/pagos
  *
  * Registra un pago del propietario y calcula la distribución a los inversionistas.
+ * El monto se distribuye automáticamente en cascada: mora → intereses → capital.
+ *
  * REQUIERE: Autenticación con rol 'admin'
  *
  * Headers requeridos:
  * - Authorization: Bearer <token>
  *
- * DB: creditos + inversiones + transacciones
- *
  * Body:
  * {
  *   "credito_id": "uuid-del-credito" o "CR-001" (codigo_credito),
- *   "fecha_pago": "2024-01-15",
- *   "monto_capital": 1000000,
- *   "monto_interes": 500000,
- *   "monto_mora": 0
+ *   "fecha_pago": "2026-02-20",
+ *   "monto": 5000000
  * }
+ *
+ * Cascada de aplicación:
+ * 1. Mora (hasta cubrir saldo_mora)
+ * 2. Intereses (hasta cubrir saldo_intereses)
+ * 3. Capital (el sobrante reduce saldo_capital)
  */
 export async function POST(request: NextRequest): Promise<NextResponse<RespuestaPago>> {
   try {
@@ -121,14 +135,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       )
     }
 
-    const montoCapital = body.monto_capital || 0
-    const montoInteres = body.monto_interes || 0
-    const montoMora = body.monto_mora || 0
-    const montoTotal = montoCapital + montoInteres + montoMora
+    const montoTotal = body.monto || 0
 
     if (montoTotal <= 0) {
       return NextResponse.json(
-        { success: false, monto_total: 0, distribucion: [], error: 'El monto total debe ser mayor a cero' },
+        { success: false, monto_total: 0, distribucion: [], error: 'El monto debe ser mayor a cero' },
         { status: 400 }
       )
     }
@@ -138,7 +149,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
 
     const { data: credito, error: creditoError } = await supabase
       .from('creditos')
-      .select('id, codigo_credito, cliente_id, monto_solicitado')
+      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora')
       .eq(isUUID ? 'id' : 'codigo_credito', body.credito_id)
       .single()
 
@@ -151,6 +162,44 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
 
     const creditoId = credito.id
     const montoCredito = credito.monto_solicitado || 0
+
+    // =========================================
+    // CASCADA: mora → intereses → capital
+    // =========================================
+    const saldoMoraAnterior = credito.saldo_mora || 0
+    const saldoInteresesAnterior = credito.saldo_intereses || 0
+    const saldoCapitalAnterior = credito.saldo_capital || 0
+
+    let restante = montoTotal
+
+    // 1. Primero pagar mora
+    const montoMora = Math.min(restante, saldoMoraAnterior)
+    restante -= montoMora
+
+    // 2. Luego pagar intereses
+    const montoInteres = Math.min(restante, saldoInteresesAnterior)
+    restante -= montoInteres
+
+    // 3. El sobrante va a capital
+    const montoCapital = Math.min(restante, saldoCapitalAnterior)
+    restante -= montoCapital
+
+    // Nuevos saldos
+    const nuevoSaldoMora = saldoMoraAnterior - montoMora
+    const nuevoSaldoIntereses = saldoInteresesAnterior - montoInteres
+    const nuevoSaldoCapital = saldoCapitalAnterior - montoCapital
+
+    const aplicacion: AplicacionPago = {
+      monto_mora: montoMora,
+      monto_interes: montoInteres,
+      monto_capital: montoCapital,
+      saldo_mora_anterior: saldoMoraAnterior,
+      saldo_intereses_anterior: saldoInteresesAnterior,
+      saldo_capital_anterior: saldoCapitalAnterior,
+      saldo_mora_nuevo: nuevoSaldoMora,
+      saldo_intereses_nuevo: nuevoSaldoIntereses,
+      saldo_capital_nuevo: nuevoSaldoCapital,
+    }
 
     // Obtener las inversiones activas para este crédito
     const { data: inversiones, error: inversionesError } = await supabase
@@ -176,9 +225,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       )
     }
 
-    // Calcular la distribución a cada inversionista
+    // Calcular la distribución a cada inversionista (solo intereses + capital)
     const distribucion: PagoInversionista[] = (inversiones || []).map(inversion => {
-      // Calcular porcentaje basado en monto invertido vs monto total del crédito
       const porcentaje = montoCredito > 0
         ? (inversion.monto_invertido / montoCredito) * 100
         : 0
@@ -189,10 +237,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         email: string | null
       } | null
 
-      // Calcular montos proporcionales al porcentaje de participación
       const interesInversionista = Math.round((montoInteres * porcentaje) / 100)
       const capitalInversionista = Math.round((montoCapital * porcentaje) / 100)
-      const totalInversionista = interesInversionista + capitalInversionista
 
       return {
         inversionista_id: inversion.inversionista_id,
@@ -200,11 +246,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         porcentaje: Math.round(porcentaje * 100) / 100,
         monto_interes: interesInversionista,
         monto_capital: capitalInversionista,
-        total: totalInversionista
+        total: interesInversionista + capitalInversionista
       }
     })
 
-    // Registrar el pago en la tabla transacciones
+    // Registrar transacciones individuales por tipo
     const referenciaPago = `PAG-${Date.now()}-${Math.floor(Math.random() * 1000)}`
 
     const filasTransaccion: {
@@ -215,11 +261,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       referencia_pago: string;
     }[] = []
 
-    if (montoCapital > 0) {
+    if (montoMora > 0) {
       filasTransaccion.push({
         credito_id: creditoId,
-        tipo_transaccion: 'pago_capital',
-        monto: montoCapital,
+        tipo_transaccion: 'pago_mora',
+        monto: montoMora,
         fecha_transaccion: body.fecha_pago,
         referencia_pago: referenciaPago
       })
@@ -235,32 +281,59 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       })
     }
 
-    if (montoMora > 0) {
+    if (montoCapital > 0) {
       filasTransaccion.push({
         credito_id: creditoId,
-        tipo_transaccion: 'pago_mora',
-        monto: montoMora,
+        tipo_transaccion: 'pago_capital',
+        monto: montoCapital,
         fecha_transaccion: body.fecha_pago,
         referencia_pago: referenciaPago
       })
     }
 
-    const { error: txError } = await supabase
-      .from('transacciones')
-      .insert(filasTransaccion)
+    if (filasTransaccion.length > 0) {
+      const { error: txError } = await supabase
+        .from('transacciones')
+        .insert(filasTransaccion)
 
-    if (txError) {
-      console.error('Error registering payment:', txError)
-      return NextResponse.json(
-        { success: false, monto_total: 0, distribucion: [], error: 'Error al registrar el pago: ' + txError.message },
-        { status: 500 }
-      )
+      if (txError) {
+        console.error('Error registering payment:', txError)
+        return NextResponse.json(
+          { success: false, monto_total: 0, distribucion: [], error: 'Error al registrar el pago: ' + txError.message },
+          { status: 500 }
+        )
+      }
+    }
+
+    // Actualizar saldos en la tabla creditos
+    const updateData: Record<string, unknown> = {
+      saldo_capital: nuevoSaldoCapital,
+      saldo_intereses: nuevoSaldoIntereses,
+      saldo_mora: nuevoSaldoMora,
+      fecha_ultimo_pago: body.fecha_pago,
+    }
+
+    // Si el capital quedó en 0, marcar como pagado
+    if (nuevoSaldoCapital === 0) {
+      updateData.estado_credito = 'pagado'
+      updateData.en_mora = false
+      updateData.saldo_mora = 0
+    }
+
+    const { error: updateError } = await supabase
+      .from('creditos')
+      .update(updateData)
+      .eq('id', creditoId)
+
+    if (updateError) {
+      console.error('Error actualizando saldos del crédito:', updateError)
     }
 
     return NextResponse.json({
       success: true,
       pago_id: referenciaPago,
       monto_total: montoTotal,
+      aplicacion,
       distribucion
     })
 

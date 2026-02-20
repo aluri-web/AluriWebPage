@@ -77,6 +77,7 @@ interface CreditoDB {
   tipo_liquidacion: string | null;
   fecha_desembolso: string | null;
   estado_credito: string | null;
+  tasa_mora: number | null;
 }
 
 // Compute how many full months of interest are due from base date to a given date
@@ -173,7 +174,7 @@ async function migrate() {
         // Buscar credito en DB con tipo_amortizacion
         const { data: credito, error: creditoError } = await supabase
           .from('creditos')
-          .select('id, codigo_credito, tasa_nominal, valor_colocado, monto_solicitado, tipo_amortizacion, tipo_liquidacion, fecha_desembolso, estado_credito')
+          .select('id, codigo_credito, tasa_nominal, valor_colocado, monto_solicitado, tipo_amortizacion, tipo_liquidacion, fecha_desembolso, estado_credito, tasa_mora')
           .eq('codigo_credito', codigoCredito)
           .single();
 
@@ -337,15 +338,42 @@ async function migrate() {
           }
         }
 
+        // 6. Calcular mora: si no se pagó antes de la fecha de vencimiento del período actual
+        let enMora = false;
+        let saldoMora = 0;
+
+        if (creditoDB.estado_credito !== 'pagado' && lastPaymentDate && saldoCapital > 0) {
+          const hoy = new Date();
+          const diaPago = fechaBase.getDate();
+
+          // Calcular la próxima fecha de vencimiento después del último pago
+          const proximoVencimiento = new Date(lastPaymentDate);
+          proximoVencimiento.setMonth(proximoVencimiento.getMonth() + 1);
+          proximoVencimiento.setDate(diaPago);
+
+          if (hoy > proximoVencimiento) {
+            enMora = true;
+            const diasMora = Math.max(0, Math.round(
+              (hoy.getTime() - proximoVencimiento.getTime()) / (24 * 60 * 60 * 1000)
+            ));
+            const tasaMoraMensual = (creditoDB.tasa_mora || 2.07) / 100;
+            saldoMora = Math.round(saldoCapital * tasaMoraMensual / 30 * diasMora);
+            console.log(`   EN MORA: ${diasMora} días desde ${proximoVencimiento.toISOString().split('T')[0]} | Saldo mora: $${saldoMora.toLocaleString()}`);
+          }
+        }
+
         console.log(`   Saldo capital final: $${saldoCapital.toLocaleString()}`);
         console.log(`   Saldo intereses final: $${saldoIntereses.toLocaleString()}`);
+        console.log(`   En mora: ${enMora} | Saldo mora: $${saldoMora.toLocaleString()}`);
 
-        // 5. Actualizar saldos en la tabla creditos
+        // 7. Actualizar saldos en la tabla creditos
         const { error: updateError } = await supabase
           .from('creditos')
           .update({
             saldo_capital: saldoCapital,
             saldo_intereses: saldoIntereses,
+            saldo_mora: saldoMora,
+            en_mora: enMora,
             fecha_ultimo_pago: lastPaymentDate ? lastPaymentDate.toISOString().split('T')[0] : null,
           })
           .eq('id', creditoDB.id);

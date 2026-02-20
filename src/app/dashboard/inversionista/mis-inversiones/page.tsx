@@ -25,9 +25,11 @@ interface Credito {
   valor_comercial: number | null
   saldo_capital: number | null
   saldo_intereses: number | null
+  saldo_mora: number | null
   tasa_nominal: number | null
   estado_credito: string | null
   fecha_ultimo_pago: string | null
+  en_mora: boolean | null
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
 }
@@ -133,8 +135,7 @@ export default async function MisInversionesPage() {
 
   const recaudadoTotal = totalCapitalRecuperado + totalInteresesGanados
 
-  // Capital vigente = saldo_capital + saldo_intereses (almacenados en migración)
-  // Para créditos activos: se usa el saldo almacenado (ya incluye intereses acumulados hasta hoy)
+  // Capital vigente = saldo_capital + saldo_intereses + saldo_mora (almacenados en migración/cron)
   let capitalVigente = 0
   investments.forEach(inv => {
     const credito = inv.credito
@@ -146,8 +147,9 @@ export default async function MisInversionesPage() {
 
     const saldoCapital = credito.saldo_capital || 0
     const saldoIntereses = credito.saldo_intereses || 0
+    const saldoMora = credito.saldo_mora || 0
 
-    capitalVigente += (saldoCapital + saldoIntereses) * share
+    capitalVigente += (saldoCapital + saldoIntereses + saldoMora) * share
   })
 
   return (
