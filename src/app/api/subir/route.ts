@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 // Helper function para verificar autenticación admin
-async function verifyAdminAuth(request: NextRequest): Promise<{
+async function verificarAuthAdmin(request: NextRequest): Promise<{
   success: boolean
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase?: any
@@ -47,7 +47,7 @@ async function verifyAdminAuth(request: NextRequest): Promise<{
 }
 
 /**
- * POST /api/upload
+ * POST /api/subir
  *
  * Sube una imagen al storage de Supabase.
  * REQUIERE: Autenticación con rol 'admin'
@@ -56,13 +56,13 @@ async function verifyAdminAuth(request: NextRequest): Promise<{
  * - Authorization: Bearer <token>
  *
  * Body (FormData):
- * - file: archivo de imagen
- * - loanCode: código del préstamo (opcional, default: 'default')
+ * - archivo: archivo de imagen
+ * - codigo_credito: código del crédito (opcional, default: 'default')
  */
 export async function POST(request: NextRequest) {
   try {
     // Verificar autenticación admin
-    const authResult = await verifyAdminAuth(request)
+    const authResult = await verificarAuthAdmin(request)
     if (!authResult.success || !authResult.supabase) {
       return NextResponse.json(
         { error: authResult.error },
@@ -72,57 +72,57 @@ export async function POST(request: NextRequest) {
 
     const supabase = authResult.supabase
     const formData = await request.formData()
-    const file = formData.get('file') as File
-    const loanCode = formData.get('loanCode') as string || 'default'
+    const archivo = formData.get('archivo') as File || formData.get('file') as File
+    const codigoCredito = formData.get('codigo_credito') as string || formData.get('loanCode') as string || 'default'
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    if (!archivo) {
+      return NextResponse.json({ error: 'No se proporcionó archivo' }, { status: 400 })
     }
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      return NextResponse.json({ error: 'File must be an image' }, { status: 400 })
+    // Validar tipo de archivo
+    if (!archivo.type.startsWith('image/')) {
+      return NextResponse.json({ error: 'El archivo debe ser una imagen' }, { status: 400 })
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File size exceeds 5MB' }, { status: 400 })
+    // Validar tamaño del archivo (max 5MB)
+    if (archivo.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: 'El archivo excede 5MB' }, { status: 400 })
     }
 
-    // Create unique filename
+    // Crear nombre de archivo único
     const timestamp = Date.now()
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_')
-    const path = `${loanCode}/${timestamp}_${sanitizedName}`
+    const nombreSanitizado = archivo.name.replace(/[^a-zA-Z0-9.]/g, '_')
+    const ruta = `${codigoCredito}/${timestamp}_${nombreSanitizado}`
 
-    // Upload to Supabase Storage
+    // Subir a Supabase Storage
     const { error } = await supabase
       .storage
       .from('properties')
-      .upload(path, file, {
+      .upload(ruta, archivo, {
         cacheControl: '3600',
         upsert: false
       })
 
     if (error) {
       console.error('Error uploading to Supabase:', error)
-      return NextResponse.json({ error: 'Error uploading file: ' + error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al subir archivo: ' + error.message }, { status: 500 })
     }
 
-    // Get public URL
+    // Obtener URL pública
     const { data: { publicUrl } } = supabase
       .storage
       .from('properties')
-      .getPublicUrl(path)
+      .getPublicUrl(ruta)
 
     return NextResponse.json({ success: true, url: publicUrl })
   } catch (error) {
-    console.error('Error in upload route:', error)
-    return NextResponse.json({ error: 'Error uploading file' }, { status: 500 })
+    console.error('Error in subir route:', error)
+    return NextResponse.json({ error: 'Error al subir archivo' }, { status: 500 })
   }
 }
 
 /**
- * DELETE /api/upload
+ * DELETE /api/subir
  *
  * Elimina una imagen del storage de Supabase.
  * REQUIERE: Autenticación con rol 'admin'
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     // Verificar autenticación admin
-    const authResult = await verifyAdminAuth(request)
+    const authResult = await verificarAuthAdmin(request)
     if (!authResult.success || !authResult.supabase) {
       return NextResponse.json(
         { error: authResult.error },
@@ -148,31 +148,31 @@ export async function DELETE(request: NextRequest) {
     const { url } = await request.json()
 
     if (!url) {
-      return NextResponse.json({ error: 'No URL provided' }, { status: 400 })
+      return NextResponse.json({ error: 'No se proporcionó URL' }, { status: 400 })
     }
 
-    // Extract path from URL
-    // Format: .../storage/v1/object/public/properties/loanCode/filename
-    const urlParts = url.split('/properties/')
-    if (urlParts.length < 2) {
-      return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 })
+    // Extraer ruta de la URL
+    // Formato: .../storage/v1/object/public/properties/codigoCredito/filename
+    const partesUrl = url.split('/properties/')
+    if (partesUrl.length < 2) {
+      return NextResponse.json({ error: 'Formato de URL inválido' }, { status: 400 })
     }
 
-    const path = urlParts[1]
+    const ruta = partesUrl[1]
 
     const { error } = await supabase
       .storage
       .from('properties')
-      .remove([path])
+      .remove([ruta])
 
     if (error) {
       console.error('Error deleting from Supabase:', error)
-      return NextResponse.json({ error: 'Error deleting file: ' + error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al eliminar archivo: ' + error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in delete route:', error)
-    return NextResponse.json({ error: 'Error deleting file' }, { status: 500 })
+    console.error('Error in eliminar route:', error)
+    return NextResponse.json({ error: 'Error al eliminar archivo' }, { status: 500 })
   }
 }

@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 /**
- * GET /api/schema?table=creditos
+ * GET /api/creditos
  *
- * Obtiene las columnas de una tabla de la base de datos directamente
- * del information_schema de PostgreSQL.
- *
+ * Lista todos los créditos/préstamos disponibles.
  * REQUIERE: Autenticación con rol 'admin'
  *
  * Headers requeridos:
  * - Authorization: Bearer <token>
+ *
+ * DB: creditos + inversiones
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -64,60 +64,66 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // 4. Procesar la solicitud (usuario autenticado como admin)
-    const { searchParams } = new URL(request.url)
-    const table = searchParams.get('table') || 'creditos'
-
-    // Consultar information_schema para obtener las columnas de la tabla
-    const { data: columns, error } = await supabase
-      .rpc('get_table_columns', { table_name: table })
+    const { data: creditos, error } = await supabase
+      .from('creditos')
+      .select(`
+        id,
+        codigo_credito,
+        estado,
+        monto_solicitado,
+        propietario:profiles!cliente_id (
+          full_name
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(50)
 
     if (error) {
-      // Si la función RPC no existe, intentar obtener el schema del OpenAPI
-      const schemaResponse = await fetch(`${supabaseUrl}/rest/v1/?apikey=${serviceRoleKey}`)
+      console.error('Error fetching creditos:', error)
+      return NextResponse.json(
+        { success: false, error: 'Error al obtener créditos' },
+        { status: 500 }
+      )
+    }
 
-      if (schemaResponse.ok) {
-        const schemaData = await schemaResponse.json()
+    // Calcular monto_financiado por crédito desde inversiones
+    const creditoIds = (creditos || []).map(c => c.id)
+    let montoFinanciadoMap: Record<string, number> = {}
 
-        // Buscar la definición de la tabla en el schema
-        if (schemaData.definitions && schemaData.definitions[table]) {
-          const tableDefinition = schemaData.definitions[table]
-          const properties = tableDefinition.properties || {}
+    if (creditoIds.length > 0) {
+      const { data: inversiones } = await supabase
+        .from('inversiones')
+        .select('credito_id, monto_invertido, estado')
+        .in('credito_id', creditoIds)
+        .in('estado', ['activo', 'pendiente'])
 
-          const columnList = Object.entries(properties).map(([name, def]: [string, unknown]) => {
-            const columnDef = def as { description?: string; type?: string; format?: string; default?: string }
-            return {
-              name,
-              type: columnDef.format || columnDef.type || 'unknown',
-              description: columnDef.description || '',
-              default: columnDef.default
-            }
-          }).sort((a, b) => a.name.localeCompare(b.name))
-
-          return NextResponse.json({
-            success: true,
-            table,
-            columns: columnList,
-            total: columnList.length
-          })
+      if (inversiones) {
+        for (const inv of inversiones) {
+          montoFinanciadoMap[inv.credito_id] = (montoFinanciadoMap[inv.credito_id] || 0) + (inv.monto_invertido || 0)
         }
       }
-
-      return NextResponse.json({
-        success: false,
-        error: 'No se pudo obtener el schema de la tabla',
-        hint: error?.message
-      }, { status: 500 })
     }
+
+    const creditosFormateados = (creditos || []).map(credito => {
+      const propietarioData = credito.propietario as unknown as { full_name: string | null } | null
+      return {
+        id: credito.id,
+        codigo: credito.codigo_credito,
+        estado: credito.estado,
+        monto_solicitado: credito.monto_solicitado,
+        monto_financiado: montoFinanciadoMap[credito.id] || 0,
+        nombre_propietario: propietarioData?.full_name || 'Sin propietario'
+      }
+    })
 
     return NextResponse.json({
       success: true,
-      table,
-      columns,
-      total: columns?.length || 0
+      creditos: creditosFormateados,
+      total: creditos?.length || 0
     })
 
   } catch (error) {
-    console.error('Error in schema API:', error)
+    console.error('Error in creditos API:', error)
     return NextResponse.json(
       { success: false, error: 'Error interno del servidor' },
       { status: 500 }

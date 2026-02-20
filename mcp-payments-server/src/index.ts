@@ -50,14 +50,14 @@ async function apiRequest(
 
 // Definición de las herramientas disponibles
 const tools: Tool[] = [
-  // ========== PRÉSTAMOS ==========
+  // ========== CRÉDITOS ==========
   {
-    name: "list_loans",
-    description: "Lista todos los préstamos/créditos disponibles en el sistema. Muestra código, monto, estado y cliente.",
+    name: "listar_creditos",
+    description: "Lista todos los créditos/préstamos disponibles en el sistema. Muestra código, monto, estado y cliente.",
     inputSchema: {
       type: "object",
       properties: {
-        limit: {
+        limite: {
           type: "number",
           description: "Número máximo de resultados (default: 50)",
         },
@@ -72,76 +72,76 @@ const tools: Tool[] = [
 
   // ========== PAGOS ==========
   {
-    name: "get_payments",
-    description: "Obtiene el historial de pagos de un préstamo específico, incluyendo la distribución calculada para cada inversionista.",
+    name: "obtener_pagos",
+    description: "Obtiene el historial de pagos de un crédito específico, incluyendo la distribución calculada para cada inversionista.",
     inputSchema: {
       type: "object",
       properties: {
-        loan_id: {
+        credito_id: {
           type: "string",
-          description: "ID o código del préstamo (ej: CR-001 o UUID)",
+          description: "ID o código del crédito (ej: CR-001 o UUID)",
         },
       },
-      required: ["loan_id"],
+      required: ["credito_id"],
     },
   },
   {
-    name: "register_payment",
+    name: "registrar_pago",
     description: "Registra un nuevo pago del propietario. Calcula automáticamente la distribución a los inversionistas según su porcentaje de participación.",
     inputSchema: {
       type: "object",
       properties: {
-        loan_id: {
+        credito_id: {
           type: "string",
-          description: "ID o código del préstamo",
+          description: "ID o código del crédito",
         },
-        payment_date: {
+        fecha_pago: {
           type: "string",
           description: "Fecha del pago en formato YYYY-MM-DD",
         },
-        amount_capital: {
+        monto_capital: {
           type: "number",
           description: "Monto abonado a capital (reduce la deuda principal)",
         },
-        amount_interest: {
+        monto_interes: {
           type: "number",
           description: "Monto de intereses pagados (ganancia para inversionistas)",
         },
-        amount_late_fee: {
+        monto_mora: {
           type: "number",
           description: "Monto de mora u otros cargos (opcional, default: 0)",
         },
       },
-      required: ["loan_id", "payment_date", "amount_capital", "amount_interest"],
+      required: ["credito_id", "fecha_pago", "monto_capital", "monto_interes"],
     },
   },
   {
-    name: "get_distribution",
-    description: "Obtiene un resumen completo de la distribución de pagos a inversionistas para un préstamo, incluyendo cuánto ha ganado cada inversionista y su ROI.",
+    name: "obtener_distribucion",
+    description: "Obtiene un resumen completo de la distribución de pagos a inversionistas para un crédito, incluyendo cuánto ha ganado cada inversionista y su ROI.",
     inputSchema: {
       type: "object",
       properties: {
-        loan_id: {
+        credito_id: {
           type: "string",
-          description: "ID o código del préstamo",
+          description: "ID o código del crédito",
         },
       },
-      required: ["loan_id"],
+      required: ["credito_id"],
     },
   },
 
   // ========== PROPIETARIOS (Admin) ==========
   {
-    name: "list_propietarios",
+    name: "listar_propietarios",
     description: "Lista todos los propietarios (deudores) del sistema. REQUIERE autenticación admin. Incluye información de créditos activos y deuda total.",
     inputSchema: {
       type: "object",
       properties: {
-        limit: {
+        limite: {
           type: "number",
           description: "Número máximo de resultados (default: 50)",
         },
-        search: {
+        buscar: {
           type: "string",
           description: "Buscar por nombre, documento o email",
         },
@@ -152,16 +152,16 @@ const tools: Tool[] = [
 
   // ========== INVERSIONISTAS (Admin) ==========
   {
-    name: "list_inversionistas",
+    name: "listar_inversionistas",
     description: "Lista todos los inversionistas del sistema. REQUIERE autenticación admin. Incluye información de inversiones activas y total invertido.",
     inputSchema: {
       type: "object",
       properties: {
-        limit: {
+        limite: {
           type: "number",
           description: "Número máximo de resultados (default: 50)",
         },
-        search: {
+        buscar: {
           type: "string",
           description: "Buscar por nombre, documento o email",
         },
@@ -170,32 +170,32 @@ const tools: Tool[] = [
     },
   },
   {
-    name: "get_investor_payments",
-    description: "Obtiene todos los pagos recibidos por un inversionista específico, incluyendo el detalle de cada préstamo donde tiene inversión.",
+    name: "obtener_pagos_inversionista",
+    description: "Obtiene todos los pagos recibidos por un inversionista específico, incluyendo el detalle de cada crédito donde tiene inversión.",
     inputSchema: {
       type: "object",
       properties: {
-        investor_id: {
+        inversionista_id: {
           type: "string",
           description: "UUID del inversionista",
         },
       },
-      required: ["investor_id"],
+      required: ["inversionista_id"],
     },
   },
 
   // ========== USUARIOS (Admin) ==========
   {
-    name: "list_users",
+    name: "listar_usuarios",
     description: "Lista todos los usuarios del sistema. Puede filtrar por rol.",
     inputSchema: {
       type: "object",
       properties: {
-        limit: {
+        limite: {
           type: "number",
           description: "Número máximo de resultados (default: 50)",
         },
-        role: {
+        rol: {
           type: "string",
           description: "Filtrar por rol: admin, inversionista, propietario",
         },
@@ -204,19 +204,19 @@ const tools: Tool[] = [
     },
   },
 
-  // ========== SCHEMA ==========
+  // ========== ESQUEMA ==========
   {
-    name: "get_table_schema",
+    name: "obtener_esquema_tabla",
     description: "Obtiene las columnas y tipos de una tabla de la base de datos. Útil para entender la estructura de datos.",
     inputSchema: {
       type: "object",
       properties: {
-        table: {
+        tabla: {
           type: "string",
           description: "Nombre de la tabla: creditos, profiles, inversiones, transacciones, plan_pagos",
         },
       },
-      required: ["table"],
+      required: ["tabla"],
     },
   },
 ];
@@ -245,67 +245,67 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   try {
     switch (name) {
-      // ========== PRÉSTAMOS ==========
-      case "list_loans": {
-        const { limit, estado } = (args || {}) as { limit?: number; estado?: string };
-        let endpoint = "/loans";
+      // ========== CRÉDITOS ==========
+      case "listar_creditos": {
+        const { limite, estado } = (args || {}) as { limite?: number; estado?: string };
+        let endpoint = "/creditos";
         const params: string[] = [];
-        if (limit) params.push(`limit=${limit}`);
+        if (limite) params.push(`limite=${limite}`);
         if (estado) params.push(`estado=${estado}`);
         if (params.length > 0) endpoint += `?${params.join("&")}`;
 
-        const result = await apiRequest(endpoint);
+        const result = await apiRequest(endpoint, "GET", undefined, true);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 
       // ========== PAGOS ==========
-      case "get_payments": {
-        const { loan_id } = args as { loan_id: string };
-        const result = await apiRequest(`/payments?loan_id=${encodeURIComponent(loan_id)}`);
+      case "obtener_pagos": {
+        const { credito_id } = args as { credito_id: string };
+        const result = await apiRequest(`/pagos?credito_id=${encodeURIComponent(credito_id)}`, "GET", undefined, true);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 
-      case "register_payment": {
-        const { loan_id, payment_date, amount_capital, amount_interest, amount_late_fee } = args as {
-          loan_id: string;
-          payment_date: string;
-          amount_capital: number;
-          amount_interest: number;
-          amount_late_fee?: number;
+      case "registrar_pago": {
+        const { credito_id, fecha_pago, monto_capital, monto_interes, monto_mora } = args as {
+          credito_id: string;
+          fecha_pago: string;
+          monto_capital: number;
+          monto_interes: number;
+          monto_mora?: number;
         };
 
-        const result = await apiRequest("/payments", "POST", {
-          loan_id,
-          payment_date,
-          amount_capital,
-          amount_interest,
-          amount_late_fee: amount_late_fee || 0,
-        });
+        const result = await apiRequest("/pagos", "POST", {
+          credito_id,
+          fecha_pago,
+          monto_capital,
+          monto_interes,
+          monto_mora: monto_mora || 0,
+        }, true);
 
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 
-      case "get_distribution": {
-        const { loan_id } = args as { loan_id: string };
-        const result = await apiRequest(`/payments/distribution?loan_id=${encodeURIComponent(loan_id)}`);
+      case "obtener_distribucion": {
+        const { credito_id } = args as { credito_id: string };
+        const result = await apiRequest(`/pagos/distribucion?credito_id=${encodeURIComponent(credito_id)}`, "GET", undefined, true);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 
       // ========== PROPIETARIOS (Admin) ==========
-      case "list_propietarios": {
-        const { limit, search } = (args || {}) as { limit?: number; search?: string };
+      case "listar_propietarios": {
+        const { limite, buscar } = (args || {}) as { limite?: number; buscar?: string };
         let endpoint = "/propietarios";
         const params: string[] = [];
-        if (limit) params.push(`limit=${limit}`);
-        if (search) params.push(`search=${encodeURIComponent(search)}`);
+        if (limite) params.push(`limit=${limite}`);
+        if (buscar) params.push(`search=${encodeURIComponent(buscar)}`);
         if (params.length > 0) endpoint += `?${params.join("&")}`;
 
         const result = await apiRequest(endpoint, "GET", undefined, true);
@@ -315,12 +315,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       // ========== INVERSIONISTAS (Admin) ==========
-      case "list_inversionistas": {
-        const { limit, search } = (args || {}) as { limit?: number; search?: string };
+      case "listar_inversionistas": {
+        const { limite, buscar } = (args || {}) as { limite?: number; buscar?: string };
         let endpoint = "/inversionistas";
         const params: string[] = [];
-        if (limit) params.push(`limit=${limit}`);
-        if (search) params.push(`search=${encodeURIComponent(search)}`);
+        if (limite) params.push(`limit=${limite}`);
+        if (buscar) params.push(`search=${encodeURIComponent(buscar)}`);
         if (params.length > 0) endpoint += `?${params.join("&")}`;
 
         const result = await apiRequest(endpoint, "GET", undefined, true);
@@ -329,33 +329,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "get_investor_payments": {
-        const { investor_id } = args as { investor_id: string };
-        const result = await apiRequest(`/investors/${investor_id}/payments`);
+      case "obtener_pagos_inversionista": {
+        const { inversionista_id } = args as { inversionista_id: string };
+        const result = await apiRequest(`/inversionistas/${inversionista_id}/pagos`, "GET", undefined, true);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 
       // ========== USUARIOS ==========
-      case "list_users": {
-        const { limit, role } = (args || {}) as { limit?: number; role?: string };
-        let endpoint = "/users";
+      case "listar_usuarios": {
+        const { limite, rol } = (args || {}) as { limite?: number; rol?: string };
+        let endpoint = "/usuarios";
         const params: string[] = [];
-        if (limit) params.push(`limit=${limit}`);
-        if (role) params.push(`role=${role}`);
+        if (limite) params.push(`limite=${limite}`);
+        if (rol) params.push(`rol=${rol}`);
         if (params.length > 0) endpoint += `?${params.join("&")}`;
 
-        const result = await apiRequest(endpoint);
+        const result = await apiRequest(endpoint, "GET", undefined, true);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       }
 
-      // ========== SCHEMA ==========
-      case "get_table_schema": {
-        const { table } = args as { table: string };
-        const result = await apiRequest(`/schema?table=${encodeURIComponent(table)}`);
+      // ========== ESQUEMA ==========
+      case "obtener_esquema_tabla": {
+        const { tabla } = args as { tabla: string };
+        const result = await apiRequest(`/esquema?tabla=${encodeURIComponent(tabla)}`, "GET", undefined, true);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };

@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 /**
- * GET /api/investors/[id]/payments
+ * GET /api/inversionistas/[id]/pagos
  *
  * Obtiene todos los pagos recibidos por un inversionista específico.
- * Incluye el detalle de cada préstamo donde tiene inversión.
+ * Incluye el detalle de cada crédito donde tiene inversión.
  *
  * REQUIERE: Autenticación con rol 'admin'
  *
@@ -17,9 +17,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
-    const { id: investorId } = await params
+    const { id: inversionistaId } = await params
 
-    if (!investorId) {
+    if (!inversionistaId) {
       return NextResponse.json(
         { success: false, error: 'ID del inversionista es requerido' },
         { status: 400 }
@@ -77,25 +77,17 @@ export async function GET(
 
     // 4. Procesar la solicitud (usuario autenticado como admin)
     // Obtener información del inversionista
-    const { data: investor, error: investorError } = await supabase
+    const { data: inversionista, error: inversionistaError } = await supabase
       .from('profiles')
       .select('id, full_name, email, document_id')
-      .eq('id', investorId)
+      .eq('id', inversionistaId)
       .single()
 
-    if (investorError || !investor) {
+    if (inversionistaError || !inversionista) {
       return NextResponse.json(
         { success: false, error: 'Inversionista no encontrado' },
         { status: 404 }
       )
-    }
-
-    // Status mapping: new DB estado → English API status
-    const statusMap: Record<string, string> = {
-      publicado: 'fundraising',
-      activo: 'active',
-      finalizado: 'completed',
-      mora: 'defaulted'
     }
 
     // Obtener todas las inversiones del inversionista
@@ -114,18 +106,18 @@ export async function GET(
           estado
         )
       `)
-      .eq('inversionista_id', investorId)
+      .eq('inversionista_id', inversionistaId)
 
     if (inversionesError) {
-      console.error('Error fetching investments:', inversionesError)
+      console.error('Error fetching inversiones:', inversionesError)
       return NextResponse.json(
         { success: false, error: 'Error al obtener inversiones' },
         { status: 500 }
       )
     }
 
-    // Para cada inversión, obtener los pagos del crédito from transacciones
-    const investmentsWithPayments = await Promise.all(
+    // Para cada inversión, obtener los pagos del crédito desde transacciones
+    const inversionesConPagos = await Promise.all(
       (inversiones || []).map(async (inversion) => {
         const creditoData = inversion.credito as unknown as {
           id: string
@@ -136,18 +128,18 @@ export async function GET(
 
         if (!creditoData) {
           return {
-            investment_id: inversion.id,
-            loan_id: inversion.credito_id,
-            loan_code: 'N/A',
-            amount_invested: inversion.monto_invertido,
-            percentage: 0,
-            payments: [],
-            total_earned: 0
+            inversion_id: inversion.id,
+            credito_id: inversion.credito_id,
+            codigo_credito: 'N/A',
+            monto_invertido: inversion.monto_invertido,
+            porcentaje: 0,
+            pagos: [],
+            total_ganado: 0
           }
         }
 
         // Calcular porcentaje de participación
-        const percentage = creditoData.monto_solicitado > 0
+        const porcentaje = creditoData.monto_solicitado > 0
           ? (inversion.monto_invertido / creditoData.monto_solicitado) * 100
           : 0
 
@@ -159,87 +151,87 @@ export async function GET(
           .in('tipo_transaccion', ['pago_capital', 'pago_interes', 'pago_mora'])
           .order('fecha_transaccion', { ascending: false })
 
-        // Group transacciones by referencia_pago to reconstruct payments
-        const paymentGroups: Record<string, {
+        // Agrupar transacciones por referencia_pago
+        const gruposPago: Record<string, {
           id: string;
-          payment_date: string;
-          amount_capital: number;
-          amount_interest: number;
-          amount_late_fee: number;
-          amount_total: number;
+          fecha_pago: string;
+          monto_capital: number;
+          monto_interes: number;
+          monto_mora: number;
+          monto_total: number;
         }> = {}
 
         for (const tx of (transacciones || [])) {
           const ref = tx.referencia_pago || tx.id
-          if (!paymentGroups[ref]) {
-            paymentGroups[ref] = {
+          if (!gruposPago[ref]) {
+            gruposPago[ref] = {
               id: ref,
-              payment_date: tx.fecha_transaccion,
-              amount_capital: 0,
-              amount_interest: 0,
-              amount_late_fee: 0,
-              amount_total: 0
+              fecha_pago: tx.fecha_transaccion,
+              monto_capital: 0,
+              monto_interes: 0,
+              monto_mora: 0,
+              monto_total: 0
             }
           }
-          const group = paymentGroups[ref]
-          if (tx.tipo_transaccion === 'pago_capital') group.amount_capital += tx.monto || 0
-          else if (tx.tipo_transaccion === 'pago_interes') group.amount_interest += tx.monto || 0
-          else if (tx.tipo_transaccion === 'pago_mora') group.amount_late_fee += tx.monto || 0
-          group.amount_total = group.amount_capital + group.amount_interest + group.amount_late_fee
+          const grupo = gruposPago[ref]
+          if (tx.tipo_transaccion === 'pago_capital') grupo.monto_capital += tx.monto || 0
+          else if (tx.tipo_transaccion === 'pago_interes') grupo.monto_interes += tx.monto || 0
+          else if (tx.tipo_transaccion === 'pago_mora') grupo.monto_mora += tx.monto || 0
+          grupo.monto_total = grupo.monto_capital + grupo.monto_interes + grupo.monto_mora
         }
 
-        const groupedPayments = Object.values(paymentGroups)
+        const pagosAgrupados = Object.values(gruposPago)
 
         // Calcular lo que le corresponde al inversionista de cada pago
-        const paymentsWithShare = groupedPayments.map(payment => ({
-          payment_id: payment.id,
-          payment_date: payment.payment_date,
-          loan_total: payment.amount_total,
-          investor_interest: Math.round((payment.amount_interest * percentage) / 100),
-          investor_capital: Math.round((payment.amount_capital * percentage) / 100),
-          investor_total: Math.round(((payment.amount_interest + payment.amount_capital) * percentage) / 100)
+        const pagosConParticipacion = pagosAgrupados.map(pago => ({
+          pago_id: pago.id,
+          fecha_pago: pago.fecha_pago,
+          total_credito: pago.monto_total,
+          interes_inversionista: Math.round((pago.monto_interes * porcentaje) / 100),
+          capital_inversionista: Math.round((pago.monto_capital * porcentaje) / 100),
+          total_inversionista: Math.round(((pago.monto_interes + pago.monto_capital) * porcentaje) / 100)
         }))
 
-        const totalEarned = paymentsWithShare.reduce((sum, p) => sum + p.investor_total, 0)
+        const totalGanado = pagosConParticipacion.reduce((sum, p) => sum + p.total_inversionista, 0)
 
         return {
-          investment_id: inversion.id,
-          loan_id: inversion.credito_id,
-          loan_code: creditoData.codigo_credito,
-          loan_status: statusMap[creditoData.estado] || creditoData.estado,
-          amount_invested: inversion.monto_invertido,
-          percentage: Math.round(percentage * 100) / 100,
-          payments: paymentsWithShare,
-          payments_count: paymentsWithShare.length,
-          total_earned: totalEarned
+          inversion_id: inversion.id,
+          credito_id: inversion.credito_id,
+          codigo_credito: creditoData.codigo_credito,
+          estado_credito: creditoData.estado,
+          monto_invertido: inversion.monto_invertido,
+          porcentaje: Math.round(porcentaje * 100) / 100,
+          pagos: pagosConParticipacion,
+          cantidad_pagos: pagosConParticipacion.length,
+          total_ganado: totalGanado
         }
       })
     )
 
     // Calcular totales generales
-    const totalInvested = investmentsWithPayments.reduce((sum, i) => sum + i.amount_invested, 0)
-    const totalEarned = investmentsWithPayments.reduce((sum, i) => sum + i.total_earned, 0)
-    const totalPayments = investmentsWithPayments.reduce((sum, i) => sum + i.payments_count, 0)
+    const totalInvertido = inversionesConPagos.reduce((sum, i) => sum + i.monto_invertido, 0)
+    const totalGanado = inversionesConPagos.reduce((sum, i) => sum + i.total_ganado, 0)
+    const totalPagos = inversionesConPagos.reduce((sum, i) => sum + i.cantidad_pagos, 0)
 
     return NextResponse.json({
       success: true,
-      investor: {
-        id: investor.id,
-        name: investor.full_name,
-        email: investor.email,
-        document: investor.document_id
+      inversionista: {
+        id: inversionista.id,
+        nombre: inversionista.full_name,
+        email: inversionista.email,
+        documento: inversionista.document_id
       },
-      summary: {
-        total_invested: totalInvested,
-        total_earned: totalEarned,
-        total_payments: totalPayments,
-        active_investments: investmentsWithPayments.filter(i => i.loan_status === 'active').length
+      resumen: {
+        total_invertido: totalInvertido,
+        total_ganado: totalGanado,
+        total_pagos: totalPagos,
+        inversiones_activas: inversionesConPagos.filter(i => i.estado_credito === 'activo').length
       },
-      investments: investmentsWithPayments
+      inversiones: inversionesConPagos
     })
 
   } catch (error) {
-    console.error('Error in investor payments API:', error)
+    console.error('Error in inversionista pagos API:', error)
     return NextResponse.json(
       { success: false, error: 'Error interno del servidor' },
       { status: 500 }

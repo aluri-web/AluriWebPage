@@ -2,17 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 /**
- * GET /api/users
+ * GET /api/esquema?tabla=creditos
  *
- * Lista todos los usuarios del sistema con su rol y estado.
+ * Obtiene las columnas de una tabla de la base de datos directamente
+ * del information_schema de PostgreSQL.
+ *
  * REQUIERE: Autenticación con rol 'admin'
  *
  * Headers requeridos:
  * - Authorization: Bearer <token>
- *
- * Query params opcionales:
- * - role: filtrar por rol (inversionista, propietario, admin)
- * - limit: número máximo de resultados (default: 50)
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -67,45 +65,59 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // 4. Procesar la solicitud (usuario autenticado como admin)
     const { searchParams } = new URL(request.url)
-    const role = searchParams.get('role')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const tabla = searchParams.get('tabla') || 'creditos'
 
-    let query = supabase
-      .from('profiles')
-      .select('id, full_name, email, document_id, phone, address, city, role, verification_status, created_at')
-      .order('created_at', { ascending: false })
-      .limit(limit)
-
-    if (role) {
-      query = query.eq('role', role)
-    }
-
-    const { data: users, error } = await query
+    // Consultar information_schema para obtener las columnas de la tabla
+    const { data: columnas, error } = await supabase
+      .rpc('get_table_columns', { table_name: tabla })
 
     if (error) {
-      console.error('Error fetching users:', error)
-      return NextResponse.json(
-        { success: false, error: 'Error al obtener usuarios' },
-        { status: 500 }
-      )
-    }
+      // Si la función RPC no existe, intentar obtener el schema del OpenAPI
+      const schemaResponse = await fetch(`${supabaseUrl}/rest/v1/?apikey=${serviceRoleKey}`)
 
-    // Contar por rol
-    const roleCounts = (users || []).reduce((acc, user) => {
-      const r = user.role || 'sin_rol'
-      acc[r] = (acc[r] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
+      if (schemaResponse.ok) {
+        const schemaData = await schemaResponse.json()
+
+        // Buscar la definición de la tabla en el schema
+        if (schemaData.definitions && schemaData.definitions[tabla]) {
+          const tableDefinition = schemaData.definitions[tabla]
+          const properties = tableDefinition.properties || {}
+
+          const listaColumnas = Object.entries(properties).map(([nombre, def]: [string, unknown]) => {
+            const columnDef = def as { description?: string; type?: string; format?: string; default?: string }
+            return {
+              nombre,
+              tipo: columnDef.format || columnDef.type || 'desconocido',
+              descripcion: columnDef.description || '',
+              valor_defecto: columnDef.default
+            }
+          }).sort((a, b) => a.nombre.localeCompare(b.nombre))
+
+          return NextResponse.json({
+            success: true,
+            tabla,
+            columnas: listaColumnas,
+            total: listaColumnas.length
+          })
+        }
+      }
+
+      return NextResponse.json({
+        success: false,
+        error: 'No se pudo obtener el esquema de la tabla',
+        sugerencia: error?.message
+      }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
-      users: users || [],
-      total: users?.length || 0,
-      by_role: roleCounts
+      tabla,
+      columnas,
+      total: columnas?.length || 0
     })
 
   } catch (error) {
-    console.error('Error in users API:', error)
+    console.error('Error in esquema API:', error)
     return NextResponse.json(
       { success: false, error: 'Error interno del servidor' },
       { status: 500 }

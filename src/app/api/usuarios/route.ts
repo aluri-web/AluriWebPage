@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 /**
- * GET /api/loans
+ * GET /api/usuarios
  *
- * Lista todos los préstamos disponibles para consultar pagos.
+ * Lista todos los usuarios del sistema con su rol y estado.
  * REQUIERE: Autenticación con rol 'admin'
  *
  * Headers requeridos:
  * - Authorization: Bearer <token>
  *
- * DB: creditos + inversiones (for amount_funded calculation)
+ * Query params opcionales:
+ * - rol: filtrar por rol (inversionista, propietario, admin)
+ * - limite: número máximo de resultados (default: 50)
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
@@ -64,74 +66,46 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     // 4. Procesar la solicitud (usuario autenticado como admin)
-    // Status mapping: new DB estado → English API status
-    const statusMap: Record<string, string> = {
-      publicado: 'fundraising',
-      activo: 'active',
-      finalizado: 'completed',
-      mora: 'defaulted'
+    const { searchParams } = new URL(request.url)
+    const rol = searchParams.get('rol')
+    const limite = parseInt(searchParams.get('limite') || '50')
+
+    let query = supabase
+      .from('profiles')
+      .select('id, full_name, email, document_id, phone, address, city, role, verification_status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limite)
+
+    if (rol) {
+      query = query.eq('role', rol)
     }
 
-    const { data: creditos, error } = await supabase
-      .from('creditos')
-      .select(`
-        id,
-        codigo_credito,
-        estado,
-        monto_solicitado,
-        owner:profiles!cliente_id (
-          full_name
-        )
-      `)
-      .order('created_at', { ascending: false })
-      .limit(50)
+    const { data: usuarios, error } = await query
 
     if (error) {
-      console.error('Error fetching loans:', error)
+      console.error('Error fetching usuarios:', error)
       return NextResponse.json(
-        { success: false, error: 'Error al obtener préstamos' },
+        { success: false, error: 'Error al obtener usuarios' },
         { status: 500 }
       )
     }
 
-    // Calculate amount_funded per credito from inversiones
-    const creditoIds = (creditos || []).map(c => c.id)
-    let fundedMap: Record<string, number> = {}
-
-    if (creditoIds.length > 0) {
-      const { data: inversiones } = await supabase
-        .from('inversiones')
-        .select('credito_id, monto_invertido, estado')
-        .in('credito_id', creditoIds)
-        .in('estado', ['activo', 'pendiente'])
-
-      if (inversiones) {
-        for (const inv of inversiones) {
-          fundedMap[inv.credito_id] = (fundedMap[inv.credito_id] || 0) + (inv.monto_invertido || 0)
-        }
-      }
-    }
-
-    const formattedLoans = (creditos || []).map(credito => {
-      const ownerData = credito.owner as unknown as { full_name: string | null } | null
-      return {
-        id: credito.id,
-        code: credito.codigo_credito,
-        status: statusMap[credito.estado] || credito.estado,
-        amount_requested: credito.monto_solicitado,
-        amount_funded: fundedMap[credito.id] || 0,
-        owner_name: ownerData?.full_name || 'Sin propietario'
-      }
-    })
+    // Contar por rol
+    const conteoRoles = (usuarios || []).reduce((acc, usuario) => {
+      const r = usuario.role || 'sin_rol'
+      acc[r] = (acc[r] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
 
     return NextResponse.json({
       success: true,
-      loans: formattedLoans,
-      total: creditos?.length || 0
+      usuarios: usuarios || [],
+      total: usuarios?.length || 0,
+      por_rol: conteoRoles
     })
 
   } catch (error) {
-    console.error('Error in loans API:', error)
+    console.error('Error in usuarios API:', error)
     return NextResponse.json(
       { success: false, error: 'Error interno del servidor' },
       { status: 500 }
