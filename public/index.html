@@ -429,19 +429,7 @@
                 });
             }
                 });
-                // Floating CTA scroll-to-top behavior
-                const floatingCta = document.getElementById('floating-cta');
-                if (floatingCta) {
-                    window.addEventListener('scroll', () => {
-                        if (window.scrollY > 200) {
-                            floatingCta.style.display = 'flex';
-                        } else {
-                            floatingCta.style.display = 'none';
-                        }
-                    });
-                    // Initially hidden until scroll
-                    floatingCta.style.display = 'none';
-                }
+                // Floating CTA always visible
     </script>
 </body>
 </html>
