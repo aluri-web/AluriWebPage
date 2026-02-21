@@ -27,7 +27,7 @@ export default function InversionistasPage() {
             <Link className="text-sm font-medium text-slate-400 hover:text-primary transition-colors" href="/propietarios">Propietarios</Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="hidden sm:flex items-center justify-center px-6 h-10 bg-primary hover:bg-primary-dark transition-all text-slate-900 text-sm font-bold rounded-full shadow-sm shadow-primary/30">
+            <Link href="/login" className="flex items-center justify-center px-6 h-10 bg-primary hover:bg-primary-dark transition-all text-slate-900 text-sm font-bold rounded-full shadow-sm shadow-primary/30">
               Ingresar
             </Link>
           </div>

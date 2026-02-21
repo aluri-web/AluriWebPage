@@ -494,6 +494,9 @@ export interface LoanTableRow {
   risk_label: string | null
   investors: string[]
   created_at: string
+  saldo_capital: number
+  saldo_intereses: number
+  saldo_mora: number
 }
 
 export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; error: string | null }> {
@@ -518,6 +521,9 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       ciudad_inmueble,
       direccion_inmueble,
       co_deudor_id,
+      saldo_capital,
+      saldo_intereses,
+      saldo_mora,
       created_at,
       cliente:profiles!cliente_id (
         full_name,
@@ -611,6 +617,15 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
     return { score: 'B2', label: 'Riesgo Alto' }
   }
 
+  // Map DB estado (Spanish) to UI status (English)
+  const statusMap: Record<string, string> = {
+    publicado: 'fundraising',
+    activo: 'active',
+    mora: 'defaulted',
+    finalizado: 'completed',
+    pagado: 'completed',
+  }
+
   // Transform data - map Spanish fields to expected English interface
   const tableData: LoanTableRow[] = (creditos || []).map(credito => {
     const amountFunded = montoFundedByCredito[credito.id] || 0
@@ -623,7 +638,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
     return {
       id: credito.id,
       code: credito.codigo_credito,
-      status: credito.estado,
+      status: statusMap[credito.estado] || credito.estado,
       amount_requested: credito.monto_solicitado,
       amount_funded: amountFunded,
       interest_rate_nm: credito.tasa_nominal,
@@ -638,7 +653,10 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       risk_score: risk.score,
       risk_label: risk.label,
       investors: investorsByCredito[credito.id] || [],
-      created_at: credito.created_at
+      created_at: credito.created_at,
+      saldo_capital: (credito as any).saldo_capital || 0,
+      saldo_intereses: (credito as any).saldo_intereses || 0,
+      saldo_mora: (credito as any).saldo_mora || 0,
     }
   })
 
@@ -852,16 +870,12 @@ export async function getLoanById(loanId: string): Promise<{ data: LoanForModal 
 export interface RegisterPaymentData {
   loan_id: string
   payment_date: string
-  amount_capital: number
-  amount_interest: number
-  amount_late_fee: number
+  monto: number
 }
 
 export async function registerLoanPayment(
   data: RegisterPaymentData
-): Promise<{ success: boolean; error?: string; paymentId?: string }> {
-  const supabase = await createClient()
-
+): Promise<{ success: boolean; error?: string; aplicacion?: Record<string, unknown> }> {
   // Validation
   if (!data.loan_id) {
     return { success: false, error: 'ID del credito es requerido.' }
@@ -871,63 +885,44 @@ export async function registerLoanPayment(
     return { success: false, error: 'Fecha de pago es requerida.' }
   }
 
-  const totalAmount = data.amount_capital + data.amount_interest + data.amount_late_fee
-
-  if (totalAmount <= 0) {
-    return { success: false, error: 'El monto total debe ser mayor a cero.' }
+  if (data.monto <= 0) {
+    return { success: false, error: 'El monto debe ser mayor a cero.' }
   }
 
   try {
-    // Generate a shared reference for this payment group
-    const referenciaPago = `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-    const transacciones = []
+    // Get admin auth token to call the API
+    const supabase = await createClient()
+    const { data: { session } } = await supabase.auth.getSession()
 
-    if (data.amount_capital > 0) {
-      transacciones.push({
-        credito_id: data.loan_id,
-        tipo_transaccion: 'pago_capital',
-        concepto: 'Abono a capital',
-        monto: data.amount_capital,
-        fecha_transaccion: new Date().toISOString(),
-        fecha_aplicacion: data.payment_date,
-        referencia_pago: referenciaPago,
-      })
-    }
-    if (data.amount_interest > 0) {
-      transacciones.push({
-        credito_id: data.loan_id,
-        tipo_transaccion: 'pago_interes',
-        concepto: 'Pago de intereses',
-        monto: data.amount_interest,
-        fecha_transaccion: new Date().toISOString(),
-        fecha_aplicacion: data.payment_date,
-        referencia_pago: referenciaPago,
-      })
-    }
-    if (data.amount_late_fee > 0) {
-      transacciones.push({
-        credito_id: data.loan_id,
-        tipo_transaccion: 'pago_mora',
-        concepto: 'Pago de mora',
-        monto: data.amount_late_fee,
-        fecha_transaccion: new Date().toISOString(),
-        fecha_aplicacion: data.payment_date,
-        referencia_pago: referenciaPago,
-      })
+    if (!session?.access_token) {
+      return { success: false, error: 'No se pudo obtener sesion de admin.' }
     }
 
-    const { error: txnError } = await supabase
-      .from('transacciones')
-      .insert(transacciones)
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
+      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
 
-    if (txnError) {
-      console.error('Error registering payment:', txnError.message)
-      return { success: false, error: 'Error al registrar pago: ' + txnError.message }
+    const response = await fetch(`${baseUrl}/api/pagos`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        credito_id: data.loan_id,
+        fecha_pago: data.payment_date,
+        monto: data.monto,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      return { success: false, error: result.error || 'Error al registrar el pago.' }
     }
 
     revalidatePath('/dashboard/admin/colocaciones')
 
-    return { success: true, paymentId: referenciaPago }
+    return { success: true, aplicacion: result.aplicacion }
 
   } catch (error) {
     console.error('Unexpected error:', error)

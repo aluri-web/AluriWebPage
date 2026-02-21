@@ -17,7 +17,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const [selectedLoan, setSelectedLoan] = useState<LoanTableRow | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [paymentLoan, setPaymentLoan] = useState<{ id: string; code: string } | null>(null)
+  const [paymentLoan, setPaymentLoan] = useState<{ id: string; code: string; saldo_capital: number; saldo_intereses: number; saldo_mora: number } | null>(null)
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return '-'
@@ -97,7 +97,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   }
 
   const openPaymentModal = (loan: LoanTableRow) => {
-    setPaymentLoan({ id: loan.id, code: loan.code })
+    setPaymentLoan({ id: loan.id, code: loan.code, saldo_capital: loan.saldo_capital, saldo_intereses: loan.saldo_intereses, saldo_mora: loan.saldo_mora })
     setIsPaymentModalOpen(true)
   }
 
@@ -312,6 +312,9 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
         <PaymentModal
           loanId={paymentLoan.id}
           loanCode={paymentLoan.code}
+          saldoCapital={paymentLoan.saldo_capital}
+          saldoIntereses={paymentLoan.saldo_intereses}
+          saldoMora={paymentLoan.saldo_mora}
           isOpen={isPaymentModalOpen}
           onClose={closePaymentModal}
         />

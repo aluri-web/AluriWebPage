@@ -2,17 +2,20 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, DollarSign, Calendar, AlertCircle, CheckCircle } from 'lucide-react'
+import { X, DollarSign, Calendar, AlertCircle, CheckCircle, ArrowDown } from 'lucide-react'
 import { registerLoanPayment } from './actions'
 
 interface PaymentModalProps {
   loanId: string
   loanCode: string
+  saldoCapital: number
+  saldoIntereses: number
+  saldoMora: number
   isOpen: boolean
   onClose: () => void
 }
 
-export default function PaymentModal({ loanId, loanCode, isOpen, onClose }: PaymentModalProps) {
+export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoIntereses, saldoMora, isOpen, onClose }: PaymentModalProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,20 +25,13 @@ export default function PaymentModal({ loanId, loanCode, isOpen, onClose }: Paym
   const [paymentDate, setPaymentDate] = useState(() => {
     return new Date().toISOString().split('T')[0]
   })
-  const [amountCapital, setAmountCapital] = useState<number>(0)
-  const [amountInterest, setAmountInterest] = useState<number>(0)
-  const [amountLateFee, setAmountLateFee] = useState<number>(0)
-
-  // Calculate total
-  const totalAmount = amountCapital + amountInterest + amountLateFee
+  const [monto, setMonto] = useState<number>(0)
 
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
       setPaymentDate(new Date().toISOString().split('T')[0])
-      setAmountCapital(0)
-      setAmountInterest(0)
-      setAmountLateFee(0)
+      setMonto(0)
       setError(null)
       setSuccess(false)
     }
@@ -50,6 +46,20 @@ export default function PaymentModal({ loanId, loanCode, isOpen, onClose }: Paym
     }).format(amount)
   }
 
+  // Simulate cascading distribution preview
+  const calcDistribution = (total: number) => {
+    let restante = total
+    const mora = Math.min(restante, saldoMora)
+    restante -= mora
+    const intereses = Math.min(restante, saldoIntereses)
+    restante -= intereses
+    const capital = Math.min(restante, saldoCapital)
+    return { mora, intereses, capital }
+  }
+
+  const dist = calcDistribution(monto)
+  const deudaTotal = saldoMora + saldoIntereses + saldoCapital
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -59,9 +69,7 @@ export default function PaymentModal({ loanId, loanCode, isOpen, onClose }: Paym
       const result = await registerLoanPayment({
         loan_id: loanId,
         payment_date: paymentDate,
-        amount_capital: amountCapital,
-        amount_interest: amountInterest,
-        amount_late_fee: amountLateFee
+        monto: monto
       })
 
       if (!result.success) {
@@ -78,7 +86,7 @@ export default function PaymentModal({ loanId, loanCode, isOpen, onClose }: Paym
         onClose()
       }, 1500)
 
-    } catch (err) {
+    } catch {
       setError('Error inesperado al registrar el pago')
       setIsSubmitting(false)
     }
@@ -122,7 +130,7 @@ export default function PaymentModal({ loanId, loanCode, isOpen, onClose }: Paym
               <CheckCircle size={32} className="text-emerald-400" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">Pago Registrado</h3>
-            <p className="text-slate-400">El pago se ha registrado correctamente.</p>
+            <p className="text-slate-400">El pago se ha registrado y distribuido correctamente.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
@@ -135,6 +143,27 @@ export default function PaymentModal({ loanId, loanCode, isOpen, onClose }: Paym
                   <p className="text-sm text-red-400">{error}</p>
                 </div>
               )}
+
+              {/* Current balances */}
+              <div className="p-3 bg-slate-800/50 rounded-lg space-y-2">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Saldos Pendientes</p>
+                <div className="flex justify-between text-sm">
+                  <span className="text-red-400">Mora</span>
+                  <span className="text-red-400 font-medium">{formatCurrency(saldoMora)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-amber-400">Intereses</span>
+                  <span className="text-amber-400 font-medium">{formatCurrency(saldoIntereses)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-blue-400">Capital</span>
+                  <span className="text-blue-400 font-medium">{formatCurrency(saldoCapital)}</span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t border-slate-700">
+                  <span className="text-white font-medium">Deuda Total</span>
+                  <span className="text-white font-bold">{formatCurrency(deudaTotal)}</span>
+                </div>
+              </div>
 
               {/* Payment Date */}
               <div>
@@ -153,68 +182,51 @@ export default function PaymentModal({ loanId, loanCode, isOpen, onClose }: Paym
                 />
               </div>
 
-              {/* Amount Capital */}
+              {/* Single Amount */}
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Abono a Capital ($)
+                  Monto del Pago ($)
                 </label>
-                <p className="text-xs text-slate-500 mb-1.5">Reduce la deuda principal del credito</p>
+                <p className="text-xs text-slate-500 mb-1.5">Se distribuye automaticamente: mora → intereses → capital</p>
                 <input
                   type="number"
-                  value={amountCapital || ''}
-                  onChange={(e) => setAmountCapital(Number(e.target.value) || 0)}
+                  value={monto || ''}
+                  onChange={(e) => setMonto(Number(e.target.value) || 0)}
                   min="0"
                   step="1000"
                   placeholder="0"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  required
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 />
               </div>
 
-              {/* Amount Interest */}
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Pago de Intereses ($)
-                </label>
-                <p className="text-xs text-slate-500 mb-1.5">Ganancia distribuida a los inversionistas</p>
-                <input
-                  type="number"
-                  value={amountInterest || ''}
-                  onChange={(e) => setAmountInterest(Number(e.target.value) || 0)}
-                  min="0"
-                  step="1000"
-                  placeholder="0"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Amount Late Fee */}
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Mora / Otros ($)
-                </label>
-                <p className="text-xs text-slate-500 mb-1.5">Cargos adicionales por mora u otros conceptos</p>
-                <input
-                  type="number"
-                  value={amountLateFee || ''}
-                  onChange={(e) => setAmountLateFee(Number(e.target.value) || 0)}
-                  min="0"
-                  step="1000"
-                  placeholder="0"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-              </div>
-
-              {/* Total (read-only) */}
-              <div className="pt-2 border-t border-slate-700">
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                  Total Pagado
-                </label>
-                <div className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600 rounded-lg">
-                  <span className="text-xl font-bold text-teal-400">
-                    {formatCurrency(totalAmount)}
-                  </span>
+              {/* Cascading distribution preview */}
+              {monto > 0 && (
+                <div className="p-3 bg-teal-500/5 border border-teal-500/20 rounded-lg space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <ArrowDown size={14} className="text-teal-400" />
+                    <p className="text-xs font-medium text-teal-400 uppercase tracking-wider">Distribucion del Pago</p>
+                  </div>
+                  {dist.mora > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-red-400">→ Mora</span>
+                      <span className="text-red-400 font-medium">{formatCurrency(dist.mora)}</span>
+                    </div>
+                  )}
+                  {dist.intereses > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-amber-400">→ Intereses</span>
+                      <span className="text-amber-400 font-medium">{formatCurrency(dist.intereses)}</span>
+                    </div>
+                  )}
+                  {dist.capital > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-blue-400">→ Capital</span>
+                      <span className="text-blue-400 font-medium">{formatCurrency(dist.capital)}</span>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Footer */}
@@ -228,7 +240,7 @@ export default function PaymentModal({ loanId, loanCode, isOpen, onClose }: Paym
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || totalAmount <= 0}
+                disabled={isSubmitting || monto <= 0}
                 className="flex-1 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
