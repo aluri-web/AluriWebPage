@@ -172,7 +172,7 @@ export default function InversionistasPage() {
         <section id="registro" className="py-24">
           <div className="max-w-4xl mx-auto px-6">
             <div className="text-center mb-12">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">Crea tu cuenta de inversionista</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4 tracking-tight">Invierte con Aluri</h2>
               <p className="text-slate-400 text-lg">Completa el formulario para comenzar a invertir.</p>
             </div>
             <SignupForm />
