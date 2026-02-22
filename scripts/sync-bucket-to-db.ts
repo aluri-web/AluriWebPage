@@ -66,7 +66,10 @@ async function syncBucketToDb() {
         return data.publicUrl;
       });
 
-    // 3. Listar documentos en /documentos/
+    // 3. Actualizar creditos (solo fotos por ahora)
+    const updateData: Record<string, unknown> = { fotos_inmueble: fotoUrls }
+
+    // Documentos: solo si la columna existe (migración aplicada)
     const { data: docs } = await supabase.storage
       .from(BUCKET)
       .list(`${codigoCredito}/documentos`, { limit: 200 });
@@ -80,14 +83,18 @@ async function syncBucketToDb() {
         return data.publicUrl;
       });
 
-    // 4. Actualizar creditos
-    const { error: updateError, count } = await supabase
+    // Intentar con documentos; si falla, solo fotos
+    let { error: updateError } = await supabase
       .from('creditos')
-      .update({
-        fotos_inmueble: fotoUrls,
-        documentos_inmueble: docUrls,
-      })
+      .update({ ...updateData, documentos_inmueble: docUrls })
       .eq('codigo_credito', codigoCredito);
+
+    if (updateError?.message?.includes('documentos_inmueble')) {
+      ({ error: updateError } = await supabase
+        .from('creditos')
+        .update(updateData)
+        .eq('codigo_credito', codigoCredito));
+    }
 
     if (updateError) {
       console.error(`  ✗ ${codigoCredito}: ${updateError.message}`);

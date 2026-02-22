@@ -2,7 +2,7 @@ import { createClient } from '../../../../../utils/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, MapPin, Phone, FileText, CheckCircle, TrendingUp, Calendar, Percent, Building, Download } from 'lucide-react'
+import { ArrowLeft, MapPin, Phone, FileText, CheckCircle, TrendingUp, Calendar, Percent, Building } from 'lucide-react'
 
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80'
 
@@ -26,7 +26,6 @@ interface Credito {
   tipo_amortizacion: string | null
   fecha_desembolso: string | null
   fotos_inmueble: string[] | null
-  documentos_inmueble: string[] | null
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
 }
@@ -51,17 +50,6 @@ function formatCOP(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value)
-}
-
-// Helper: Extract readable filename from Supabase Storage URL
-function extractFilename(url: string): string {
-  try {
-    const path = new URL(url).pathname
-    const filename = path.split('/').pop() || 'documento'
-    return filename.replace(/^\d+_/, '')
-  } catch {
-    return 'documento'
-  }
 }
 
 // Helper: Format date
@@ -111,7 +99,6 @@ export default async function InvestmentDetailPage({
         tipo_amortizacion,
         fecha_desembolso,
         fotos_inmueble,
-        documentos_inmueble,
         transacciones (
           tipo_transaccion,
           monto
@@ -358,33 +345,7 @@ export default async function InvestmentDetailPage({
             </div>
           </div>
 
-          {/* Documents */}
-          {credito?.documentos_inmueble && credito.documentos_inmueble.length > 0 && (
-            <div id="documentos" className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
-              <h2 className="text-lg font-semibold text-white mb-4">Documentos del Inmueble</h2>
-              <div className="space-y-3">
-                {credito.documentos_inmueble.map((url, index) => (
-                  <a
-                    key={index}
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors group"
-                  >
-                    <div className="p-2 bg-teal-500/10 rounded-lg">
-                      <FileText size={18} className="text-teal-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium truncate">
-                        {extractFilename(url)}
-                      </p>
-                    </div>
-                    <Download size={16} className="text-zinc-500 group-hover:text-teal-400 transition-colors" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Documents — habilitado cuando se ejecute migración documentos_inmueble */}
 
           {/* Timeline */}
           <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
@@ -449,20 +410,10 @@ export default async function InvestmentDetailPage({
                 <Phone size={18} />
                 Contactar a Aluri
               </button>
-              {credito?.documentos_inmueble && credito.documentos_inmueble.length > 0 ? (
-                <a
-                  href="#documentos"
-                  className="w-full flex items-center justify-center gap-2 bg-zinc-800 text-white font-medium py-3 px-4 rounded-lg hover:bg-zinc-700 transition-colors"
-                >
-                  <FileText size={18} />
-                  Ver Documentos ({credito.documentos_inmueble.length})
-                </a>
-              ) : (
-                <button disabled className="w-full flex items-center justify-center gap-2 bg-zinc-800 text-zinc-600 font-medium py-3 px-4 rounded-lg cursor-not-allowed">
-                  <FileText size={18} />
-                  Sin Documentos
-                </button>
-              )}
+              <button disabled className="w-full flex items-center justify-center gap-2 bg-zinc-800 text-zinc-600 font-medium py-3 px-4 rounded-lg cursor-not-allowed">
+                <FileText size={18} />
+                Sin Documentos
+              </button>
             </div>
           </div>
 
