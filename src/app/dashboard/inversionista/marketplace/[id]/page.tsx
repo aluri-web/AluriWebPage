@@ -38,14 +38,10 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
   const ltv = loan.ltv ?? 0
   const ltvString = ltv > 0 ? `${ltv.toFixed(1)}%` : '-'
 
-  // Gallery images - fallback to placeholders
-  const galleryImages = [
-        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&h=800&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&h=300&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=400&h=300&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=400&h=300&fit=crop&q=80',
-        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=300&fit=crop&q=80'
-      ]
+  // Gallery images - use real photos or fallback to placeholder
+  const galleryImages = (loan.fotos_inmueble && loan.fotos_inmueble.length > 0)
+    ? loan.fotos_inmueble
+    : ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&h=800&fit=crop&q=80']
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">

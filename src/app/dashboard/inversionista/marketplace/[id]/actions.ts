@@ -18,6 +18,7 @@ export interface CreditoOpportunity {
   ltv: number | null
   fecha_firma_programada: string | null
   fecha_desembolso: string | null
+  fotos_inmueble: string[] | null
   inversiones: { monto_invertido: number; estado: string }[]
   owner: {
     full_name: string | null
@@ -44,6 +45,7 @@ export async function getLoanDetail(loanId: string): Promise<{ data: CreditoOppo
       ltv,
       fecha_firma_programada,
       fecha_desembolso,
+      fotos_inmueble,
       inversiones (
         monto_invertido,
         estado

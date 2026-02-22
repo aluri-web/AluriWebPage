@@ -16,15 +16,8 @@ const calculateRiskScore = (loan: MarketplaceCredito) => {
   return { score: 'B2', label: 'Riesgo Alto', borderColor: 'border-red-500/50', textColor: 'text-red-400', bgColor: 'bg-red-500/10' }
 }
 
-// Property images array for variety
-const propertyImages = [
-  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=600&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&h=600&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=800&h=600&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&h=600&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&h=600&fit=crop&q=80'
-]
+// Fallback placeholder when no real photos exist
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop&q=80'
 
 export default function MarketplacePage() {
   const [loans, setLoans] = useState<MarketplaceCredito[]>([])
@@ -209,8 +202,9 @@ export default function MarketplacePage() {
               const progress = getFundingProgress(loan)
               const risk = calculateRiskScore(loan)
               const ltv = getLTV(loan)
-              // Use real property photo or fallback to placeholder
-              const imageUrl = propertyImages[index % propertyImages.length]
+              const imageUrl = (loan.fotos_inmueble && loan.fotos_inmueble.length > 0)
+                ? loan.fotos_inmueble[0]
+                : PLACEHOLDER_IMAGE
 
               return (
                 <div

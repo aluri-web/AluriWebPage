@@ -2,16 +2,9 @@ import { createClient } from '../../../../../utils/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, MapPin, Phone, FileText, CheckCircle, TrendingUp, Calendar, Percent, Building } from 'lucide-react'
+import { ArrowLeft, MapPin, Phone, FileText, CheckCircle, TrendingUp, Calendar, Percent, Building, Download } from 'lucide-react'
 
-// Generic property images for display
-const propertyImages = [
-  'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80',
-  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400&q=80',
-  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=400&q=80',
-  'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=400&q=80',
-  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&q=80',
-]
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80'
 
 // Transaction record from transacciones table
 interface Transaccion {
@@ -32,6 +25,8 @@ interface Credito {
   valor_comercial: number | null
   tipo_amortizacion: string | null
   fecha_desembolso: string | null
+  fotos_inmueble: string[] | null
+  documentos_inmueble: string[] | null
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
 }
@@ -56,6 +51,17 @@ function formatCOP(value: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+// Helper: Extract readable filename from Supabase Storage URL
+function extractFilename(url: string): string {
+  try {
+    const path = new URL(url).pathname
+    const filename = path.split('/').pop() || 'documento'
+    return filename.replace(/^\d+_/, '')
+  } catch {
+    return 'documento'
+  }
 }
 
 // Helper: Format date
@@ -104,6 +110,8 @@ export default async function InvestmentDetailPage({
         valor_comercial,
         tipo_amortizacion,
         fecha_desembolso,
+        fotos_inmueble,
+        documentos_inmueble,
         transacciones (
           tipo_transaccion,
           monto
@@ -217,33 +225,42 @@ export default async function InvestmentDetailPage({
         {/* Left Column - Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Property Images */}
-          <div className="bg-zinc-900 rounded-xl border border-zinc-700 overflow-hidden">
-            <div className="relative aspect-video">
-              <Image
-                src={propertyImages[0]}
-                alt="Propiedad"
-                fill
-                className="object-cover"
-                unoptimized
-              />
-              <div className="absolute bottom-4 right-4 bg-black/60 px-3 py-1 rounded-lg text-white text-sm">
-                1/5
-              </div>
-            </div>
-            <div className="p-4 flex gap-2">
-              {propertyImages.slice(1).map((img, i) => (
-                <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden">
+          {(() => {
+            const images = (credito?.fotos_inmueble && credito.fotos_inmueble.length > 0)
+              ? credito.fotos_inmueble
+              : [PLACEHOLDER_IMAGE]
+            return (
+              <div className="bg-zinc-900 rounded-xl border border-zinc-700 overflow-hidden">
+                <div className="relative aspect-video">
                   <Image
-                    src={img}
-                    alt={`Propiedad ${i + 2}`}
+                    src={images[0]}
+                    alt="Propiedad"
                     fill
                     className="object-cover"
                     unoptimized
                   />
+                  <div className="absolute bottom-4 right-4 bg-black/60 px-3 py-1 rounded-lg text-white text-sm">
+                    1/{images.length}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
+                {images.length > 1 && (
+                  <div className="p-4 flex gap-2 overflow-x-auto">
+                    {images.slice(1).map((img, i) => (
+                      <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                        <Image
+                          src={img}
+                          alt={`Propiedad ${i + 2}`}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Investment Performance */}
           <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
@@ -341,6 +358,34 @@ export default async function InvestmentDetailPage({
             </div>
           </div>
 
+          {/* Documents */}
+          {credito?.documentos_inmueble && credito.documentos_inmueble.length > 0 && (
+            <div id="documentos" className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
+              <h2 className="text-lg font-semibold text-white mb-4">Documentos del Inmueble</h2>
+              <div className="space-y-3">
+                {credito.documentos_inmueble.map((url, index) => (
+                  <a
+                    key={index}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-colors group"
+                  >
+                    <div className="p-2 bg-teal-500/10 rounded-lg">
+                      <FileText size={18} className="text-teal-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium truncate">
+                        {extractFilename(url)}
+                      </p>
+                    </div>
+                    <Download size={16} className="text-zinc-500 group-hover:text-teal-400 transition-colors" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Timeline */}
           <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
             <h2 className="text-lg font-semibold text-white mb-4">Fechas Importantes</h2>
@@ -404,10 +449,20 @@ export default async function InvestmentDetailPage({
                 <Phone size={18} />
                 Contactar a Aluri
               </button>
-              <button className="w-full flex items-center justify-center gap-2 bg-zinc-800 text-white font-medium py-3 px-4 rounded-lg hover:bg-zinc-700 transition-colors">
-                <FileText size={18} />
-                Ver Documentos
-              </button>
+              {credito?.documentos_inmueble && credito.documentos_inmueble.length > 0 ? (
+                <a
+                  href="#documentos"
+                  className="w-full flex items-center justify-center gap-2 bg-zinc-800 text-white font-medium py-3 px-4 rounded-lg hover:bg-zinc-700 transition-colors"
+                >
+                  <FileText size={18} />
+                  Ver Documentos ({credito.documentos_inmueble.length})
+                </a>
+              ) : (
+                <button disabled className="w-full flex items-center justify-center gap-2 bg-zinc-800 text-zinc-600 font-medium py-3 px-4 rounded-lg cursor-not-allowed">
+                  <FileText size={18} />
+                  Sin Documentos
+                </button>
+              )}
             </div>
           </div>
 
