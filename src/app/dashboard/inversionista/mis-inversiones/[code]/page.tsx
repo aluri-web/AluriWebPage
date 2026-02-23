@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, MapPin, Phone, CheckCircle, TrendingUp, Calendar, Percent, Building } from 'lucide-react'
 import ExtractoModal from './ExtractoModal'
+import PhotoGallery from './PhotoGallery'
 
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80'
 
@@ -228,42 +229,13 @@ export default async function InvestmentDetailPage({
         {/* Left Column - Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* Property Images */}
-          {(() => {
-            const images = (credito?.fotos_inmueble && credito.fotos_inmueble.length > 0)
-              ? credito.fotos_inmueble
-              : [PLACEHOLDER_IMAGE]
-            return (
-              <div className="bg-zinc-900 rounded-xl border border-zinc-700 overflow-hidden">
-                <div className="relative aspect-video">
-                  <Image
-                    src={images[0]}
-                    alt="Propiedad"
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                  <div className="absolute bottom-4 right-4 bg-black/60 px-3 py-1 rounded-lg text-white text-sm">
-                    1/{images.length}
-                  </div>
-                </div>
-                {images.length > 1 && (
-                  <div className="p-4 flex gap-2 overflow-x-auto">
-                    {images.slice(1).map((img, i) => (
-                      <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden flex-shrink-0">
-                        <Image
-                          src={img}
-                          alt={`Propiedad ${i + 2}`}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )
-          })()}
+          <PhotoGallery
+            images={
+              credito?.fotos_inmueble && credito.fotos_inmueble.length > 0
+                ? credito.fotos_inmueble
+                : [PLACEHOLDER_IMAGE]
+            }
+          />
 
           {/* Investment Performance */}
           <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
