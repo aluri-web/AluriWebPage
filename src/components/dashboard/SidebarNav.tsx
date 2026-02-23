@@ -8,8 +8,7 @@ import {
   PiggyBank,
   Wallet,
   User,
-  Settings,
-  FileText
+  Settings
 } from 'lucide-react'
 
 const mainNavItems = [
@@ -17,7 +16,6 @@ const mainNavItems = [
   { href: '/dashboard/inversionista/marketplace', label: 'Marketplace', icon: Store },
   { href: '/dashboard/inversionista/mis-inversiones', label: 'Mis Inversiones', icon: PiggyBank },
   { href: '/dashboard/inversionista/billetera', label: 'Billetera', icon: Wallet },
-  { href: '/dashboard/inversionista/extractos', label: 'Extractos', icon: FileText },
 ]
 
 const accountNavItems = [
