@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, MapPin, Phone, FileText, CheckCircle, TrendingUp, Calendar, Percent, Building } from 'lucide-react'
+import ExpandableValue from './ExpandableValue'
 
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80'
 
@@ -25,6 +26,7 @@ interface Credito {
   valor_comercial: number | null
   tipo_amortizacion: string | null
   fecha_desembolso: string | null
+  fecha_firma: string | null
   fotos_inmueble: string[] | null
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
@@ -98,6 +100,7 @@ export default async function InvestmentDetailPage({
         valor_comercial,
         tipo_amortizacion,
         fecha_desembolso,
+        fecha_firma,
         fotos_inmueble,
         transacciones (
           tipo_transaccion,
@@ -176,9 +179,22 @@ export default async function InvestmentDetailPage({
   }
   const status = statusConfig[creditoEstado] || { label: creditoEstado, bgClass: 'bg-zinc-500/10', textClass: 'text-zinc-400' }
 
-  // Investment date
-  const investmentDate = investment.fecha_inversion || investment.confirmed_at || investment.created_at
-  const creditoStartDate = credito?.fecha_desembolso || null
+  // Dates
+  const fechaFirma = credito?.fecha_firma || null
+  const fechaDesembolso = credito?.fecha_desembolso || null
+
+  // Next payment date: same day of month as disbursement, next upcoming month
+  let nextPaymentDate: string | null = null
+  if (fechaDesembolso && creditoEstado !== 'pagado' && creditoEstado !== 'finalizado') {
+    const desembolso = new Date(fechaDesembolso)
+    const payDay = desembolso.getDate()
+    const now = new Date()
+    const candidate = new Date(now.getFullYear(), now.getMonth(), payDay)
+    if (candidate <= now) {
+      candidate.setMonth(candidate.getMonth() + 1)
+    }
+    nextPaymentDate = candidate.toISOString()
+  }
 
   return (
     <div className="text-white p-8">
@@ -258,28 +274,28 @@ export default async function InvestmentDetailPage({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-6">
-              <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-6">
+              <div className="text-center p-3 md:p-4 bg-zinc-800/50 rounded-xl min-w-0">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Monto Invertido</p>
-                <p className="text-2xl font-bold text-white">{formatCOP(investedAmount)}</p>
+                <ExpandableValue className="text-base lg:text-2xl font-bold text-white">{formatCOP(investedAmount)}</ExpandableValue>
               </div>
-              <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
+              <div className="text-center p-3 md:p-4 bg-zinc-800/50 rounded-xl min-w-0">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Tasa E.A.</p>
-                <p className="text-2xl font-bold text-teal-400">{rate.toFixed(1)}%</p>
+                <p className="text-base lg:text-2xl font-bold text-teal-400">{rate.toFixed(1)}%</p>
               </div>
-              <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
+              <div className="text-center p-3 md:p-4 bg-zinc-800/50 rounded-xl min-w-0">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Plazo</p>
-                <p className="text-2xl font-bold text-white">{termMonths} <span className="text-sm font-normal text-zinc-500">meses</span></p>
+                <p className="text-base lg:text-2xl font-bold text-white">{termMonths} <span className="text-sm font-normal text-zinc-500">meses</span></p>
               </div>
-              <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
+              <div className="text-center p-3 md:p-4 bg-zinc-800/50 rounded-xl min-w-0">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Tipo de Credito</p>
-                <p className="text-lg font-bold text-white">
+                <p className="text-sm lg:text-lg font-bold text-white">
                   {credito?.tipo_amortizacion === 'solo_interes' ? 'Solo Intereses' : 'Capital e Intereses'}
                 </p>
               </div>
-              <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
+              <div className="text-center p-3 md:p-4 bg-zinc-800/50 rounded-xl min-w-0">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Retorno Esperado</p>
-                <p className="text-2xl font-bold text-emerald-400">{formatCOP(expectedAnnualReturn)}</p>
+                <ExpandableValue className="text-base lg:text-2xl font-bold text-emerald-400">{formatCOP(expectedAnnualReturn)}</ExpandableValue>
               </div>
             </div>
 
@@ -356,8 +372,8 @@ export default async function InvestmentDetailPage({
                   <Calendar size={18} className="text-teal-400" />
                 </div>
                 <div>
-                  <p className="text-zinc-500 text-xs">Fecha de Inversion</p>
-                  <p className="text-white font-medium">{formatDate(investmentDate)}</p>
+                  <p className="text-zinc-500 text-xs">Fecha de Firma</p>
+                  <p className="text-white font-medium">{formatDate(fechaFirma)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -365,8 +381,17 @@ export default async function InvestmentDetailPage({
                   <Calendar size={18} className="text-teal-400" />
                 </div>
                 <div>
-                  <p className="text-zinc-500 text-xs">Inicio del Credito</p>
-                  <p className="text-white font-medium">{formatDate(creditoStartDate || null)}</p>
+                  <p className="text-zinc-500 text-xs">Fecha de Desembolso</p>
+                  <p className="text-white font-medium">{formatDate(fechaDesembolso)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-teal-500/10 rounded-lg">
+                  <Calendar size={18} className="text-teal-400" />
+                </div>
+                <div>
+                  <p className="text-zinc-500 text-xs">Siguiente Pago</p>
+                  <p className="text-white font-medium">{nextPaymentDate ? formatDate(nextPaymentDate) : 'N/A'}</p>
                 </div>
               </div>
             </div>
@@ -434,8 +459,8 @@ export default async function InvestmentDetailPage({
                 <span className="text-white font-medium">{termMonths} meses</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-zinc-500 text-sm">Fecha inversion</span>
-                <span className="text-white font-medium">{formatDate(investmentDate)}</span>
+                <span className="text-zinc-500 text-sm">Desembolso</span>
+                <span className="text-white font-medium">{formatDate(fechaDesembolso)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-500 text-sm">Participacion</span>
