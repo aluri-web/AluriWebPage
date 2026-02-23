@@ -109,6 +109,6 @@ export interface ResumenEjecucion {
 // Constantes
 // ============================================
 
-export const ESTADOS_CREDITO_ACTIVO = ['vigente', 'desembolsado', 'mora'] as const
+export const ESTADOS_CREDITO_ACTIVO = ['activo'] as const
 export const FACTOR_MORA = 1.5  // Tasa de mora = tasa nominal × 1.5
 export const DIAS_MES = 30      // Días base para cálculo mensual
