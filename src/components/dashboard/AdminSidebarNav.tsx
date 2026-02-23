@@ -8,7 +8,8 @@ import {
   FileText,
   Settings,
   Wallet,
-  HandCoins
+  HandCoins,
+  Code2
 } from 'lucide-react'
 
 const mainNavItems = [
@@ -20,6 +21,7 @@ const mainNavItems = [
 
 const configNavItems = [
   { href: '/dashboard/admin/configuracion', label: 'Configuracion', icon: Settings },
+  { href: '/dashboard/admin/api', label: 'API', icon: Code2 },
 ]
 
 export default function AdminSidebarNav() {
