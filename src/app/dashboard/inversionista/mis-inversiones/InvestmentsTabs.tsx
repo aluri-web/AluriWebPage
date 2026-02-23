@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MapPin, Calendar, Eye, TrendingUp, Clock } from 'lucide-react'
+import { Eye, TrendingUp, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 // Transaction record from transacciones table
@@ -30,6 +30,7 @@ interface Credito {
   en_mora: boolean | null
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
+  cliente: { full_name: string } | null
 }
 
 interface Inversion {
@@ -96,13 +97,6 @@ function formatCOP(value: number): string {
   }).format(value)
 }
 
-function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('es-CO', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  })
-}
 
 export default function InvestmentsTabs({ investments }: InvestmentsTabsProps) {
   const [activeTab, setActiveTab] = useState<'active' | 'pending'>('active')
@@ -225,7 +219,7 @@ function ActiveInvestmentsTable({
           <thead>
             <tr className="border-b border-zinc-700 bg-zinc-800/50">
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Codigo</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Inmueble</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Propietario</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase">Mi Inversion</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase">Tasa</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Mora</th>
@@ -236,7 +230,7 @@ function ActiveInvestmentsTable({
           <tbody className="divide-y divide-zinc-800">
             {investments.map((inv) => {
               const credito = inv.credito
-              const propertyDisplay = credito?.ciudad_inmueble || credito?.direccion_inmueble || 'Sin ubicacion'
+              const propietarioName = credito?.cliente?.full_name || 'Sin asignar'
               const rate = inv.interest_rate_investor || credito?.tasa_interes_ea || 0
 
               // Calculate real progress from payments
@@ -250,10 +244,7 @@ function ActiveInvestmentsTable({
                     </span>
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <MapPin size={14} className="text-zinc-500" />
-                      <span className="text-white text-sm">{propertyDisplay}</span>
-                    </div>
+                    <span className="text-white text-sm">{propietarioName}</span>
                   </td>
                   <td className="px-4 py-4 text-right">
                     <span className="text-white font-medium">{formatCOP(inv.monto_invertido)}</span>
@@ -336,18 +327,17 @@ function PendingInvestmentsTable({
           <thead>
             <tr className="border-b border-zinc-700 bg-zinc-800/50">
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Codigo</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Inmueble</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Propietario</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase">Mi Inversion</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Mora</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Progreso Fondeo</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Fecha</th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
             {investments.map((inv) => {
               const credito = inv.credito
-              const propertyDisplay = credito?.ciudad_inmueble || credito?.direccion_inmueble || 'Sin ubicacion'
+              const propietarioName = credito?.cliente?.full_name || 'Sin asignar'
 
               // Calculate funding progress from inversiones sub-query
               const requested = credito?.monto_solicitado || 0
@@ -355,8 +345,6 @@ function PendingInvestmentsTable({
                 .filter(i => !['cancelado', 'rechazado'].includes(i.estado))
                 .reduce((s, i) => s + (i.monto_invertido || 0), 0)
               const fundingProgress = requested > 0 ? (funded / requested) * 100 : 0
-
-              const investmentDate = inv.confirmed_at || inv.created_at
 
               return (
                 <tr key={inv.id} className="hover:bg-zinc-800/30 transition-colors">
@@ -366,10 +354,7 @@ function PendingInvestmentsTable({
                     </span>
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <MapPin size={14} className="text-zinc-500" />
-                      <span className="text-white text-sm">{propertyDisplay}</span>
-                    </div>
+                    <span className="text-white text-sm">{propietarioName}</span>
                   </td>
                   <td className="px-4 py-4 text-right">
                     <span className="text-white font-medium">{formatCOP(inv.monto_invertido)}</span>
@@ -391,12 +376,6 @@ function PendingInvestmentsTable({
                           style={{ width: `${Math.min(100, fundingProgress)}%` }}
                         />
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2 text-sm text-zinc-400">
-                      <Calendar size={14} />
-                      <span>{formatDate(investmentDate)}</span>
                     </div>
                   </td>
                   <td className="px-4 py-4 text-center">

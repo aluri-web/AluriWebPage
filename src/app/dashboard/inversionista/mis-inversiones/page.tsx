@@ -32,6 +32,7 @@ interface Credito {
   en_mora: boolean | null
   transacciones: Transaccion[]
   inversiones: { monto_invertido: number; estado: string }[]
+  cliente: { full_name: string } | null
 }
 
 interface Inversion {
@@ -67,6 +68,7 @@ export default async function MisInversionesPage() {
       *,
       credito:creditos!inner (
         *,
+        cliente:profiles!cliente_id (full_name),
         transacciones (
           tipo_transaccion,
           monto,
