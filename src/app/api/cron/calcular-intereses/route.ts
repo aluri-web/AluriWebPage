@@ -172,7 +172,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { count: creditosPendientes } = await supabase
       .from('creditos')
       .select('id', { count: 'exact', head: true })
-      .in('estado_credito', ['vigente', 'desembolsado', 'mora'])
+      .in('estado_credito', ['activo'])
       .gt('saldo_capital', 0)
       .or(`ultima_causacion.is.null,ultima_causacion.lt.${hoy}`)
 
