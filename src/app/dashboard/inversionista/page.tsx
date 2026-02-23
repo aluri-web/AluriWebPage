@@ -52,7 +52,7 @@ export default async function InvestorDashboard() {
     .from('inversiones')
     .select('*, credito:creditos!inner(*, inversiones(monto_invertido, estado), transacciones(tipo_transaccion, monto, fecha_transaccion, referencia_pago))')
     .eq('inversionista_id', user?.id)
-    .eq('estado', 'activo')
+    .not('estado', 'in', '("cancelado","rechazado")')
     .order('created_at', { ascending: false })
 
   if (error) {

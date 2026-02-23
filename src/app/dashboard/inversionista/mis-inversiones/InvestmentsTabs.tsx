@@ -113,11 +113,9 @@ export default function InvestmentsTabs({ investments }: InvestmentsTabsProps) {
     (inv) => (inv.credito?.estado === 'activo' || inv.credito?.estado === 'mora')
       && inv.credito?.estado_credito !== 'pagado'
   )
-  // Historical: publicado, finalizado, o pagados
+  // En Fondeo / Histórico: todo lo demás (publicado, firmado, finalizado, pagados, etc.)
   const pendingInvestments = investments.filter(
-    (inv) => inv.credito?.estado === 'publicado'
-      || inv.credito?.estado === 'finalizado'
-      || inv.credito?.estado_credito === 'pagado'
+    (inv) => !activeInvestments.includes(inv)
   )
 
   const getMoraBadge = (credito: Credito | null) => {
@@ -354,7 +352,7 @@ function PendingInvestmentsTable({
               // Calculate funding progress from inversiones sub-query
               const requested = credito?.monto_solicitado || 0
               const funded = (credito?.inversiones || [])
-                .filter(i => i.estado === 'activo' || i.estado === 'pendiente')
+                .filter(i => !['cancelado', 'rechazado'].includes(i.estado))
                 .reduce((s, i) => s + (i.monto_invertido || 0), 0)
               const fundingProgress = requested > 0 ? (funded / requested) * 100 : 0
 

@@ -79,7 +79,7 @@ export default async function MisInversionesPage() {
       )
     `)
     .eq('inversionista_id', user?.id)
-    .eq('estado', 'activo')
+    .not('estado', 'in', '("cancelado","rechazado")')
     .order('created_at', { ascending: false })
 
   if (error) {
