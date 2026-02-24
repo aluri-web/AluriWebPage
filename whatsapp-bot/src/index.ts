@@ -122,8 +122,8 @@ async function conectarWhatsApp() {
 
         console.log(`📩 ${remitente}: ${texto}`)
 
-        // Procesar comando
-        const respuesta = await procesarMensaje(texto)
+        // Procesar comando (pasar remitente como userId para el LLM)
+        const respuesta = await procesarMensaje(texto, remitente)
 
         if (respuesta) {
           console.log(`📤 Respondiendo a ${remitente}`)
