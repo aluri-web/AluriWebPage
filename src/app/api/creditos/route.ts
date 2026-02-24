@@ -26,7 +26,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const supabase = authResult.supabase
 
-    // Obtener créditos
+    // Obtener créditos (sin límite para mostrar todos)
     const { data: creditos, error } = await supabase
       .from('creditos')
       .select(`
@@ -39,7 +39,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         )
       `)
       .order('created_at', { ascending: false })
-      .limit(50)
 
     if (error) {
       console.error('Error fetching creditos:', error)

@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { Eye, TrendingUp, Clock } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Eye, TrendingUp, Clock, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import Link from 'next/link'
+
+type SortField = 'codigo' | 'monto' | 'tasa' | 'progreso'
+type SortDirection = 'asc' | 'desc'
 
 // Transaction record from transacciones table
 interface Transaccion {
@@ -202,6 +205,48 @@ function ActiveInvestmentsTable({
   investments: Inversion[]
   getMoraBadge: (credito: Credito | null) => JSX.Element | null
 }) {
+  const [sortField, setSortField] = useState<SortField>('codigo')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+
+  const sortedInvestments = useMemo(() => {
+    return [...investments].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'codigo':
+          comparison = (a.credito?.codigo_credito || '').localeCompare(b.credito?.codigo_credito || '')
+          break
+        case 'monto':
+          comparison = (a.monto_invertido || 0) - (b.monto_invertido || 0)
+          break
+        case 'tasa':
+          const rateA = a.interest_rate_investor || a.credito?.tasa_interes_ea || 0
+          const rateB = b.interest_rate_investor || b.credito?.tasa_interes_ea || 0
+          comparison = rateA - rateB
+          break
+        case 'progreso':
+          const progressA = calculateInvestmentProgress(a).progressPercent
+          const progressB = calculateInvestmentProgress(b).progressPercent
+          comparison = progressA - progressB
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [investments, sortField, sortDirection])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown size={12} className="opacity-30" />
+    return sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+  }
+
   if (investments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-48 text-zinc-500 bg-zinc-900 rounded-xl border border-zinc-700">
@@ -218,17 +263,25 @@ function ActiveInvestmentsTable({
         <table className="w-full">
           <thead>
             <tr className="border-b border-zinc-700 bg-zinc-800/50">
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Codigo</th>
+              <th onClick={() => handleSort('codigo')} className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase cursor-pointer hover:text-zinc-200">
+                <div className="flex items-center gap-1">Codigo <SortIcon field="codigo" /></div>
+              </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Propietario</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase">Mi Inversion</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase">Tasa</th>
+              <th onClick={() => handleSort('monto')} className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase cursor-pointer hover:text-zinc-200">
+                <div className="flex items-center justify-end gap-1">Mi Inversion <SortIcon field="monto" /></div>
+              </th>
+              <th onClick={() => handleSort('tasa')} className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase cursor-pointer hover:text-zinc-200">
+                <div className="flex items-center justify-end gap-1">Tasa <SortIcon field="tasa" /></div>
+              </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Mora</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Progreso / Ganancias</th>
+              <th onClick={() => handleSort('progreso')} className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase cursor-pointer hover:text-zinc-200">
+                <div className="flex items-center gap-1">Progreso / Ganancias <SortIcon field="progreso" /></div>
+              </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
-            {investments.map((inv) => {
+            {sortedInvestments.map((inv) => {
               const credito = inv.credito
               const propietarioName = credito?.cliente?.full_name || 'Sin asignar'
               const rate = inv.interest_rate_investor || credito?.tasa_interes_ea || 0
@@ -311,6 +364,53 @@ function PendingInvestmentsTable({
   investments: Inversion[]
   getMoraBadge: (credito: Credito | null) => JSX.Element | null
 }) {
+  const [sortField, setSortField] = useState<SortField>('codigo')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+
+  const sortedInvestments = useMemo(() => {
+    return [...investments].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'codigo':
+          comparison = (a.credito?.codigo_credito || '').localeCompare(b.credito?.codigo_credito || '')
+          break
+        case 'monto':
+          comparison = (a.monto_invertido || 0) - (b.monto_invertido || 0)
+          break
+        case 'tasa':
+          const rateA = a.interest_rate_investor || a.credito?.tasa_interes_ea || 0
+          const rateB = b.interest_rate_investor || b.credito?.tasa_interes_ea || 0
+          comparison = rateA - rateB
+          break
+        case 'progreso':
+          const getProgress = (inv: Inversion) => {
+            const requested = inv.credito?.monto_solicitado || 0
+            const funded = (inv.credito?.inversiones || [])
+              .filter(i => !['cancelado', 'rechazado'].includes(i.estado))
+              .reduce((s, i) => s + (i.monto_invertido || 0), 0)
+            return requested > 0 ? (funded / requested) * 100 : 0
+          }
+          comparison = getProgress(a) - getProgress(b)
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [investments, sortField, sortDirection])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown size={12} className="opacity-30" />
+    return sortDirection === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+  }
+
   if (investments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-48 text-zinc-500 bg-zinc-900 rounded-xl border border-zinc-700">
@@ -326,16 +426,22 @@ function PendingInvestmentsTable({
         <table className="w-full">
           <thead>
             <tr className="border-b border-zinc-700 bg-zinc-800/50">
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Codigo</th>
+              <th onClick={() => handleSort('codigo')} className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase cursor-pointer hover:text-zinc-200">
+                <div className="flex items-center gap-1">Codigo <SortIcon field="codigo" /></div>
+              </th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Propietario</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase">Mi Inversion</th>
+              <th onClick={() => handleSort('monto')} className="px-4 py-3 text-right text-xs font-semibold text-zinc-400 uppercase cursor-pointer hover:text-zinc-200">
+                <div className="flex items-center justify-end gap-1">Mi Inversion <SortIcon field="monto" /></div>
+              </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Mora</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase">Progreso Fondeo</th>
+              <th onClick={() => handleSort('progreso')} className="px-4 py-3 text-left text-xs font-semibold text-zinc-400 uppercase cursor-pointer hover:text-zinc-200">
+                <div className="flex items-center gap-1">Progreso Fondeo <SortIcon field="progreso" /></div>
+              </th>
               <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-400 uppercase">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
-            {investments.map((inv) => {
+            {sortedInvestments.map((inv) => {
               const credito = inv.credito
               const propietarioName = credito?.cliente?.full_name || 'Sin asignar'
 

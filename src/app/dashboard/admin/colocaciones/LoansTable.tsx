@@ -1,12 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { Banknote, DollarSign } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Banknote, DollarSign, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { LoanTableRow, InvestorOption } from './actions'
 import AddInvestmentModal from './AddInvestmentModal'
 import PaymentModal from './PaymentModal'
 import Link from 'next/link'
 import { MoreHorizontal } from 'lucide-react'
+
+type SortField = 'code' | 'status' | 'debtor_name' | 'amount_requested' | 'ltv' | 'interest_rate_ea' | 'amount_funded' | 'created_at'
+type SortDirection = 'asc' | 'desc'
 
 interface LoansTableProps {
   loans: LoanTableRow[]
@@ -18,6 +21,68 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [paymentLoan, setPaymentLoan] = useState<{ id: string; code: string; saldo_capital: number; saldo_intereses: number; saldo_mora: number } | null>(null)
+  const [sortField, setSortField] = useState<SortField>('created_at')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+
+  // Sorted loans
+  const sortedLoans = useMemo(() => {
+    return [...loans].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'code':
+          comparison = (a.code || '').localeCompare(b.code || '')
+          break
+        case 'status':
+          comparison = (a.status || '').localeCompare(b.status || '')
+          break
+        case 'debtor_name':
+          comparison = (a.debtor_name || '').localeCompare(b.debtor_name || '')
+          break
+        case 'amount_requested':
+          comparison = (a.amount_requested || 0) - (b.amount_requested || 0)
+          break
+        case 'ltv':
+          comparison = (a.ltv || 0) - (b.ltv || 0)
+          break
+        case 'interest_rate_ea':
+          comparison = (a.interest_rate_ea || 0) - (b.interest_rate_ea || 0)
+          break
+        case 'amount_funded':
+          comparison = (a.amount_funded || 0) - (b.amount_funded || 0)
+          break
+        case 'created_at':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [loans, sortField, sortDirection])
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown size={14} className="opacity-30" />
+    return sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+  }
+
+  const SortableHeader = ({ field, children, className = '' }: { field: SortField; children: React.ReactNode; className?: string }) => (
+    <th
+      onClick={() => handleSort(field)}
+      className={`px-3 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-200 transition-colors select-none ${className}`}
+    >
+      <div className="flex items-center gap-1.5">
+        {children}
+        <SortIcon field={field} />
+      </div>
+    </th>
+  )
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return '-'
@@ -121,15 +186,9 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           <table className="w-full min-w-[1600px]">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-800/50">
-                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Codigo
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Deudor
-                </th>
+                <SortableHeader field="code" className="text-left">Codigo</SortableHeader>
+                <SortableHeader field="status" className="text-left">Estado</SortableHeader>
+                <SortableHeader field="debtor_name" className="text-left">Deudor</SortableHeader>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Co-Deudor
                 </th>
@@ -139,40 +198,30 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                 <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Avaluo
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Monto
-                </th>
-                <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  LTV
-                </th>
+                <SortableHeader field="amount_requested" className="text-right">Monto</SortableHeader>
+                <SortableHeader field="ltv" className="text-right">LTV</SortableHeader>
                 <th className="px-3 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Riesgo
                 </th>
                 <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Tasa NM
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Tasa EA
-                </th>
+                <SortableHeader field="interest_rate_ea" className="text-right">Tasa EA</SortableHeader>
                 <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Comision
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Fondeado
-                </th>
+                <SortableHeader field="amount_funded" className="text-right">Fondeado</SortableHeader>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Inversionistas
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Fecha
-                </th>
+                <SortableHeader field="created_at" className="text-left">Fecha</SortableHeader>
                 <th className="px-3 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Acciones
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {loans.map((loan) => {
+              {sortedLoans.map((loan) => {
                 const requested = loan.amount_requested || 0
                 const funded = loan.amount_funded || 0
                 const remaining = requested - funded

@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { getActiveLoans, MarketplaceCredito } from './actions'
-import { Store, MapPin, Calendar, Shield, Clock, DollarSign, Search, SlidersHorizontal, X } from 'lucide-react'
+import { Store, MapPin, Calendar, Shield, Clock, DollarSign, Search, SlidersHorizontal, X, ArrowUpDown } from 'lucide-react'
+
+type SortOption = 'newest' | 'oldest' | 'rate_high' | 'rate_low' | 'amount_high' | 'amount_low' | 'ltv_low' | 'ltv_high'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -26,6 +28,7 @@ export default function MarketplacePage() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [riskFilter, setRiskFilter] = useState('all')
+  const [sortOption, setSortOption] = useState<SortOption>('newest')
 
   useEffect(() => {
     async function fetchLoans() {
@@ -59,8 +62,32 @@ export default function MarketplacePage() {
       })
     }
 
-    setFilteredLoans(filtered)
-  }, [searchTerm, riskFilter, loans])
+    // Sort filtered loans
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortOption) {
+        case 'newest':
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        case 'oldest':
+          return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+        case 'rate_high':
+          return (b.tasa_interes_ea || 0) - (a.tasa_interes_ea || 0)
+        case 'rate_low':
+          return (a.tasa_interes_ea || 0) - (b.tasa_interes_ea || 0)
+        case 'amount_high':
+          return (b.monto_solicitado || 0) - (a.monto_solicitado || 0)
+        case 'amount_low':
+          return (a.monto_solicitado || 0) - (b.monto_solicitado || 0)
+        case 'ltv_low':
+          return (a.ltv || 0) - (b.ltv || 0)
+        case 'ltv_high':
+          return (b.ltv || 0) - (a.ltv || 0)
+        default:
+          return 0
+      }
+    })
+
+    setFilteredLoans(sorted)
+  }, [searchTerm, riskFilter, sortOption, loans])
 
   const formatCurrency = (amount: number | null) => {
     if (amount === null || amount === undefined) return '$0'
@@ -172,10 +199,29 @@ export default function MarketplacePage() {
               <SlidersHorizontal size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
             </div>
 
+            {/* Sort Dropdown */}
+            <div className="relative">
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as SortOption)}
+                className="pl-4 pr-10 py-3 bg-transparent border border-white/10 rounded-xl text-white appearance-none focus:outline-none focus:border-teal-400/50 transition-all cursor-pointer text-sm min-w-[180px]"
+              >
+                <option value="newest" className="bg-[#111]">Mas recientes</option>
+                <option value="oldest" className="bg-[#111]">Mas antiguos</option>
+                <option value="rate_high" className="bg-[#111]">Mayor tasa</option>
+                <option value="rate_low" className="bg-[#111]">Menor tasa</option>
+                <option value="amount_high" className="bg-[#111]">Mayor monto</option>
+                <option value="amount_low" className="bg-[#111]">Menor monto</option>
+                <option value="ltv_low" className="bg-[#111]">Menor LTV</option>
+                <option value="ltv_high" className="bg-[#111]">Mayor LTV</option>
+              </select>
+              <ArrowUpDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            </div>
+
             {/* Clear Filters */}
-            {(searchTerm || riskFilter !== 'all') && (
+            {(searchTerm || riskFilter !== 'all' || sortOption !== 'newest') && (
               <button
-                onClick={() => { setSearchTerm(''); setRiskFilter('all'); }}
+                onClick={() => { setSearchTerm(''); setRiskFilter('all'); setSortOption('newest'); }}
                 className="flex items-center gap-2 px-4 py-3 text-gray-400 hover:text-white transition-colors text-sm"
               >
                 <X size={16} />
