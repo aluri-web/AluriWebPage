@@ -10,7 +10,8 @@ import {
 
 // Configuración de la API base
 const API_BASE_URL = process.env.API_BASE_URL || "https://aluri.co/api";
-const AUTH_TOKEN = process.env.ALURI_AUTH_TOKEN || "";
+const API_KEY = process.env.ALURI_API_KEY || "";
+const AUTH_TOKEN = process.env.ALURI_AUTH_TOKEN || "";  // Fallback para compatibilidad
 
 // Función helper para hacer requests a la API
 async function apiRequest(
@@ -25,8 +26,13 @@ async function apiRequest(
     "Content-Type": "application/json",
   };
 
-  if (requiresAuth && AUTH_TOKEN) {
-    headers["Authorization"] = `Bearer ${AUTH_TOKEN}`;
+  // Prioridad: API Key > JWT Token
+  if (requiresAuth) {
+    if (API_KEY) {
+      headers["X-API-Key"] = API_KEY;
+    } else if (AUTH_TOKEN) {
+      headers["Authorization"] = `Bearer ${AUTH_TOKEN}`;
+    }
   }
 
   const options: RequestInit = {
@@ -365,9 +371,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("MCP Aluri Server v2.0 iniciado");
+  console.error("MCP Aluri Server v2.1 iniciado");
   console.error(`API Base URL: ${API_BASE_URL}`);
-  console.error(`Auth Token: ${AUTH_TOKEN ? "Configurado" : "No configurado"}`);
+  console.error(`API Key: ${API_KEY ? "Configurada" : "No configurada"}`);
+  console.error(`JWT Token: ${AUTH_TOKEN ? "Configurado" : "No configurado"}`);
 }
 
 main().catch(console.error);

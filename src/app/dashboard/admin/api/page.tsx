@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import TokenDisplay from './TokenDisplay'
+import ApiKeyManager from './ApiKeyManager'
 
 export default async function APIPage() {
   const supabase = await createClient()
@@ -36,7 +37,10 @@ export default async function APIPage() {
         </div>
       </header>
 
-      {/* Token Section */}
+      {/* API Keys Section */}
+      <ApiKeyManager />
+
+      {/* Token Section (JWT) */}
       <TokenDisplay accessToken={session.access_token} />
 
       {/* API Documentation */}
@@ -83,9 +87,11 @@ export default async function APIPage() {
 
       {/* MCP Configuration */}
       <section className="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">Configuración MCP</h2>
+        <h2 className="text-lg font-semibold text-white mb-4">Configuracion MCP</h2>
         <p className="text-slate-400 text-sm mb-4">
-          Copia esta configuración en tu archivo <code className="text-amber-400">.mcp.json</code> para usar las herramientas de Aluri con Claude:
+          Copia esta configuracion en tu archivo <code className="text-amber-400">claude_desktop_config.json</code> para usar las herramientas de Aluri con Claude.
+          <br />
+          <span className="text-emerald-400">Recomendado:</span> Usa una API Key en lugar del JWT para evitar expiraciones.
         </p>
         <pre className="bg-slate-900 rounded-xl p-4 text-sm text-slate-300 overflow-x-auto">
 {`{
@@ -95,7 +101,7 @@ export default async function APIPage() {
       "args": ["./mcp-payments-server/dist/index.js"],
       "env": {
         "API_BASE_URL": "https://aluri.co/api",
-        "ALURI_AUTH_TOKEN": "<tu-token-aqui>"
+        "ALURI_API_KEY": "<tu-api-key-aqui>"
       }
     }
   }
