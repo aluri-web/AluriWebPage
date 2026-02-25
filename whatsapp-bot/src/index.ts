@@ -19,6 +19,10 @@ let sock: WASocket | null = null
 let intentosReconexion = 0
 const MAX_INTENTOS = 5
 
+// Cache para evitar procesar mensajes duplicados
+const mensajesProcesados = new Set<string>()
+const MAX_CACHE_SIZE = 1000
+
 async function conectarWhatsApp() {
   // Validar configuración
   if (!validarConfig()) {
@@ -92,6 +96,17 @@ async function conectarWhatsApp() {
         // Ignorar mensajes propios y de grupos
         if (msg.key.fromMe) continue
         if (msg.key.remoteJid?.endsWith('@g.us')) continue
+
+        // Evitar procesar mensajes duplicados
+        const msgId = msg.key.id
+        if (!msgId || mensajesProcesados.has(msgId)) continue
+        mensajesProcesados.add(msgId)
+
+        // Limpiar cache si es muy grande
+        if (mensajesProcesados.size > MAX_CACHE_SIZE) {
+          const idsArray = Array.from(mensajesProcesados)
+          idsArray.slice(0, 500).forEach(id => mensajesProcesados.delete(id))
+        }
 
         // Obtener número del remitente
         const remitente = msg.key.remoteJid?.replace('@s.whatsapp.net', '') || ''
