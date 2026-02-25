@@ -40,7 +40,7 @@ export async function login(formData: FormData) {
   } else if (profile?.role === 'propietario') {
     redirect('/dashboard/propietario')
   } else {
-    redirect('/dashboard/inversionista/mis-inversiones')
+    redirect('/dashboard/inversionista')
   }
 }
 
