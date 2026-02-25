@@ -35,8 +35,8 @@ async function syncBucketToDb() {
     process.exit(1);
   }
 
-  // Filtrar solo directorios (id === null en Supabase Storage)
-  const folders = (topLevel || []).filter(item => item.id === null);
+  // Filtrar solo directorios CR___ (id === null en Supabase Storage)
+  const folders = (topLevel || []).filter(item => item.id === null && /^CR\d+$/i.test(item.name));
 
   if (folders.length === 0) {
     console.log('No se encontraron carpetas en el bucket.');

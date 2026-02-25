@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, MapPin, Phone, CheckCircle, TrendingUp, Calendar, Percent, Building } from 'lucide-react'
 import ExtractoModal from './ExtractoModal'
-import PhotoGallery from './PhotoGallery'
+import PhotoGallery from '@/components/shared/PhotoGallery'
 
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&q=80'
 

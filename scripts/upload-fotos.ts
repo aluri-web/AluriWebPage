@@ -48,6 +48,25 @@ function getMimeType(ext: string): string {
   return types[ext] || 'application/octet-stream';
 }
 
+async function clearBucketFolder(codigoCredito: string) {
+  const { data: existing } = await supabase.storage
+    .from(BUCKET)
+    .list(`${codigoCredito}/fotos`, { limit: 500 });
+
+  const filesToRemove = (existing || [])
+    .filter(f => f.id !== null)
+    .map(f => `${codigoCredito}/fotos/${f.name}`);
+
+  if (filesToRemove.length > 0) {
+    const { error } = await supabase.storage.from(BUCKET).remove(filesToRemove);
+    if (error) {
+      console.error(`    ✗ Error limpiando bucket: ${error.message}`);
+    } else {
+      console.log(`    Limpiadas ${filesToRemove.length} fotos viejas del bucket`);
+    }
+  }
+}
+
 async function uploadFotos() {
   const absDir = path.resolve(LOCAL_DIR);
 
@@ -58,41 +77,44 @@ async function uploadFotos() {
 
   console.log(`=== Subiendo fotos desde ${absDir} ===\n`);
 
-  // Listar subcarpetas (CR001, CR002, etc.)
+  // Listar subcarpetas — solo las que empiezan con CR (codigo de credito)
   const entries = fs.readdirSync(absDir, { withFileTypes: true });
-  const folders = entries.filter(e => e.isDirectory());
+  const folders = entries.filter(e => e.isDirectory() && /^CR\d+$/i.test(e.name));
 
   if (folders.length === 0) {
-    console.log('No se encontraron subcarpetas.');
+    console.log('No se encontraron subcarpetas CR___.');
     return;
   }
 
-  console.log(`Encontradas ${folders.length} carpetas\n`);
+  console.log(`Encontradas ${folders.length} carpetas de credito\n`);
 
   let totalUploaded = 0;
-  let totalSkipped = 0;
+  let totalCleaned = 0;
   let totalErrors = 0;
 
   for (const folder of folders) {
     const codigoCredito = folder.name;
-    const folderPath = path.join(absDir, codigoCredito);
+    const fotosDir = path.join(absDir, codigoCredito, 'fotos');
 
-    // Buscar imágenes directamente en la carpeta (o en subcarpeta fotos/)
-    let fotosDir = folderPath;
-    const subFotos = path.join(folderPath, 'fotos');
-    if (fs.existsSync(subFotos)) {
-      fotosDir = subFotos;
+    // Solo usar la subcarpeta fotos/ — ignorar archivos sueltos
+    if (!fs.existsSync(fotosDir)) {
+      console.log(`  ${codigoCredito}: sin carpeta fotos/, saltando`);
+      continue;
     }
 
     const files = fs.readdirSync(fotosDir, { withFileTypes: true })
       .filter(f => f.isFile() && VALID_EXTENSIONS.includes(path.extname(f.name).toLowerCase()));
 
     if (files.length === 0) {
-      console.log(`  ${codigoCredito}: sin fotos, saltando`);
+      console.log(`  ${codigoCredito}: carpeta fotos/ vacia, saltando`);
       continue;
     }
 
     console.log(`  ${codigoCredito}: ${files.length} fotos encontradas`);
+
+    // Limpiar fotos viejas del bucket antes de subir
+    await clearBucketFolder(codigoCredito);
+    totalCleaned++;
 
     for (const file of files) {
       const filePath = path.join(fotosDir, file.name);
@@ -119,10 +141,10 @@ async function uploadFotos() {
   }
 
   console.log(`\n=== Resumen ===`);
+  console.log(`Creditos procesados: ${totalCleaned}`);
   console.log(`Fotos subidas: ${totalUploaded}`);
   console.log(`Errores: ${totalErrors}`);
-  if (totalSkipped > 0) console.log(`Saltados: ${totalSkipped}`);
-  console.log(`\nAhora ejecuta: npx ts-node scripts/sync-bucket-to-db.ts`);
+  console.log(`\nAhora ejecuta: npx tsx scripts/sync-bucket-to-db.ts`);
 }
 
 uploadFotos().catch(err => {

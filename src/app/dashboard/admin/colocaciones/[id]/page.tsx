@@ -1,10 +1,9 @@
 import { createAdminClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CreditCard, User, MoreHorizontal, Settings, MapPin } from 'lucide-react'
-import CreditWorkflow from '../CreditWorkflow'
+import { ArrowLeft, Settings } from 'lucide-react'
+import CreditDetailTabs from './CreditDetailTabs'
 
-// Reuse or import this function if it exists, otherwise define locally for now
 async function getCreditDetails(id: string) {
     try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -17,17 +16,27 @@ async function getCreditDetails(id: string) {
 
         const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
 
-        // First, try to fetch just the credit without JOIN
         const { data: credit, error: creditError } = await supabase
             .from('creditos')
-            .select('*')
+            .select(`
+                *,
+                transacciones (
+                    tipo_transaccion,
+                    monto
+                ),
+                inversiones (
+                    monto_invertido,
+                    estado,
+                    inversionista:profiles!inversionista_id (
+                        full_name
+                    )
+                )
+            `)
             .eq('id', id)
             .single()
 
         if (creditError) {
             console.error('Error fetching credit:', creditError)
-            console.error('Error code:', creditError.code)
-            console.error('Error message:', creditError.message)
             return null
         }
 
@@ -36,7 +45,7 @@ async function getCreditDetails(id: string) {
             return null
         }
 
-        // Then fetch the profile separately
+        // Fetch the profile separately
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
@@ -45,10 +54,8 @@ async function getCreditDetails(id: string) {
 
         if (profileError) {
             console.warn('Could not fetch profile:', profileError.message)
-            // Continue anyway, just without profile data
         }
 
-        // Combine the data
         return {
             ...credit,
             profiles: profile || null
@@ -82,7 +89,7 @@ export default async function CreditDetailsPage({ params }: { params: Promise<{ 
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                            Crédito #{credit.codigo_credito}
+                            Credito #{credit.codigo_credito}
                             <span className={`text-sm px-3 py-1 rounded-full border ${credit.estado === 'activo' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
                                 credit.estado === 'publicado' ? 'bg-teal-500/10 border-teal-500/20 text-teal-400' :
                                     credit.estado === 'en_firma' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :
@@ -105,155 +112,7 @@ export default async function CreditDetailsPage({ params }: { params: Promise<{ 
                 </div>
             </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Main Content */}
-                <div className="lg:col-span-2 space-y-8">
-                    {/* Workflow Component */}
-                    <CreditWorkflow credit={credit} />
-
-                    {/* Details Card */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-2">
-                            <CreditCard size={18} className="text-teal-400" />
-                            <h3 className="font-semibold text-white">Detalles del Crédito</h3>
-                        </div>
-                        <div className="p-6 grid grid-cols-2 gap-6">
-                            <div>
-                                <span className="block text-sm text-slate-500 mb-1">Monto Aprobado</span>
-                                <span className="text-lg font-medium text-white">
-                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(credit.valor_colocado)}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="block text-sm text-slate-500 mb-1">Tasa de Interés</span>
-                                <span className="text-lg font-medium text-white">{credit.tasa_nominal}% N.M.</span>
-                            </div>
-                            <div>
-                                <span className="block text-sm text-slate-500 mb-1">Plazo</span>
-                                <span className="text-lg font-medium text-white">{credit.plazo} Meses</span>
-                            </div>
-                            <div>
-                                <span className="block text-sm text-slate-500 mb-1">Tipo de Contrato</span>
-                                <span className="text-lg font-medium text-white capitalize">{credit.tipo_contrato?.replace('_', ' ') || 'N/A'}</span>
-                            </div>
-                            <div>
-                                <span className="block text-sm text-slate-500 mb-1">Tipo de Amortización</span>
-                                <span className="text-lg font-medium text-white capitalize">{credit.tipo_amortizacion?.replace('_', ' ') || 'N/A'}</span>
-                            </div>
-                            <div>
-                                <span className="block text-sm text-slate-500 mb-1">Tipo de Liquidación</span>
-                                <span className="text-lg font-medium text-white capitalize">{credit.tipo_liquidacion || 'N/A'}</span>
-                            </div>
-                            {credit.tasa_interes_ea && (
-                                <div>
-                                    <span className="block text-sm text-slate-500 mb-1">Tasa E.A.</span>
-                                    <span className="text-lg font-medium text-white">{credit.tasa_interes_ea}%</span>
-                                </div>
-                            )}
-                            {credit.comision_deudor > 0 && (
-                                <div>
-                                    <span className="block text-sm text-slate-500 mb-1">Comisión Deudor</span>
-                                    <span className="text-lg font-medium text-white">
-                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(credit.comision_deudor)}
-                                    </span>
-                                </div>
-                            )}
-                            {credit.notaria && (
-                                <div>
-                                    <span className="block text-sm text-slate-500 mb-1">Notaría</span>
-                                    <span className="text-lg font-medium text-white">{credit.notaria}</span>
-                                </div>
-                            )}
-                            {credit.costos_notaria > 0 && (
-                                <div>
-                                    <span className="block text-sm text-slate-500 mb-1">Costos de Notaría</span>
-                                    <span className="text-lg font-medium text-white">
-                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(credit.costos_notaria)}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Property Info Card */}
-                    {(credit.direccion_inmueble || credit.ciudad_inmueble || credit.valor_comercial) && (
-                        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                            <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-2">
-                                <MapPin size={18} className="text-amber-400" />
-                                <h3 className="font-semibold text-white">Información del Inmueble</h3>
-                            </div>
-                            <div className="p-6 grid grid-cols-2 gap-6">
-                                {credit.direccion_inmueble && (
-                                    <div className="col-span-2">
-                                        <span className="block text-sm text-slate-500 mb-1">Dirección</span>
-                                        <span className="text-lg font-medium text-white">{credit.direccion_inmueble}</span>
-                                    </div>
-                                )}
-                                {credit.ciudad_inmueble && (
-                                    <div>
-                                        <span className="block text-sm text-slate-500 mb-1">Ciudad</span>
-                                        <span className="text-lg font-medium text-white">{credit.ciudad_inmueble}</span>
-                                    </div>
-                                )}
-                                {credit.tipo_inmueble && (
-                                    <div>
-                                        <span className="block text-sm text-slate-500 mb-1">Tipo de Inmueble</span>
-                                        <span className="text-lg font-medium text-white capitalize">{credit.tipo_inmueble}</span>
-                                    </div>
-                                )}
-                                {credit.valor_comercial && (
-                                    <div>
-                                        <span className="block text-sm text-slate-500 mb-1">Avalúo Comercial</span>
-                                        <span className="text-lg font-medium text-teal-400">
-                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(credit.valor_comercial)}
-                                        </span>
-                                    </div>
-                                )}
-                                {credit.ltv != null && (
-                                    <div>
-                                        <span className="block text-sm text-slate-500 mb-1">LTV</span>
-                                        <span className={`text-lg font-medium ${
-                                            credit.ltv > 70 ? 'text-red-400' :
-                                            credit.ltv > 50 ? 'text-amber-400' : 'text-emerald-400'
-                                        }`}>
-                                            {credit.ltv.toFixed(1)}%
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Sidebar */}
-                <div className="space-y-6">
-                    {/* Client Info */}
-                    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-2">
-                            <User size={18} className="text-purple-400" />
-                            <h3 className="font-semibold text-white">Información del Cliente</h3>
-                        </div>
-                        <div className="p-6">
-                            <div className="flex items-center gap-4 mb-4">
-                                <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-400">
-                                    {credit.profiles?.full_name?.charAt(0) || '?'}
-                                </div>
-                                <div>
-                                    <h4 className="font-medium text-white">{credit.profiles?.full_name}</h4>
-                                    <p className="text-sm text-slate-500">{credit.profiles?.email}</p>
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                <div className="flex justify-between text-sm">
-                                    <span className="text-slate-500">ID Cliente</span>
-                                    <span className="text-slate-300 font-mono text-xs">{credit.cliente_id.substring(0, 8)}...</span>
-                                </div>
-                                {/* Add more client details here if available in profile */}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <CreditDetailTabs credit={credit} />
         </div>
     )
 }
