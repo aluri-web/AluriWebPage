@@ -16,6 +16,7 @@ export interface MarketplaceCredito {
   fecha_firma_programada: string | null
   fecha_desembolso: string | null
   fotos_inmueble: string[] | null
+  created_at: string
   inversiones: { monto_invertido: number; estado: string }[]
 }
 
@@ -38,6 +39,7 @@ export async function getActiveLoans(): Promise<{ data: MarketplaceCredito[]; er
       fecha_firma_programada,
       fecha_desembolso,
       fotos_inmueble,
+      created_at,
       inversiones (
         monto_invertido,
         estado
