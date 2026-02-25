@@ -26,6 +26,8 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const drag = useRef({ isDown: false, moved: false, startX: 0, scrollLeft: 0 })
+  const [longPressLoan, setLongPressLoan] = useState<LoanTableRow | null>(null)
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     const container = tableScrollRef.current
@@ -209,6 +211,23 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     setPaymentLoan(null)
   }
 
+  const handleLongPressStart = useCallback((loan: LoanTableRow) => {
+    longPressTimer.current = setTimeout(() => {
+      setLongPressLoan(loan)
+    }, 500) // 500ms para activar long press
+  }, [])
+
+  const handleLongPressEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
+
+  const closeLongPressMenu = useCallback(() => {
+    setLongPressLoan(null)
+  }, [])
+
   if (loans.length === 0) {
     return (
       <div className="bg-slate-900 rounded-xl border border-slate-800 p-12 text-center">
@@ -270,7 +289,15 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                 const canAddInvestment = remaining > 0
 
                 return (
-                  <tr key={loan.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr
+                    key={loan.id}
+                    className="hover:bg-slate-800/30 transition-colors relative"
+                    onMouseDown={() => handleLongPressStart(loan)}
+                    onMouseUp={handleLongPressEnd}
+                    onMouseLeave={handleLongPressEnd}
+                    onTouchStart={() => handleLongPressStart(loan)}
+                    onTouchEnd={handleLongPressEnd}
+                  >
                     <td className="px-4 py-3 whitespace-nowrap sticky left-0 z-10 bg-slate-900/95 backdrop-blur-sm shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
                       <span className="px-2 py-1 bg-slate-800 text-teal-400 text-xs font-mono rounded">
                         {loan.code}
@@ -409,6 +436,74 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           isOpen={isPaymentModalOpen}
           onClose={closePaymentModal}
         />
+      )}
+
+      {/* Long Press Actions Menu */}
+      {longPressLoan && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center"
+          onClick={closeLongPressMenu}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4">
+              <h3 className="text-white font-semibold text-lg">Acciones - {longPressLoan.code}</h3>
+              <p className="text-slate-400 text-sm">{longPressLoan.debtor_name}</p>
+            </div>
+
+            <div className="space-y-2">
+              {/* Add Investment */}
+              <button
+                onClick={() => {
+                  openAddInvestmentModal(longPressLoan)
+                  closeLongPressMenu()
+                }}
+                disabled={longPressLoan.amount_requested - longPressLoan.amount_funded <= 0}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors ${
+                  longPressLoan.amount_requested - longPressLoan.amount_funded > 0
+                    ? 'border-teal-500/30 text-teal-400 hover:bg-teal-500/10'
+                    : 'border-slate-700 text-slate-600 cursor-not-allowed'
+                }`}
+              >
+                <Banknote size={20} />
+                <span className="font-medium">Agregar Inversión</span>
+              </button>
+
+              {/* Register Payment */}
+              {(longPressLoan.status === 'active' || longPressLoan.status === 'defaulted') && (
+                <button
+                  onClick={() => {
+                    openPaymentModal(longPressLoan)
+                    closeLongPressMenu()
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                >
+                  <DollarSign size={20} />
+                  <span className="font-medium">Registrar Pago</span>
+                </button>
+              )}
+
+              {/* View Details */}
+              <Link
+                href={`/dashboard/admin/colocaciones/${longPressLoan.id}`}
+                onClick={closeLongPressMenu}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+              >
+                <MoreHorizontal size={20} />
+                <span className="font-medium">Ver Detalles y Flujo</span>
+              </Link>
+            </div>
+
+            <button
+              onClick={closeLongPressMenu}
+              className="w-full mt-4 px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
       )}
     </>
   )
