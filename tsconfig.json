@@ -39,6 +39,7 @@
   "exclude": [
     "node_modules",
     "mcp-payments-server",
-    "scripts"
+    "scripts",
+    "whatsapp-bot"
   ]
 }
