@@ -1,6 +1,7 @@
 import { createClient } from '../../../utils/supabase/server'
 import { TrendingUp, Briefcase, Percent, Activity } from 'lucide-react'
 import PortfolioChart from '../../../components/dashboard/PortfolioChart'
+import BalancePieChart from '../../../components/dashboard/BalancePieChart'
 
 interface TransaccionData {
   tipo_transaccion: string
@@ -85,6 +86,27 @@ export default async function InvestorDashboard() {
 
   const simulatedCollected = totalExpectedReturn * 0.15
 
+  // Per-credit breakdown for Balance pie chart
+  const balanceChartData = investmentsData
+    .filter(i => i.credito?.estado === 'activo' || i.credito?.estado === 'mora' || i.credito?.estado === 'publicado')
+    .map(i => ({
+      name: i.credito?.codigo_credito || 'N/A',
+      value: Number(i.monto_invertido || 0),
+    }))
+
+  // Per-credit annual return for Retorno pie chart
+  const returnChartData = investmentsData
+    .filter(i => i.credito?.estado === 'activo' || i.credito?.estado === 'mora' || i.credito?.estado === 'publicado')
+    .map(i => {
+      const rate = Number(i.interest_rate_investor || i.credito?.tasa_interes_ea || 0)
+      return {
+        name: i.credito?.codigo_credito || 'N/A',
+        value: Math.round(Number(i.monto_invertido || 0) * rate / 100),
+        rate,
+      }
+    })
+    .filter(i => i.value > 0)
+
   // Extract recent activities from all transacciones, pro-rated by investor share
   const recentActivities = investmentsData
     .flatMap(inv => {
@@ -114,30 +136,31 @@ export default async function InvestorDashboard() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700 min-h-[160px] flex flex-col justify-between">
-          <div className="flex items-center justify-between">
+        <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700 min-h-[160px] flex flex-col">
+          <div className="flex items-center justify-between mb-2">
             <span className="text-zinc-500 text-sm">Balance Total</span>
             <div className="p-2 bg-teal-500/10 rounded-lg text-teal-400">
               <TrendingUp size={20} />
             </div>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-white">
-              ${totalInvested.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
-            </p>
+          <p className="text-lg font-bold text-white mb-1">
+            ${totalInvested.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+          </p>
+          <div className="flex-1">
+            <BalancePieChart data={balanceChartData} />
           </div>
         </div>
 
-        <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700 min-h-[160px] flex flex-col justify-between">
-          <div className="flex items-center justify-between">
+        <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700 min-h-[160px] flex flex-col">
+          <div className="flex items-center justify-between mb-2">
             <span className="text-zinc-500 text-sm">Retorno Anual (E.A.)</span>
             <div className="p-2 bg-teal-500/10 rounded-lg text-teal-400">
               <Percent size={20} />
             </div>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-white">{weightedRoi.toFixed(1)}%</p>
-            <p className="text-zinc-500 text-sm mt-1">Promedio ponderado</p>
+          <p className="text-lg font-bold text-white mb-1">{weightedRoi.toFixed(1)}%  <span className="text-zinc-500 text-xs font-normal">Promedio ponderado</span></p>
+          <div className="flex-1">
+            <BalancePieChart data={returnChartData} tooltipMode="rate" />
           </div>
         </div>
 

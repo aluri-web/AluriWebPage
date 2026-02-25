@@ -23,16 +23,16 @@ export default function PortfolioChart({ invested, collected }: PortfolioChartPr
   }
 
   return (
-    <div className="w-full h-[300px]">
+    <div className="w-full h-[160px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
             data={data}
             cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={100}
-            paddingAngle={5}
+            cy="45%"
+            innerRadius={30}
+            outerRadius={50}
+            paddingAngle={3}
             dataKey="value"
           >
             {data.map((entry, index) => (
@@ -57,7 +57,7 @@ export default function PortfolioChart({ invested, collected }: PortfolioChartPr
           <Legend
             verticalAlign="bottom"
             height={36}
-            formatter={(value) => <span className="text-slate-300 text-sm">{value}</span>}
+            formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
           />
         </PieChart>
       </ResponsiveContainer>

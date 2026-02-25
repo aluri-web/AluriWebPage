@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { Banknote, DollarSign, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { LoanTableRow, InvestorOption } from './actions'
 import AddInvestmentModal from './AddInvestmentModal'
@@ -23,6 +23,44 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const [paymentLoan, setPaymentLoan] = useState<{ id: string; code: string; saldo_capital: number; saldo_intereses: number; saldo_mora: number } | null>(null)
   const [sortField, setSortField] = useState<SortField>('created_at')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const drag = useRef({ isDown: false, moved: false, startX: 0, scrollLeft: 0 })
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    const container = tableScrollRef.current
+    if (!container) return
+    drag.current = { isDown: true, moved: false, startX: e.pageX, scrollLeft: container.scrollLeft }
+  }, [])
+
+  useEffect(() => {
+    const handleDragMove = (e: MouseEvent) => {
+      const d = drag.current
+      if (!d.isDown) return
+      const dx = e.pageX - d.startX
+      if (!d.moved && Math.abs(dx) > 5) {
+        d.moved = true
+        setIsDragging(true)
+      }
+      if (d.moved) {
+        const container = tableScrollRef.current
+        if (container) container.scrollLeft = d.scrollLeft - dx
+      }
+    }
+
+    const handleDragEnd = () => {
+      drag.current.isDown = false
+      drag.current.moved = false
+      setIsDragging(false)
+    }
+
+    window.addEventListener('mousemove', handleDragMove)
+    window.addEventListener('mouseup', handleDragEnd)
+    return () => {
+      window.removeEventListener('mousemove', handleDragMove)
+      window.removeEventListener('mouseup', handleDragEnd)
+    }
+  }, [])
 
   // Sorted loans
   const sortedLoans = useMemo(() => {
@@ -75,7 +113,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const SortableHeader = ({ field, children, className = '' }: { field: SortField; children: React.ReactNode; className?: string }) => (
     <th
       onClick={() => handleSort(field)}
-      className={`px-3 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-200 transition-colors select-none ${className}`}
+      className={`px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-200 transition-colors select-none whitespace-nowrap ${className}`}
     >
       <div className="flex items-center gap-1.5">
         {children}
@@ -182,40 +220,44 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   return (
     <>
       <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1600px]">
+        <div
+          ref={tableScrollRef}
+          className="overflow-x-auto scrollbar-visible cursor-grab active:cursor-grabbing"
+          onMouseDown={handleDragStart}
+        >
+          <table className="w-full min-w-[2200px]" style={{ userSelect: isDragging ? 'none' : undefined }}>
             <thead>
               <tr className="border-b border-slate-800 bg-slate-800/50">
                 <SortableHeader field="code" className="text-left">Codigo</SortableHeader>
                 <SortableHeader field="status" className="text-left">Estado</SortableHeader>
                 <SortableHeader field="debtor_name" className="text-left">Deudor</SortableHeader>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Co-Deudor
                 </th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Ciudad
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Avaluo
                 </th>
                 <SortableHeader field="amount_requested" className="text-right">Monto</SortableHeader>
                 <SortableHeader field="ltv" className="text-right">LTV</SortableHeader>
-                <th className="px-3 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Riesgo
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Tasa NM
                 </th>
                 <SortableHeader field="interest_rate_ea" className="text-right">Tasa EA</SortableHeader>
-                <th className="px-3 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Comision
                 </th>
                 <SortableHeader field="amount_funded" className="text-right">Fondeado</SortableHeader>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Inversionistas
                 </th>
                 <SortableHeader field="created_at" className="text-left">Fecha</SortableHeader>
-                <th className="px-3 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Acciones
                 </th>
               </tr>
@@ -229,48 +271,48 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
 
                 return (
                   <tr key={loan.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className="px-2 py-1 bg-slate-800 text-teal-400 text-xs font-mono rounded">
                         {loan.code}
                       </span>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       {getStatusBadge(loan.status)}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div>
                         <p className="text-sm text-white">{loan.debtor_name || '-'}</p>
                         <p className="text-xs text-slate-500 font-mono">{loan.debtor_cedula || ''}</p>
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-sm text-slate-400">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">
                       {loan.co_debtor_name || <span className="text-slate-600">-</span>}
                     </td>
-                    <td className="px-3 py-3 text-sm text-slate-300">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
                       {loan.property_city || '-'}
                     </td>
-                    <td className="px-3 py-3 text-sm text-slate-300 text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300 text-right">
                       {formatCurrency(loan.property_value)}
                     </td>
-                    <td className="px-3 py-3 text-sm text-white font-medium text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-white font-medium text-right">
                       {formatCurrency(loan.amount_requested)}
                     </td>
-                    <td className="px-3 py-3 text-sm text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
                       {getLtvBadge(loan.ltv)}
                     </td>
-                    <td className="px-3 py-3 text-sm text-center">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
                       {getRiskBadge(loan.risk_score)}
                     </td>
-                    <td className="px-3 py-3 text-sm text-slate-300 text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300 text-right">
                       {loan.interest_rate_nm ? `${loan.interest_rate_nm}%` : '-'}
                     </td>
-                    <td className="px-3 py-3 text-sm text-teal-400 font-medium text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-teal-400 font-medium text-right">
                       {loan.interest_rate_ea ? `${loan.interest_rate_ea}%` : '-'}
                     </td>
-                    <td className="px-3 py-3 text-sm text-slate-300 text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300 text-right">
                       {formatCurrency(loan.debtor_commission)}
                     </td>
-                    <td className="px-3 py-3 text-sm text-right">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
                       <div>
                         <span className="text-teal-400 font-medium">{formatCurrency(loan.amount_funded)}</span>
                         {remaining > 0 && (
@@ -278,13 +320,13 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap gap-1 max-w-[180px]">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex gap-1">
                         {loan.investors.length > 0 ? (
                           loan.investors.slice(0, 3).map((name, idx) => (
                             <span
                               key={idx}
-                              className="px-2 py-0.5 bg-slate-800 text-slate-300 text-xs rounded truncate max-w-[70px]"
+                              className="px-2 py-0.5 bg-slate-800 text-slate-300 text-xs rounded"
                               title={name}
                             >
                               {name.split(' ')[0]}
@@ -300,10 +342,10 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3 text-sm text-slate-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
                       {formatDate(loan.created_at)}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1">
                         {/* Add Investment Button */}
                         <button
