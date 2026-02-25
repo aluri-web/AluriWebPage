@@ -110,10 +110,10 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     return sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
   }
 
-  const SortableHeader = ({ field, children, className = '' }: { field: SortField; children: React.ReactNode; className?: string }) => (
+  const SortableHeader = ({ field, children, className = '', sticky = false }: { field: SortField; children: React.ReactNode; className?: string; sticky?: boolean }) => (
     <th
       onClick={() => handleSort(field)}
-      className={`px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-200 transition-colors select-none whitespace-nowrap ${className}`}
+      className={`px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-200 transition-colors select-none whitespace-nowrap ${className} ${sticky ? 'sticky left-0 z-10 bg-slate-800/95 backdrop-blur-sm shadow-[2px_0_4px_rgba(0,0,0,0.3)]' : ''}`}
     >
       <div className="flex items-center gap-1.5">
         {children}
@@ -228,7 +228,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           <table className="w-full min-w-[2200px]" style={{ userSelect: isDragging ? 'none' : undefined }}>
             <thead>
               <tr className="border-b border-slate-800 bg-slate-800/50">
-                <SortableHeader field="code" className="text-left">Codigo</SortableHeader>
+                <SortableHeader field="code" className="text-left" sticky>Codigo</SortableHeader>
                 <SortableHeader field="status" className="text-left">Estado</SortableHeader>
                 <SortableHeader field="debtor_name" className="text-left">Deudor</SortableHeader>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
@@ -271,7 +271,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
 
                 return (
                   <tr key={loan.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap sticky left-0 z-10 bg-slate-900/95 backdrop-blur-sm shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
                       <span className="px-2 py-1 bg-slate-800 text-teal-400 text-xs font-mono rounded">
                         {loan.code}
                       </span>
