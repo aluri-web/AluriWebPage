@@ -20,6 +20,7 @@ interface LoanParams {
     contractType?: 'hipotecario' | 'retroventa'
     amortizationType?: 'francesa' | 'solo_interes'
     liquidationType?: 'anticipada' | 'vencida'
+    tipoPersona?: 'natural' | 'juridica'
     commercialValue?: number
     // Financial
     interestRateEa?: number
@@ -36,7 +37,7 @@ interface LoanParams {
 
 export async function createLoan(params: LoanParams) {
     const supabase = await createClient()
-    const { borrowerId, amount, interestRate, termMonths, startDate, estado, monthlyIncome, profession, warrantyAnalysis, contractType, amortizationType, liquidationType, commercialValue, interestRateEa, debtorCommission, aluriCommissionPct, coDebtorId, propertyAddress, propertyCity, propertyType, propertyPhotos } = params
+    const { borrowerId, amount, interestRate, termMonths, startDate, estado, monthlyIncome, profession, warrantyAnalysis, contractType, amortizationType, liquidationType, tipoPersona, commercialValue, interestRateEa, debtorCommission, aluriCommissionPct, coDebtorId, propertyAddress, propertyCity, propertyType, propertyPhotos } = params
 
     // 1. Cálculo Financiero
     const i = interestRate / 100
@@ -82,6 +83,7 @@ export async function createLoan(params: LoanParams) {
             tipo_contrato: contractType || 'hipotecario',
             tipo_amortizacion: amortizationType || 'francesa',
             tipo_liquidacion: liquidationType || 'vencida',
+            tipo_persona: tipoPersona || 'natural',
             valor_comercial: commercialValue || null,
             tasa_interes_ea: interestRateEa || null,
             comision_deudor: debtorCommission || 0,

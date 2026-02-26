@@ -14,6 +14,7 @@ export default async function CreditosPage() {
       codigo_credito,
       estado,
       monto_solicitado,
+      valor_colocado,
       tasa_nominal,
       tasa_interes_ea,
       ciudad_inmueble,
@@ -21,7 +22,8 @@ export default async function CreditosPage() {
       tipo_inmueble,
       valor_comercial,
       created_at,
-      inversiones(monto_invertido)
+      inversiones(monto_invertido),
+      transacciones(id, tipo_transaccion, monto, fecha_aplicacion, referencia_pago)
     `)
     .eq('cliente_id', user!.id)
     .order('created_at', { ascending: false })

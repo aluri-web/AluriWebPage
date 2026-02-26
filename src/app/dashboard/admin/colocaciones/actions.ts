@@ -299,6 +299,7 @@ export interface FullLoanData {
   contract_type?: 'hipotecario' | 'retroventa'
   amortization_type?: 'francesa' | 'solo_interes'
   liquidation_type?: 'anticipada' | 'vencida'
+  tipo_persona?: 'natural' | 'juridica'
   commercial_value?: number
   estado?: string // Optional initial estado
 }
@@ -418,6 +419,7 @@ export async function createFullLoanRecord(
       contractType: data.contract_type,
       amortizationType: data.amortization_type,
       liquidationType: data.liquidation_type,
+      tipoPersona: data.tipo_persona,
       commercialValue: data.commercial_value,
       interestRateEa: data.interest_rate_ea,
       debtorCommission: data.debtor_commission,

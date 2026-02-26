@@ -62,6 +62,7 @@ interface FormData {
   contract_type: 'hipotecario' | 'retroventa'
   amortization_type: 'francesa' | 'solo_interes'
   liquidation_type: 'anticipada' | 'vencida'
+  tipo_persona: 'natural' | 'juridica'
 
   // Co-Debtor
   has_co_debtor: boolean
@@ -163,7 +164,8 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
       warranty_analysis: '',
       contract_type: 'hipotecario',
       amortization_type: 'francesa',
-      liquidation_type: 'vencida'
+      liquidation_type: 'vencida',
+      tipo_persona: 'natural'
     }
   })
 
@@ -476,6 +478,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
       contract_type: formData.contract_type,
       amortization_type: formData.amortization_type,
       liquidation_type: formData.liquidation_type,
+      tipo_persona: formData.tipo_persona,
       commercial_value: formData.commercial_value
     })
 
@@ -520,7 +523,8 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
         warranty_analysis: '',
         contract_type: 'hipotecario',
         amortization_type: 'francesa',
-        liquidation_type: 'vencida'
+        liquidation_type: 'vencida',
+        tipo_persona: 'natural'
       })
       setDebtorFound(null)
       setCoDebtorFound(null)
@@ -718,7 +722,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                 <h3 className="font-semibold text-white">Configuracion del Contrato</h3>
               </div>
               <div className="p-5 space-y-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-sm text-slate-400 mb-1.5">Tipo de Contrato</label>
                     <select {...register('contract_type')}
@@ -728,11 +732,11 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1.5">Amortizacion</label>
+                    <label className="block text-sm text-slate-400 mb-1.5">Tipo de Credito</label>
                     <select {...register('amortization_type')}
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500">
-                      <option value="francesa">Francesa (Cuota Fija)</option>
-                      <option value="solo_interes">Solo Intereses (Balloon)</option>
+                      <option value="francesa">Capital e Intereses</option>
+                      <option value="solo_interes">Solo Intereses</option>
                     </select>
                   </div>
                   <div>
@@ -741,6 +745,14 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500">
                       <option value="vencida">Vencida</option>
                       <option value="anticipada">Anticipada</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1.5">Tipo de Persona</label>
+                    <select {...register('tipo_persona')}
+                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500">
+                      <option value="natural">Persona Natural</option>
+                      <option value="juridica">Persona Juridica</option>
                     </select>
                   </div>
                 </div>

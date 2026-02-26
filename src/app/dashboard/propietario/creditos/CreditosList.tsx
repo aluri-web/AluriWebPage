@@ -1,16 +1,26 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { FileText, Building2, DollarSign, Hash, Calendar, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { FileText, Building2, DollarSign, Hash, Calendar, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react'
+import AbonosTable from '../../../../components/dashboard/AbonosTable'
 
 type SortField = 'codigo' | 'estado' | 'monto' | 'fecha'
 type SortDirection = 'asc' | 'desc'
+
+interface Transaccion {
+  id: string
+  tipo_transaccion: string
+  monto: number
+  fecha_aplicacion: string
+  referencia_pago: string | null
+}
 
 interface Credito {
   id: string
   codigo_credito: string
   estado: string
   monto_solicitado: number
+  valor_colocado: number | null
   tasa_nominal: number | null
   tasa_interes_ea: number | null
   ciudad_inmueble: string | null
@@ -19,6 +29,7 @@ interface Credito {
   valor_comercial: number | null
   created_at: string
   inversiones: { monto_invertido: number }[]
+  transacciones: Transaccion[]
 }
 
 interface CreditosListProps {
@@ -96,6 +107,16 @@ const getFunded = (credito: Credito): number => {
 export default function CreditosList({ creditos }: CreditosListProps) {
   const [sortField, setSortField] = useState<SortField>('fecha')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const [expandedAbonos, setExpandedAbonos] = useState<Set<string>>(new Set())
+
+  const toggleAbonos = (creditId: string) => {
+    setExpandedAbonos(prev => {
+      const next = new Set(prev)
+      if (next.has(creditId)) next.delete(creditId)
+      else next.add(creditId)
+      return next
+    })
+  }
 
   const sortedCreditos = useMemo(() => {
     return [...creditos].sort((a, b) => {
@@ -301,6 +322,28 @@ export default function CreditosList({ creditos }: CreditosListProps) {
                     <span>{formatCOP(amountFunded)} fondeado</span>
                     <span>{formatCOP(credito.monto_solicitado)} objetivo</span>
                   </div>
+                </div>
+              )}
+
+              {/* Abonos Toggle */}
+              {credito.transacciones && credito.transacciones.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-gray-100">
+                  <button
+                    onClick={() => toggleAbonos(credito.id)}
+                    className="flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                  >
+                    {expandedAbonos.has(credito.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    {expandedAbonos.has(credito.id) ? 'Ocultar Abonos' : 'Ver Abonos'}
+                  </button>
+
+                  {expandedAbonos.has(credito.id) && (
+                    <div className="mt-4 rounded-xl border border-gray-200 overflow-hidden">
+                      <AbonosTable
+                        transacciones={credito.transacciones}
+                        valorColocado={credito.valor_colocado || credito.monto_solicitado}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -1,5 +1,4 @@
 import fs from 'fs';
-import csv from 'csv-parser';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -21,7 +20,7 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   }
 });
 
-const CSV_FILE_PATH = 'docs/datos_pagos.csv';
+const CSV_FILE_PATH = 'docs/pagos 2026-02-26.csv';
 
 // ==========================================
 // HELPERS DE PARSEO
@@ -95,8 +94,6 @@ function monthsOfInterestDue(base: Date, date: Date, anticipada: boolean): numbe
 // ==========================================
 
 async function migrate() {
-  const rawRows: any[] = [];
-
   console.log('=== MIGRACION DE PAGOS (v2) ===\n');
 
   // PASO 0: Limpiar transacciones de migración anterior
@@ -114,36 +111,31 @@ async function migrate() {
 
   console.log('Leyendo CSV de pagos...');
 
-  fs.createReadStream(path.resolve(CSV_FILE_PATH))
-    .pipe(csv({ separator: ';' }))
-    .on('data', (data) => rawRows.push(data))
-    .on('end', async () => {
-      console.log(`Se encontraron ${rawRows.length} filas.\n`);
+  // Read CSV manually (no header row)
+  const csvContent = fs.readFileSync(path.resolve(CSV_FILE_PATH), 'latin1');
+  const csvLines = csvContent.split('\n').filter(l => l.trim().length > 0);
 
-      // 1. Parsear todas las filas del CSV
+  console.log(`Se encontraron ${csvLines.length} filas.\n`);
+
+  {
+      // 1. Parsear todas las filas del CSV (formato: codigo;deudor;fecha;valor;concepto)
       const pagos: PagoCSV[] = [];
-      for (const row of rawRows) {
-        const keys = Object.keys(row);
-        const codigoKey = keys.find(k => k.includes('dito') || k.includes('Cr'));
-        const deudorKey = keys.find(k => k.includes('Deudor') || k.includes('deudor'));
-        const fechaKey = keys.find(k => k.includes('Fecha') || k.includes('fecha'));
-        const valorKey = keys.find(k => k.includes('Valor') || k.includes('valor'));
-        const conceptoKey = keys.find(k => k.includes('CONCEPTO') || k.includes('concepto') || k.includes('Concepto'));
-
-        const codigoCredito = normalizeCode(codigoKey ? row[codigoKey] : '');
-        const fechaRaw = fechaKey ? row[fechaKey].trim() : '';
+      for (const line of csvLines) {
+        const cols = line.split(';');
+        const codigoCredito = normalizeCode(cols[0] || '');
+        const fechaRaw = (cols[2] || '').trim();
         const fechaISO = parseDateToISO(fechaRaw);
 
-        if (!codigoCredito || !fechaISO) continue;
+        if (!codigoCredito || !codigoCredito.startsWith('CR') || !fechaISO) continue;
 
         pagos.push({
           codigoCredito,
-          deudor: deudorKey ? row[deudorKey].trim() : '',
+          deudor: (cols[1] || '').trim(),
           fecha: fechaRaw,
           fechaISO,
           fechaDate: parseDateToDate(fechaRaw),
-          monto: parseMoney(valorKey ? row[valorKey] : '0'),
-          concepto: conceptoKey ? row[conceptoKey].trim() : '',
+          monto: parseMoney(cols[3] || '0'),
+          concepto: (cols[4] || '').trim(),
         });
       }
 
@@ -391,7 +383,7 @@ async function migrate() {
       console.log(`Transacciones fallidas: ${transaccionesFallidas}`);
       console.log(`Creditos no encontrados: ${creditosNoEncontrados}`);
       console.log(`=============================`);
-    });
+  }
 }
 
 migrate();

@@ -1,4 +1,3 @@
-# Crédito;Deudor;Fecha;Valor;CONCEPTO
 CR001;Camilo Vela;4/3/2025;$4,935,162;DESCUENTO EN GIRO
 CR001;Camilo Vela;4/4/2025;$4,935,200;Consignación efectivo
 CR001;Camilo Vela;4/5/2025;$4,935,200;Consignación efectivo
@@ -42,7 +41,7 @@ CR004;Juan Ramiro Gomez;11/10/2025;$3,000,000;Consignación efectivo
 CR004;Juan Ramiro Gomez;20/11/2025;$2,000,000;Consignación efectivo
 CR004;Juan Ramiro Gomez;5/12/2025;$5,000,000;Consignación efectivo
 CR004;Juan Ramiro Gomez;11/12/2025;$250,000;Condonación Mora
-CR004;Juan Ramiro Gomez;20/1/2026;$100,000,000;Consignación efectivo
+CR004;Juan Ramiro Gomez;20/1/2026;$100,541,921;Consignación efectivo
 CR005;Hugo Sebastian Lozano;23/7/2025;$3,000,000;DESCUENTO EN GIRO
 CR005;Hugo Sebastian Lozano;23/8/2025;$3,000,000;Consignación efectivo
 CR005;Hugo Sebastian Lozano;23/9/2025;$3,000,000;Consignación efectivo
