@@ -1220,16 +1220,27 @@ export async function deleteCredit(
     return { success: false, error: 'ID del credito es requerido.' }
   }
 
-  // Verify credit exists
+  // Verify credit exists and fetch owner + investors for notifications
   const { data: credit, error: fetchError } = await supabaseAdmin
     .from('creditos')
-    .select('id, codigo_credito')
+    .select('id, codigo_credito, cliente_id, monto_solicitado')
     .eq('id', creditId)
     .single()
 
   if (fetchError || !credit) {
     return { success: false, error: 'Credito no encontrado.' }
   }
+
+  // Fetch investors before deleting
+  const { data: investors } = await supabaseAdmin
+    .from('inversiones')
+    .select('inversionista_id, monto_invertido')
+    .eq('credito_id', creditId)
+    .in('estado', ['activo', 'pendiente'])
+
+  const formatCOP = (v: number) => new Intl.NumberFormat('es-CO', {
+    style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0
+  }).format(v)
 
   try {
     // Delete in FK order
@@ -1258,7 +1269,40 @@ export async function deleteCredit(
       return { success: false, error: 'Error al eliminar credito: ' + deleteError.message }
     }
 
+    // Send notifications after successful deletion
+    const notifications: { user_id: string; tipo: string; titulo: string; mensaje: string; metadata: Record<string, unknown> }[] = []
+
+    // Notify owner
+    if (credit.cliente_id) {
+      notifications.push({
+        user_id: credit.cliente_id,
+        tipo: 'credito_eliminado',
+        titulo: 'Crédito Eliminado',
+        mensaje: `El crédito ${credit.codigo_credito} por ${formatCOP(credit.monto_solicitado || 0)} ha sido eliminado por el administrador.`,
+        metadata: { credit_code: credit.codigo_credito, amount: credit.monto_solicitado }
+      })
+    }
+
+    // Notify each investor
+    if (investors && investors.length > 0) {
+      for (const inv of investors) {
+        notifications.push({
+          user_id: inv.inversionista_id,
+          tipo: 'credito_eliminado',
+          titulo: 'Crédito Eliminado',
+          mensaje: `El crédito ${credit.codigo_credito} en el que invertiste ${formatCOP(inv.monto_invertido)} ha sido eliminado. Tu inversión será devuelta.`,
+          metadata: { credit_code: credit.codigo_credito, amount: inv.monto_invertido }
+        })
+      }
+    }
+
+    if (notifications.length > 0) {
+      await supabaseAdmin.from('notificaciones').insert(notifications)
+    }
+
     revalidatePath('/dashboard/admin/colocaciones')
+    revalidatePath('/dashboard/inversionista/notificaciones')
+    revalidatePath('/dashboard/propietario/notificaciones')
 
     return {
       success: true,

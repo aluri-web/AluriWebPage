@@ -1,16 +1,20 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   LayoutDashboard,
   FileText,
+  Bell,
   Settings
 } from 'lucide-react'
+import { getUnreadCount } from '../../app/dashboard/propietario/notificaciones/actions'
 
 const mainNavItems = [
   { href: '/dashboard/propietario', label: 'Panel', icon: LayoutDashboard },
   { href: '/dashboard/propietario/creditos', label: 'Mis Creditos', icon: FileText },
+  { href: '/dashboard/propietario/notificaciones', label: 'Notificaciones', icon: Bell },
 ]
 
 const configNavItems = [
@@ -19,6 +23,11 @@ const configNavItems = [
 
 export default function PropietarioSidebarNav() {
   const pathname = usePathname()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    getUnreadCount().then(setUnreadCount)
+  }, [pathname])
 
   const isActive = (href: string) => {
     if (href === '/dashboard/propietario') {
@@ -36,7 +45,14 @@ export default function PropietarioSidebarNav() {
           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       }`}
     >
-      <Icon size={20} />
+      <div className="relative">
+        <Icon size={20} />
+        {href === '/dashboard/propietario/notificaciones' && unreadCount > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </div>
       <span className="text-sm font-medium">{label}</span>
     </Link>
   )
