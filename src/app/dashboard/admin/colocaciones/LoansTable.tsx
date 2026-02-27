@@ -151,13 +151,15 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
       fundraising: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
       active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
       completed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      defaulted: 'bg-red-500/20 text-red-400 border-red-500/30'
+      defaulted: 'bg-red-500/20 text-red-400 border-red-500/30',
+      cancelled: 'bg-slate-500/20 text-slate-400 border-slate-500/30'
     }
     const labels: Record<string, string> = {
-      fundraising: 'Fondeando',
-      active: 'Activo',
+      fundraising: 'Colocando',
+      active: 'Desembolsado',
       completed: 'Completado',
-      defaulted: 'En Mora'
+      defaulted: 'En Mora',
+      cancelled: 'No Colocado'
     }
     return (
       <span className={`px-2 py-1 text-xs font-medium rounded border ${styles[status] || 'bg-slate-500/20 text-slate-400'}`}>

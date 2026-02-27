@@ -32,11 +32,11 @@ export default async function AdminDashboard() {
 
   const totalCapital = inversionesData?.reduce((sum, inv) => sum + (inv.monto_invertido || 0), 0) || 0
 
-  // 4. Créditos En Mora (estado = 'mora')
+  // 4. Créditos En Mora (en_mora = true, calculado por cron diario)
   const { count: defaultedLoans } = await supabase
     .from('creditos')
     .select('*', { count: 'exact', head: true })
-    .eq('estado', 'mora')
+    .eq('en_mora', true)
 
   // 5. Actividad Reciente - últimas inversiones
   const { data: recentInvestments } = await supabase

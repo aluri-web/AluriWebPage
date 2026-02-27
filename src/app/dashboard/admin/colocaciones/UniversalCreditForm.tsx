@@ -697,7 +697,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                       className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-teal-500">
                       <option value="solicitado">Solicitado</option>
                       <option value="aprobado">Aprobado</option>
-                      <option value="publicado">Publicado</option>
+                      <option value="publicado">Colocando</option>
                       <option value="en_firma">En Firma</option>
                     </select>
                   </div>

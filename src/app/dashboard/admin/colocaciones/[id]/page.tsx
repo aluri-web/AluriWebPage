@@ -98,7 +98,7 @@ export default async function CreditDetailsPage({ params }: { params: Promise<{ 
                                                 ['castigado', 'anulado'].includes(credit.estado) ? 'bg-red-500/10 border-red-500/20 text-red-400' :
                                                     'bg-slate-800 border-slate-700 text-slate-400'
                                 }`}>
-                                {credit.estado.toUpperCase().replace('_', ' ')}
+                                {{ publicado: 'COLOCANDO', activo: 'DESEMBOLSADO', en_firma: 'EN FIRMA', firmado: 'FIRMADO', finalizado: 'FINALIZADO', castigado: 'CASTIGADO', anulado: 'ANULADO', mora: 'EN MORA', no_colocado: 'NO COLOCADO' }[credit.estado] || credit.estado.toUpperCase().replace('_', ' ')}
                             </span>
                         </h1>
                         <p className="text-slate-400 mt-1">

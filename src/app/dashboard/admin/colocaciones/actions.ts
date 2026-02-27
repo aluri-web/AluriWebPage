@@ -634,6 +634,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
     mora: 'defaulted',
     finalizado: 'completed',
     pagado: 'completed',
+    no_colocado: 'cancelled',
   }
 
   // Transform data - map Spanish fields to expected English interface
@@ -1206,7 +1207,7 @@ export async function updateCredit(
 
 export async function deleteCredit(
   creditId: string
-): Promise<{ success: boolean; error?: string; deleted?: { plan_pagos: number; transacciones: number; inversiones: number } }> {
+): Promise<{ success: boolean; error?: string }> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -1220,10 +1221,10 @@ export async function deleteCredit(
     return { success: false, error: 'ID del credito es requerido.' }
   }
 
-  // Verify credit exists and fetch owner + investors for notifications
+  // Verify credit exists and fetch owner info for notifications
   const { data: credit, error: fetchError } = await supabaseAdmin
     .from('creditos')
-    .select('id, codigo_credito, cliente_id, monto_solicitado')
+    .select('id, codigo_credito, cliente_id, monto_solicitado, estado')
     .eq('id', creditId)
     .single()
 
@@ -1231,7 +1232,11 @@ export async function deleteCredit(
     return { success: false, error: 'Credito no encontrado.' }
   }
 
-  // Fetch investors before deleting
+  if (credit.estado === 'no_colocado') {
+    return { success: false, error: 'Este credito ya fue marcado como No Colocado.' }
+  }
+
+  // Fetch investors for notifications
   const { data: investors } = await supabaseAdmin
     .from('inversiones')
     .select('inversionista_id, monto_invertido')
@@ -1243,42 +1248,42 @@ export async function deleteCredit(
   }).format(v)
 
   try {
-    // Delete in FK order
-    const { count: ppCount } = await supabaseAdmin
-      .from('plan_pagos')
-      .delete({ count: 'exact' })
-      .eq('credito_id', creditId)
-
-    const { count: txCount } = await supabaseAdmin
-      .from('transacciones')
-      .delete({ count: 'exact' })
-      .eq('credito_id', creditId)
-
-    const { count: invCount } = await supabaseAdmin
-      .from('inversiones')
-      .delete({ count: 'exact' })
-      .eq('credito_id', creditId)
-
-    const { error: deleteError } = await supabaseAdmin
+    // Soft delete: change estado to 'no_colocado'
+    const { error: updateError } = await supabaseAdmin
       .from('creditos')
-      .delete()
+      .update({
+        estado: 'no_colocado',
+        updated_at: new Date().toISOString()
+      })
       .eq('id', creditId)
 
-    if (deleteError) {
-      console.error('Error deleting credit:', deleteError.message)
-      return { success: false, error: 'Error al eliminar credito: ' + deleteError.message }
+    if (updateError) {
+      console.error('Error soft-deleting credit:', updateError.message)
+      return { success: false, error: 'Error al marcar credito como no colocado: ' + updateError.message }
     }
 
-    // Send notifications after successful deletion
+    // Cancel active/pending investments
+    if (investors && investors.length > 0) {
+      await supabaseAdmin
+        .from('inversiones')
+        .update({
+          estado: 'cancelado',
+          updated_at: new Date().toISOString()
+        })
+        .eq('credito_id', creditId)
+        .in('estado', ['activo', 'pendiente'])
+    }
+
+    // Send notifications
     const notifications: { user_id: string; tipo: string; titulo: string; mensaje: string; metadata: Record<string, unknown> }[] = []
 
     // Notify owner
     if (credit.cliente_id) {
       notifications.push({
         user_id: credit.cliente_id,
-        tipo: 'credito_eliminado',
-        titulo: 'Crédito Eliminado',
-        mensaje: `El crédito ${credit.codigo_credito} por ${formatCOP(credit.monto_solicitado || 0)} ha sido eliminado por el administrador.`,
+        tipo: 'credito_no_colocado',
+        titulo: 'Crédito No Colocado',
+        mensaje: `El crédito ${credit.codigo_credito} por ${formatCOP(credit.monto_solicitado || 0)} ha sido marcado como no colocado.`,
         metadata: { credit_code: credit.codigo_credito, amount: credit.monto_solicitado }
       })
     }
@@ -1288,9 +1293,9 @@ export async function deleteCredit(
       for (const inv of investors) {
         notifications.push({
           user_id: inv.inversionista_id,
-          tipo: 'credito_eliminado',
-          titulo: 'Crédito Eliminado',
-          mensaje: `El crédito ${credit.codigo_credito} en el que invertiste ${formatCOP(inv.monto_invertido)} ha sido eliminado. Tu inversión será devuelta.`,
+          tipo: 'credito_no_colocado',
+          titulo: 'Crédito No Colocado',
+          mensaje: `El crédito ${credit.codigo_credito} en el que invertiste ${formatCOP(inv.monto_invertido)} ha sido marcado como no colocado. Tu inversión será devuelta.`,
           metadata: { credit_code: credit.codigo_credito, amount: inv.monto_invertido }
         })
       }
@@ -1304,17 +1309,10 @@ export async function deleteCredit(
     revalidatePath('/dashboard/inversionista/notificaciones')
     revalidatePath('/dashboard/propietario/notificaciones')
 
-    return {
-      success: true,
-      deleted: {
-        plan_pagos: ppCount || 0,
-        transacciones: txCount || 0,
-        inversiones: invCount || 0,
-      }
-    }
+    return { success: true }
   } catch (error) {
-    console.error('Unexpected error deleting credit:', error)
-    return { success: false, error: 'Error inesperado al eliminar el credito.' }
+    console.error('Unexpected error soft-deleting credit:', error)
+    return { success: false, error: 'Error inesperado.' }
   }
 }
 

@@ -31,6 +31,7 @@ function getNotificationIcon(tipo: string) {
     case 'inversion_rechazada':
       return <XCircle size={20} />
     case 'credito_eliminado':
+    case 'credito_no_colocado':
       return <AlertTriangle size={20} />
     default:
       return <Bell size={20} />
@@ -44,6 +45,7 @@ function getNotificationColor(tipo: string) {
     case 'inversion_rechazada':
       return 'bg-red-50 text-red-600'
     case 'credito_eliminado':
+    case 'credito_no_colocado':
       return 'bg-amber-50 text-amber-600'
     default:
       return 'bg-gray-50 text-gray-600'

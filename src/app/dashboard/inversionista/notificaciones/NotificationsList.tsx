@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle, XCircle, Bell, CheckCheck } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Bell, CheckCheck } from 'lucide-react'
 import { markAsRead, markAllAsRead, Notificacion } from './actions'
 
 interface NotificationsListProps {
@@ -74,7 +74,12 @@ export default function NotificationsList({ notifications }: NotificationsListPr
 
       <div className="space-y-2">
         {notifications.map((notification) => {
-          const isApproval = notification.tipo === 'inversion_aprobada'
+          const tipo = notification.tipo
+          const iconConfig = tipo === 'inversion_aprobada'
+            ? { bg: 'bg-emerald-500/10 text-emerald-400', icon: <CheckCircle size={20} /> }
+            : tipo === 'credito_no_colocado'
+              ? { bg: 'bg-amber-500/10 text-amber-400', icon: <AlertTriangle size={20} /> }
+              : { bg: 'bg-red-500/10 text-red-400', icon: <XCircle size={20} /> }
 
           return (
             <button
@@ -89,14 +94,8 @@ export default function NotificationsList({ notifications }: NotificationsListPr
             >
               <div className="flex items-start gap-4">
                 {/* Icon */}
-                <div className={`mt-0.5 p-2 rounded-full flex-shrink-0 ${
-                  isApproval
-                    ? 'bg-emerald-500/10 text-emerald-400'
-                    : 'bg-red-500/10 text-red-400'
-                }`}>
-                  {isApproval
-                    ? <CheckCircle size={20} />
-                    : <XCircle size={20} />
+                <div className={`mt-0.5 p-2 rounded-full flex-shrink-0 ${iconConfig.bg}`}>
+                  {iconConfig.icon
                   }
                 </div>
 

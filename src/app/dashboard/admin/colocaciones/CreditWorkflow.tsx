@@ -25,10 +25,10 @@ interface CreditWorkflowProps {
 }
 
 const STEPS = [
-    { id: 'publicado', label: 'Publicado', icon: FileText },
+    { id: 'publicado', label: 'Colocando', icon: FileText },
     { id: 'en_firma', label: 'En Firma', icon: Calendar },
     { id: 'firmado', label: 'Firmado', icon: CheckCircle },
-    { id: 'activo', label: 'Activo', icon: Banknote },
+    { id: 'activo', label: 'Desembolsado', icon: Banknote },
 ]
 
 export default function CreditWorkflow({ credit }: CreditWorkflowProps) {
@@ -272,7 +272,7 @@ export default function CreditWorkflow({ credit }: CreditWorkflowProps) {
                     <div className="flex items-center gap-4">
                         <div className="text-emerald-400 flex items-center gap-2">
                             <CheckCircle size={20} />
-                            <span className="font-semibold">Crédito Activo y Vigente</span>
+                            <span className="font-semibold">Crédito Desembolsado y Vigente</span>
                         </div>
                         {credit.fecha_desembolso && (
                             <p className="text-slate-400 text-sm">

@@ -49,14 +49,15 @@ const getStatusLabel = (estado: string) => {
   switch (estado) {
     case 'solicitado': return 'Solicitado'
     case 'aprobado': return 'Aprobado'
-    case 'publicado': return 'En Fondeo'
+    case 'publicado': return 'Colocando'
     case 'en_firma': return 'En Firma'
     case 'firmado': return 'Firmado'
-    case 'activo': return 'Activo'
+    case 'activo': return 'Desembolsado'
     case 'finalizado': return 'Completado'
     case 'castigado': return 'Castigado'
     case 'mora': return 'En Mora'
     case 'anulado': return 'Anulado'
+    case 'no_colocado': return 'No Colocado'
     default: return estado
   }
 }
@@ -73,6 +74,7 @@ const getStatusClass = (estado: string) => {
     case 'castigado': return 'bg-orange-50 text-orange-600 border-orange-200'
     case 'mora': return 'bg-red-50 text-red-600 border-red-200'
     case 'anulado': return 'bg-gray-100 text-gray-400 border-gray-200'
+    case 'no_colocado': return 'bg-gray-100 text-gray-400 border-gray-200'
     default: return 'bg-gray-100 text-gray-600 border-gray-200'
   }
 }

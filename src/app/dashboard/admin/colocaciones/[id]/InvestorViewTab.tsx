@@ -82,11 +82,12 @@ export default function InvestorViewTab({ credit }: { credit: InvestorViewCredit
   const estadoCredito = credit.estado_credito || ''
   const creditoEstado = estadoCredito === 'pagado' ? 'pagado' : (credit.estado || 'pending')
   const statusConfig: Record<string, { label: string; bgClass: string; textClass: string }> = {
-    publicado: { label: 'Fondeando', bgClass: 'bg-amber-500/10', textClass: 'text-amber-400' },
-    activo: { label: 'Activo', bgClass: 'bg-emerald-500/10', textClass: 'text-emerald-400' },
+    publicado: { label: 'Colocando', bgClass: 'bg-amber-500/10', textClass: 'text-amber-400' },
+    activo: { label: 'Desembolsado', bgClass: 'bg-emerald-500/10', textClass: 'text-emerald-400' },
     pagado: { label: 'Pagado', bgClass: 'bg-blue-500/10', textClass: 'text-blue-400' },
     finalizado: { label: 'Completado', bgClass: 'bg-blue-500/10', textClass: 'text-blue-400' },
     mora: { label: 'En Mora', bgClass: 'bg-red-500/10', textClass: 'text-red-400' },
+    no_colocado: { label: 'No Colocado', bgClass: 'bg-slate-500/10', textClass: 'text-slate-400' },
   }
   const status = statusConfig[creditoEstado] || { label: creditoEstado, bgClass: 'bg-slate-500/10', textClass: 'text-slate-400' }
 
@@ -268,8 +269,8 @@ export default function InvestorViewTab({ credit }: { credit: InvestorViewCredit
             <div>
               <span className={`font-medium ${status.textClass}`}>{status.label}</span>
               <p className="text-slate-500 text-xs mt-0.5">
-                {creditoEstado === 'activo' && 'Credito activo generando rendimientos'}
-                {creditoEstado === 'publicado' && 'En proceso de recaudacion'}
+                {creditoEstado === 'activo' && 'Credito desembolsado generando rendimientos'}
+                {creditoEstado === 'publicado' && 'En proceso de colocacion'}
                 {creditoEstado === 'finalizado' && 'Credito finalizado exitosamente'}
                 {creditoEstado === 'mora' && 'Credito en proceso de recuperacion'}
               </p>
