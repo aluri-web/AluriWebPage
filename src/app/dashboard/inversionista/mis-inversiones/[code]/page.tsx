@@ -416,13 +416,21 @@ export default async function InvestmentDetailPage({
             </div>
           </div>
 
-          {/* Location Map Placeholder */}
+          {/* Location Map */}
           <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
             <h3 className="text-sm font-semibold text-white mb-1">Ubicacion</h3>
             <p className="text-zinc-500 text-xs mb-4">{propertyCity}, Colombia</p>
 
-            <div className="h-40 bg-zinc-800 rounded-lg flex items-center justify-center mb-4">
-              <MapPin className="text-teal-400" size={32} />
+            <div className="h-48 bg-zinc-800 rounded-lg overflow-hidden mb-4">
+              <iframe
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                referrerPolicy="no-referrer-when-downgrade"
+                src={`https://www.google.com/maps?q=${encodeURIComponent(`${propertyAddress}, ${propertyCity}, Colombia`)}&output=embed`}
+              />
             </div>
           </div>
 
