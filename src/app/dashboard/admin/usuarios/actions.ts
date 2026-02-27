@@ -105,6 +105,7 @@ export async function crearUsuario(formData: FormData) {
 interface UpdateUserData {
   id: string
   full_name?: string
+  email?: string
   role?: string
   verification_status?: string
 }
@@ -144,6 +145,24 @@ export async function updateUserProfile(data: UpdateUserData) {
       return { error: 'Estado de verificacion invalido' }
     }
     updateData.verification_status = data.verification_status
+  }
+
+  // Handle email change separately (requires auth update too)
+  if (data.email !== undefined && data.email.trim() !== '') {
+    updateData.email = data.email.trim()
+
+    // Update email in auth system
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(data.id, {
+      email: data.email.trim(),
+    })
+
+    if (authError) {
+      console.error('Error updating auth email:', authError.message)
+      if (authError.message.includes('already')) {
+        return { error: 'Este correo ya esta registrado por otro usuario.' }
+      }
+      return { error: 'Error al actualizar email en auth: ' + authError.message }
+    }
   }
 
   if (Object.keys(updateData).length === 0) {

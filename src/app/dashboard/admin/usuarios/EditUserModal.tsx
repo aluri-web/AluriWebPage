@@ -30,6 +30,7 @@ export default function EditUserModal({ user, onClose }: EditUserModalProps) {
   const [success, setSuccess] = useState(false)
 
   const [fullName, setFullName] = useState(user.full_name || '')
+  const [email, setEmail] = useState(user.email || '')
   const [verificationStatus, setVerificationStatus] = useState(user.verification_status || 'pending')
   const [role, setRole] = useState(user.role || 'inversionista')
 
@@ -42,6 +43,7 @@ export default function EditUserModal({ user, onClose }: EditUserModalProps) {
       const result = await updateUserProfile({
         id: user.id,
         full_name: fullName,
+        email: email !== user.email ? email : undefined,
         verification_status: verificationStatus,
         role: role
       })
@@ -122,16 +124,16 @@ export default function EditUserModal({ user, onClose }: EditUserModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">
+                <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
                   Correo Electronico
                 </label>
                 <input
                   type="email"
-                  value={user.email || ''}
-                  disabled
-                  className="w-full px-4 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-slate-400 cursor-not-allowed"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                 />
-                <p className="text-xs text-slate-500 mt-1">El email no se puede modificar</p>
               </div>
 
               <div>

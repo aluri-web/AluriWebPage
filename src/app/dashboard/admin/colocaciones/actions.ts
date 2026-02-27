@@ -990,3 +990,322 @@ export async function getPaymentsForLoan(loanId: string): Promise<{ data: LoanPa
 
   return { data: Array.from(grouped.values()), error: null }
 }
+
+// ========== GET CREDIT FOR EDITING ==========
+
+export interface CreditForEdit {
+  id: string
+  codigo_credito: string
+  estado: string
+  cliente_id: string
+  debtor_name: string | null
+  debtor_cedula: string | null
+  co_deudor_id: string | null
+  co_debtor_name: string | null
+  co_debtor_cedula: string | null
+  monto_solicitado: number
+  tasa_nominal: number
+  tasa_interes_ea: number | null
+  plazo: number
+  comision_deudor: number
+  comision_aluri_pct: number
+  tipo_contrato: string | null
+  tipo_amortizacion: string | null
+  tipo_liquidacion: string | null
+  tipo_persona: string | null
+  direccion_inmueble: string | null
+  ciudad_inmueble: string | null
+  tipo_inmueble: string | null
+  valor_comercial: number | null
+  ltv: number | null
+  ingresos_mensuales: number | null
+  profesion: string | null
+  clase: string | null
+}
+
+export async function getCreditForEdit(creditId: string): Promise<{ data: CreditForEdit | null; error: string | null }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { data: null, error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const { data: credit, error } = await supabase
+    .from('creditos')
+    .select(`
+      id, codigo_credito, estado, cliente_id, co_deudor_id,
+      monto_solicitado, tasa_nominal, tasa_interes_ea, plazo,
+      comision_deudor, comision_aluri_pct,
+      tipo_contrato, tipo_amortizacion, tipo_liquidacion, tipo_persona,
+      direccion_inmueble, ciudad_inmueble, tipo_inmueble, valor_comercial, ltv,
+      ingresos_mensuales, profesion, clase
+    `)
+    .eq('id', creditId)
+    .single()
+
+  if (error || !credit) {
+    return { data: null, error: error?.message || 'Credito no encontrado.' }
+  }
+
+  // Fetch debtor profile
+  const { data: debtor } = await supabase
+    .from('profiles')
+    .select('full_name, document_id')
+    .eq('id', credit.cliente_id)
+    .single()
+
+  // Fetch co-debtor profile if exists
+  let coDebtor: { full_name: string | null; document_id: string | null } | null = null
+  if (credit.co_deudor_id) {
+    const { data: cd } = await supabase
+      .from('profiles')
+      .select('full_name, document_id')
+      .eq('id', credit.co_deudor_id)
+      .single()
+    coDebtor = cd
+  }
+
+  return {
+    data: {
+      ...credit,
+      debtor_name: debtor?.full_name || null,
+      debtor_cedula: debtor?.document_id || null,
+      co_debtor_name: coDebtor?.full_name || null,
+      co_debtor_cedula: coDebtor?.document_id || null,
+    },
+    error: null
+  }
+}
+
+// ========== UPDATE CREDIT ==========
+
+export interface UpdateCreditData {
+  id: string
+  monto_solicitado?: number
+  tasa_nominal?: number
+  plazo?: number
+  comision_deudor?: number
+  comision_aluri_pct?: number
+  tipo_contrato?: string
+  tipo_amortizacion?: string
+  tipo_liquidacion?: string
+  tipo_persona?: string
+  direccion_inmueble?: string
+  ciudad_inmueble?: string
+  tipo_inmueble?: string
+  valor_comercial?: number
+  ingresos_mensuales?: number
+  profesion?: string
+  clase?: string
+  cliente_id?: string
+  co_deudor_id?: string | null
+}
+
+export async function updateCredit(
+  data: UpdateCreditData
+): Promise<{ success: boolean; error?: string }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { success: false, error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  if (!data.id) {
+    return { success: false, error: 'ID del credito es requerido.' }
+  }
+
+  // Build update object excluding id
+  const { id, ...fields } = data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const updateObj: Record<string, any> = {}
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) {
+      updateObj[key] = value
+    }
+  }
+
+  if (Object.keys(updateObj).length === 0) {
+    return { success: false, error: 'No hay datos para actualizar.' }
+  }
+
+  // Recalculate derived fields
+  if (updateObj.tasa_nominal !== undefined) {
+    const nm = updateObj.tasa_nominal / 100
+    updateObj.tasa_interes_ea = Math.round(((Math.pow(1 + nm, 12) - 1) * 100) * 100) / 100
+  }
+
+  // Recalculate LTV if amount or commercial value changed
+  const monto = updateObj.monto_solicitado
+  const valorComercial = updateObj.valor_comercial
+  if (monto !== undefined || valorComercial !== undefined) {
+    // Fetch current values for the ones not being updated
+    const { data: current } = await supabaseAdmin
+      .from('creditos')
+      .select('monto_solicitado, valor_comercial')
+      .eq('id', id)
+      .single()
+
+    const finalMonto = monto ?? current?.monto_solicitado ?? 0
+    const finalValor = valorComercial ?? current?.valor_comercial ?? 0
+
+    if (finalValor > 0) {
+      updateObj.ltv = Math.round((finalMonto / finalValor) * 10000) / 100
+    }
+
+    // Also update valor_colocado and saldo_capital if monto changes
+    if (monto !== undefined) {
+      updateObj.valor_colocado = monto
+      updateObj.saldo_capital = monto
+    }
+  }
+
+  const { error } = await supabaseAdmin
+    .from('creditos')
+    .update(updateObj)
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error updating credit:', error.message)
+    return { success: false, error: 'Error al actualizar credito: ' + error.message }
+  }
+
+  revalidatePath('/dashboard/admin/colocaciones')
+  revalidatePath(`/dashboard/admin/colocaciones/${id}`)
+
+  return { success: true }
+}
+
+// ========== DELETE CREDIT ==========
+
+export async function deleteCredit(
+  creditId: string
+): Promise<{ success: boolean; error?: string; deleted?: { plan_pagos: number; transacciones: number; inversiones: number } }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { success: false, error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  if (!creditId) {
+    return { success: false, error: 'ID del credito es requerido.' }
+  }
+
+  // Verify credit exists
+  const { data: credit, error: fetchError } = await supabaseAdmin
+    .from('creditos')
+    .select('id, codigo_credito')
+    .eq('id', creditId)
+    .single()
+
+  if (fetchError || !credit) {
+    return { success: false, error: 'Credito no encontrado.' }
+  }
+
+  try {
+    // Delete in FK order
+    const { count: ppCount } = await supabaseAdmin
+      .from('plan_pagos')
+      .delete({ count: 'exact' })
+      .eq('credito_id', creditId)
+
+    const { count: txCount } = await supabaseAdmin
+      .from('transacciones')
+      .delete({ count: 'exact' })
+      .eq('credito_id', creditId)
+
+    const { count: invCount } = await supabaseAdmin
+      .from('inversiones')
+      .delete({ count: 'exact' })
+      .eq('credito_id', creditId)
+
+    const { error: deleteError } = await supabaseAdmin
+      .from('creditos')
+      .delete()
+      .eq('id', creditId)
+
+    if (deleteError) {
+      console.error('Error deleting credit:', deleteError.message)
+      return { success: false, error: 'Error al eliminar credito: ' + deleteError.message }
+    }
+
+    revalidatePath('/dashboard/admin/colocaciones')
+
+    return {
+      success: true,
+      deleted: {
+        plan_pagos: ppCount || 0,
+        transacciones: txCount || 0,
+        inversiones: invCount || 0,
+      }
+    }
+  } catch (error) {
+    console.error('Unexpected error deleting credit:', error)
+    return { success: false, error: 'Error inesperado al eliminar el credito.' }
+  }
+}
+
+// ========== GET CREDIT DELETE INFO ==========
+
+export async function getCreditDeleteInfo(creditId: string): Promise<{
+  data: { code: string; debtor_name: string | null; plan_pagos: number; transacciones: number; inversiones: number } | null
+  error: string | null
+}> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { data: null, error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const { data: credit } = await supabase
+    .from('creditos')
+    .select('codigo_credito, cliente_id')
+    .eq('id', creditId)
+    .single()
+
+  if (!credit) return { data: null, error: 'Credito no encontrado.' }
+
+  const { data: debtor } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', credit.cliente_id)
+    .single()
+
+  const { count: ppCount } = await supabase
+    .from('plan_pagos')
+    .select('id', { count: 'exact', head: true })
+    .eq('credito_id', creditId)
+
+  const { count: txCount } = await supabase
+    .from('transacciones')
+    .select('id', { count: 'exact', head: true })
+    .eq('credito_id', creditId)
+
+  const { count: invCount } = await supabase
+    .from('inversiones')
+    .select('id', { count: 'exact', head: true })
+    .eq('credito_id', creditId)
+
+  return {
+    data: {
+      code: credit.codigo_credito,
+      debtor_name: debtor?.full_name || null,
+      plan_pagos: ppCount || 0,
+      transacciones: txCount || 0,
+      inversiones: invCount || 0,
+    },
+    error: null
+  }
+}

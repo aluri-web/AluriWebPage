@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Banknote, DollarSign, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Banknote, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, Pencil, Trash2 } from 'lucide-react'
 import { LoanTableRow, InvestorOption } from './actions'
 import AddInvestmentModal from './AddInvestmentModal'
 import PaymentModal from './PaymentModal'
+import EditCreditModal from './EditCreditModal'
+import DeleteCreditModal from './DeleteCreditModal'
 import Link from 'next/link'
 import { MoreHorizontal } from 'lucide-react'
 
@@ -28,6 +30,8 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const drag = useRef({ isDown: false, moved: false, startX: 0, scrollLeft: 0 })
   const [longPressLoan, setLongPressLoan] = useState<LoanTableRow | null>(null)
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const [editCreditId, setEditCreditId] = useState<string | null>(null)
+  const [deleteCreditId, setDeleteCreditId] = useState<string | null>(null)
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     const container = tableScrollRef.current
@@ -398,6 +402,24 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                           </button>
                         )}
 
+                        {/* Edit Credit Button */}
+                        <button
+                          onClick={() => setEditCreditId(loan.id)}
+                          title="Editar Credito"
+                          className="p-2 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50 transition-colors"
+                        >
+                          <Pencil size={16} />
+                        </button>
+
+                        {/* Delete Credit Button */}
+                        <button
+                          onClick={() => setDeleteCreditId(loan.id)}
+                          title="Eliminar Credito"
+                          className="p-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+
                         <Link
                           href={`/dashboard/admin/colocaciones/${loan.id}`}
                           title="Ver Detalles y Flujo"
@@ -435,6 +457,24 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           saldoMora={paymentLoan.saldo_mora}
           isOpen={isPaymentModalOpen}
           onClose={closePaymentModal}
+        />
+      )}
+
+      {/* Edit Credit Modal */}
+      {editCreditId && (
+        <EditCreditModal
+          creditId={editCreditId}
+          isOpen={!!editCreditId}
+          onClose={() => setEditCreditId(null)}
+        />
+      )}
+
+      {/* Delete Credit Modal */}
+      {deleteCreditId && (
+        <DeleteCreditModal
+          creditId={deleteCreditId}
+          isOpen={!!deleteCreditId}
+          onClose={() => setDeleteCreditId(null)}
         />
       )}
 
@@ -484,6 +524,30 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                   <span className="font-medium">Registrar Pago</span>
                 </button>
               )}
+
+              {/* Edit Credit */}
+              <button
+                onClick={() => {
+                  setEditCreditId(longPressLoan.id)
+                  closeLongPressMenu()
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors"
+              >
+                <Pencil size={20} />
+                <span className="font-medium">Editar Credito</span>
+              </button>
+
+              {/* Delete Credit */}
+              <button
+                onClick={() => {
+                  setDeleteCreditId(longPressLoan.id)
+                  closeLongPressMenu()
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                <Trash2 size={20} />
+                <span className="font-medium">Eliminar Credito</span>
+              </button>
 
               {/* View Details */}
               <Link
