@@ -1,21 +1,25 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   Home,
   Store,
   PiggyBank,
   Wallet,
+  Bell,
   User,
   Settings
 } from 'lucide-react'
+import { getUnreadCount } from '../../app/dashboard/inversionista/notificaciones/actions'
 
 const mainNavItems = [
   { href: '/dashboard/inversionista', label: 'Inicio', icon: Home },
   { href: '/dashboard/inversionista/marketplace', label: 'Marketplace', icon: Store },
   { href: '/dashboard/inversionista/mis-inversiones', label: 'Mis Inversiones', icon: PiggyBank },
   { href: '/dashboard/inversionista/billetera', label: 'Billetera', icon: Wallet },
+  { href: '/dashboard/inversionista/notificaciones', label: 'Notificaciones', icon: Bell },
 ]
 
 const accountNavItems = [
@@ -24,6 +28,11 @@ const accountNavItems = [
 
 export default function SidebarNav() {
   const pathname = usePathname()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    getUnreadCount().then(setUnreadCount)
+  }, [pathname])
 
   const isActive = (href: string) => {
     if (href === '/dashboard/inversionista') {
@@ -41,7 +50,14 @@ export default function SidebarNav() {
           : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
       }`}
     >
-      <Icon size={20} />
+      <div className="relative">
+        <Icon size={20} />
+        {href === '/dashboard/inversionista/notificaciones' && unreadCount > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </div>
       <span className="text-sm font-medium">{label}</span>
     </Link>
   )

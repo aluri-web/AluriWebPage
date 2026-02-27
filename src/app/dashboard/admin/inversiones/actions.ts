@@ -59,6 +59,19 @@ export async function approveInvestment(investmentId: string): Promise<{ success
 
   const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
 
+  // Fetch investment details for notification
+  const { data: investment } = await supabase
+    .from('inversiones')
+    .select(`
+      inversionista_id,
+      monto_invertido,
+      credito:creditos!credito_id (
+        codigo_credito
+      )
+    `)
+    .eq('id', investmentId)
+    .single()
+
   const { error } = await supabase
     .from('inversiones')
     .update({
@@ -73,12 +86,37 @@ export async function approveInvestment(investmentId: string): Promise<{ success
     return { success: false, error: error.message }
   }
 
+  // Create notification for investor
+  if (investment) {
+    const creditCode = (investment.credito as any)?.codigo_credito || ''
+    const amount = investment.monto_invertido
+    const formattedAmount = new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount)
+
+    await supabase.from('notificaciones').insert({
+      user_id: investment.inversionista_id,
+      tipo: 'inversion_aprobada',
+      titulo: 'Inversión Aprobada',
+      mensaje: `Tu inversión de ${formattedAmount} en el crédito ${creditCode} ha sido aprobada. Los fondos están activos.`,
+      metadata: {
+        investment_id: investmentId,
+        credit_code: creditCode,
+        amount
+      }
+    })
+  }
+
   revalidatePath('/dashboard/admin/inversiones')
   revalidatePath('/dashboard/admin/colocaciones')
+  revalidatePath('/dashboard/inversionista/notificaciones')
   return { success: true }
 }
 
-export async function rejectInvestment(investmentId: string): Promise<{ success: boolean; error?: string }> {
+export async function rejectInvestment(investmentId: string, reason: string): Promise<{ success: boolean; error?: string }> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -88,12 +126,26 @@ export async function rejectInvestment(investmentId: string): Promise<{ success:
 
   const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
 
+  // Fetch investment details for notification
+  const { data: investment } = await supabase
+    .from('inversiones')
+    .select(`
+      inversionista_id,
+      monto_invertido,
+      credito:creditos!credito_id (
+        codigo_credito
+      )
+    `)
+    .eq('id', investmentId)
+    .single()
+
   const { error } = await supabase
     .from('inversiones')
     .update({
       estado: 'rechazado',
       rejected_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      motivo_rechazo: reason || null
     })
     .eq('id', investmentId)
 
@@ -102,7 +154,34 @@ export async function rejectInvestment(investmentId: string): Promise<{ success:
     return { success: false, error: error.message }
   }
 
+  // Create notification for investor
+  if (investment) {
+    const creditCode = (investment.credito as any)?.codigo_credito || ''
+    const amount = investment.monto_invertido
+    const formattedAmount = new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount)
+
+    const reasonText = reason ? `\n\nMotivo: ${reason}` : ''
+    await supabase.from('notificaciones').insert({
+      user_id: investment.inversionista_id,
+      tipo: 'inversion_rechazada',
+      titulo: 'Inversión Rechazada',
+      mensaje: `Tu inversión de ${formattedAmount} en el crédito ${creditCode} ha sido rechazada.${reasonText}`,
+      metadata: {
+        investment_id: investmentId,
+        credit_code: creditCode,
+        amount,
+        reason
+      }
+    })
+  }
+
   revalidatePath('/dashboard/admin/inversiones')
   revalidatePath('/dashboard/admin/colocaciones')
+  revalidatePath('/dashboard/inversionista/notificaciones')
   return { success: true }
 }

@@ -16,6 +16,10 @@ export default function InvestmentsTable({ investments }: InvestmentsTableProps)
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
+  // Rejection modal state
+  const [rejectModalId, setRejectModalId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ type, message })
     setTimeout(() => setToast(null), 4000)
@@ -60,12 +64,22 @@ export default function InvestmentsTable({ investments }: InvestmentsTableProps)
     })
   }
 
-  const handleReject = async (investmentId: string) => {
-    setLoadingId(investmentId)
+  const openRejectModal = (investmentId: string) => {
+    setRejectModalId(investmentId)
+    setRejectReason('')
+  }
+
+  const handleConfirmReject = async () => {
+    if (!rejectModalId) return
+
+    const investmentIdToReject = rejectModalId
+    const reasonToSend = rejectReason.trim()
+    setLoadingId(investmentIdToReject)
     setActionType('reject')
+    setRejectModalId(null)
 
     startTransition(async () => {
-      const result = await rejectInvestment(investmentId)
+      const result = await rejectInvestment(investmentIdToReject, reasonToSend)
 
       if (result.success) {
         showToast('success', 'Inversión rechazada')
@@ -76,6 +90,7 @@ export default function InvestmentsTable({ investments }: InvestmentsTableProps)
 
       setLoadingId(null)
       setActionType(null)
+      setRejectReason('')
     })
   }
 
@@ -100,6 +115,40 @@ export default function InvestmentsTable({ investments }: InvestmentsTableProps)
         }`}>
           {toast.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
           <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      )}
+
+      {/* Rejection reason modal */}
+      {rejectModalId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-white mb-1">Rechazar Inversión</h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Indica el motivo del rechazo. El inversionista recibirá una notificación.
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Ej: Documentación incompleta, fondos no verificados..."
+              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-red-400/50 resize-none"
+              rows={3}
+              autoFocus
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => { setRejectModalId(null); setRejectReason('') }}
+                className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-sm font-medium transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmReject}
+                className="flex-1 px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-xl text-sm font-medium transition-colors"
+              >
+                Confirmar Rechazo
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -175,7 +224,7 @@ export default function InvestmentsTable({ investments }: InvestmentsTableProps)
                           )}
                         </button>
                         <button
-                          onClick={() => handleReject(investment.id)}
+                          onClick={() => openRejectModal(investment.id)}
                           disabled={isPending}
                           className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Rechazar inversión"
