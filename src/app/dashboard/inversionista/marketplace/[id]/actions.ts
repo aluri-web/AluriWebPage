@@ -66,6 +66,9 @@ export async function getLoanDetail(loanId: string): Promise<{ data: CreditoOppo
   return { data: data as unknown as CreditoOpportunity, error: null }
 }
 
+const MIN_INVESTMENT = 50_000_000
+const MAX_INVESTORS = 5
+
 export async function investInLoan(
   loanId: string,
   amount: number
@@ -84,6 +87,10 @@ export async function investInLoan(
     return { success: false, message: '', error: 'El monto debe ser mayor a 0.' }
   }
 
+  if (amount < MIN_INVESTMENT) {
+    return { success: false, message: '', error: `El monto mínimo de inversión es $${MIN_INVESTMENT.toLocaleString('es-CO')}.` }
+  }
+
   // Verify the credito exists and is in publicado status
   const { data: credito, error: creditoError } = await supabase
     .from('creditos')
@@ -99,12 +106,18 @@ export async function investInLoan(
     return { success: false, message: '', error: 'Esta oportunidad ya no está disponible para inversión.' }
   }
 
-  // Check if investment amount exceeds remaining amount
-  const amountRequested = credito.monto_solicitado || 0
-  const amountFunded = ((credito as any).inversiones || [])
+  // Check investor count and remaining amount
+  const activeInvestments = ((credito as any).inversiones || [])
     .filter((i: any) => i.estado === 'activo' || i.estado === 'pendiente')
+  const investorCount = activeInvestments.length
+  const amountRequested = credito.monto_solicitado || 0
+  const amountFunded = activeInvestments
     .reduce((s: number, i: any) => s + (i.monto_invertido || 0), 0)
   const remainingAmount = amountRequested - amountFunded
+
+  if (investorCount >= MAX_INVESTORS) {
+    return { success: false, message: '', error: 'Este crédito ya alcanzó el máximo de 5 inversionistas.' }
+  }
 
   if (amount > remainingAmount) {
     return {

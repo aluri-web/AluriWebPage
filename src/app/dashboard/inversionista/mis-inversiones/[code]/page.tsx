@@ -150,8 +150,12 @@ export default async function InvestmentDetailPage({
   }
   const cuotaMensualInvestor = cuotaMensualTotal * (loanAmount > 0 ? investedAmount / loanAmount : 0)
 
-  // Expected return = total payments over the life of the credit (cuota * plazo)
-  const expectedTotalReturn = Math.round(cuotaMensualInvestor * termMonths)
+  // Expected return = profit (ganancia) over the life of the credit
+  // For francesa: total payments - invested capital (payments include capital repayment)
+  // For solo_interes: total payments ARE the profit (capital returned separately at end)
+  const expectedTotalReturn = credito?.tipo_amortizacion === 'solo_interes'
+    ? Math.round(cuotaMensualInvestor * termMonths)
+    : Math.round(cuotaMensualInvestor * termMonths - investedAmount)
 
   // Property info from separate columns
   const propertyCity = credito?.ciudad_inmueble || 'Colombia'

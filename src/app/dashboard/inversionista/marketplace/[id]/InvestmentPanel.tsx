@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation'
 import { investInLoan } from './actions'
 import { CheckCircle, AlertCircle, Loader2, Info } from 'lucide-react'
 
+const MIN_INVESTMENT = 50_000_000
+const MAX_INVESTORS = 5
+
 interface InvestmentPanelProps {
   loanId: string
   amountRequested: number
   amountFunded: number
+  investorCount: number
   interestRateEa: number | null
   termMonths: number | null
 }
@@ -17,6 +21,7 @@ export default function InvestmentPanel({
   loanId,
   amountRequested,
   amountFunded,
+  investorCount,
   interestRateEa,
   termMonths
 }: InvestmentPanelProps) {
@@ -28,7 +33,10 @@ export default function InvestmentPanel({
 
   const remainingAmount = amountRequested - amountFunded
   const progress = amountRequested > 0 ? (amountFunded / amountRequested) * 100 : 0
-  const minInvestment = 1000000
+  const slotsLeft = MAX_INVESTORS - investorCount
+  const availableSlots = Math.min(slotsLeft, Math.floor(remainingAmount / MIN_INVESTMENT))
+  const canInvest = availableSlots > 0 && remainingAmount >= MIN_INVESTMENT
+  const minInvestment = MIN_INVESTMENT
   const maxInvestment = remainingAmount
 
   const formatCurrency = (value: number) => {
@@ -85,13 +93,18 @@ export default function InvestmentPanel({
       return
     }
 
-    if (numericAmount > remainingAmount) {
-      setError(`El monto máximo disponible es ${formatCurrency(remainingAmount)}.`)
+    if (!canInvest) {
+      setError('No hay cupos disponibles para invertir en este crédito.')
       return
     }
 
-    if (numericAmount < minInvestment) {
-      setError(`El monto mínimo de inversión es ${formatCurrency(minInvestment)}.`)
+    if (numericAmount < MIN_INVESTMENT) {
+      setError(`El monto mínimo de inversión es ${formatCurrency(MIN_INVESTMENT)}.`)
+      return
+    }
+
+    if (numericAmount > remainingAmount) {
+      setError(`El monto máximo disponible es ${formatCurrency(remainingAmount)}.`)
       return
     }
 
@@ -137,14 +150,18 @@ export default function InvestmentPanel({
                 id="amount"
                 value={amount ? Number(amount).toLocaleString('es-CO') : ''}
                 onChange={handleAmountChange}
-                placeholder="20,000,000"
+                placeholder="50,000,000"
                 className="w-full pl-10 pr-4 py-4 bg-transparent border border-white/10 rounded-xl text-white text-2xl font-bold focus:outline-none focus:border-teal-400/50 transition-all placeholder-gray-700"
-                disabled={isLoading || remainingAmount <= 0}
+                disabled={isLoading || !canInvest}
               />
             </div>
             <div className="flex justify-between mt-2 text-xs text-gray-600">
               <span>Min: {formatCompactCurrency(minInvestment)}</span>
               <span>Max: {formatCompactCurrency(maxInvestment)}</span>
+            </div>
+            <div className="flex justify-between mt-1 text-xs text-gray-600">
+              <span>Cupos: {investorCount}/{MAX_INVESTORS} inversionistas</span>
+              {availableSlots > 0 && <span>{availableSlots} cupo{availableSlots !== 1 ? 's' : ''} disponible{availableSlots !== 1 ? 's' : ''}</span>}
             </div>
           </div>
 
@@ -202,7 +219,7 @@ export default function InvestmentPanel({
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isLoading || !amount || remainingAmount <= 0}
+            disabled={isLoading || !amount || !canInvest}
             className="w-full py-4 bg-teal-400 hover:bg-teal-400 disabled:bg-gray-800 disabled:cursor-not-allowed text-black disabled:text-gray-600 font-bold text-base rounded-xl transition-all shadow-[0_0_30px_rgba(45,212,191,0.3)] hover:shadow-[0_0_40px_rgba(45,212,191,0.5)] disabled:shadow-none"
           >
             {isLoading ? (
@@ -215,9 +232,14 @@ export default function InvestmentPanel({
             )}
           </button>
 
-          {remainingAmount <= 0 && (
+          {!canInvest && (
             <p className="text-center text-gray-600 text-sm mt-3">
-              Esta oportunidad ya está completamente financiada.
+              {remainingAmount <= 0
+                ? 'Esta oportunidad ya está completamente financiada.'
+                : investorCount >= MAX_INVESTORS
+                  ? 'Este crédito ya alcanzó el máximo de 5 inversionistas.'
+                  : `El monto restante ($${formatCompactCurrency(remainingAmount)}) no alcanza el mínimo de inversión ($${formatCompactCurrency(MIN_INVESTMENT)}).`
+              }
             </p>
           )}
         </form>

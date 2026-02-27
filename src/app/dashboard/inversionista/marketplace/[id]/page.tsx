@@ -21,10 +21,11 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // Calculate amount_funded from inversiones sub-query
-  const amountFunded = (loan.inversiones || [])
+  // Calculate amount_funded and investor count from inversiones sub-query
+  const activeInvestments = (loan.inversiones || [])
     .filter(i => i.estado === 'activo' || i.estado === 'pendiente')
-    .reduce((s, i) => s + (i.monto_invertido || 0), 0)
+  const amountFunded = activeInvestments.reduce((s, i) => s + (i.monto_invertido || 0), 0)
+  const investorCount = activeInvestments.length
 
   const getPropertyTitle = () => {
     const propertyType = loan.tipo_inmueble || 'Remodelación'
@@ -146,6 +147,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
               loanId={loan.id}
               amountRequested={loan.monto_solicitado || 0}
               amountFunded={amountFunded}
+              investorCount={investorCount}
               interestRateEa={loan.tasa_interes_ea}
               termMonths={loan.plazo}
             />

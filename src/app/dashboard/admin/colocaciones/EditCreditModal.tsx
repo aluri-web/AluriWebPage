@@ -173,6 +173,10 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
 
   const handleAddInvestor = async () => {
     if (!newInvId || newInvAmount <= 0) return
+    if (newInvAmount < 50_000_000) {
+      setError('El monto minimo de inversion es $50,000,000.')
+      return
+    }
     setAddingInvestor(true)
     setError(null)
 
@@ -236,6 +240,13 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
   }
 
   if (!isOpen) return null
+
+  const MIN_INVESTMENT = 50_000_000
+  const MAX_INVESTORS = 5
+  const totalInvestedAmount = investments.reduce((sum, i) => sum + i.monto_invertido, 0)
+  const remainingForInvestors = montoSolicitado - totalInvestedAmount
+  const slotsLeft = MAX_INVESTORS - investments.length
+  const canAddInvestor = slotsLeft > 0 && remainingForInvestors >= MIN_INVESTMENT
 
   const inputClass = 'w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
   const labelClass = 'block text-xs font-medium text-slate-400 mb-1'
@@ -468,21 +479,24 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
             {/* Inversionistas */}
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b border-slate-700 pb-2">
-                <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider">Inversionistas</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowAddInvestor(!showAddInvestor)}
-                  className="flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
-                >
-                  <UserPlus size={14} />
-                  Agregar
-                </button>
+                <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider">
+                  Inversionistas <span className="text-slate-500 font-normal">({investments.length}/{MAX_INVESTORS})</span>
+                </h3>
+                {canAddInvestor && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddInvestor(!showAddInvestor)}
+                    className="flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
+                  >
+                    <UserPlus size={14} />
+                    Agregar
+                  </button>
+                )}
               </div>
 
               {investments.length > 0 ? (
                 <div className="space-y-2">
                   {investments.map(inv => {
-                    const totalInvested = investments.reduce((sum, i) => sum + i.monto_invertido, 0)
                     const pct = montoSolicitado > 0 ? ((inv.monto_invertido / montoSolicitado) * 100).toFixed(1) : '0'
                     return (
                       <div key={inv.id} className="flex items-center justify-between bg-slate-900/50 rounded-lg p-3">
@@ -516,8 +530,9 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
                       </div>
                     )
                   })}
-                  <div className="text-xs text-slate-500 pt-1">
-                    Total invertido: ${investments.reduce((s, i) => s + i.monto_invertido, 0).toLocaleString('es-CO')} / ${montoSolicitado.toLocaleString('es-CO')}
+                  <div className="text-xs text-slate-500 pt-1 space-y-0.5">
+                    <div>Total invertido: ${totalInvestedAmount.toLocaleString('es-CO')} / ${montoSolicitado.toLocaleString('es-CO')}</div>
+                    <div>Disponible: ${remainingForInvestors.toLocaleString('es-CO')} · {slotsLeft} cupo{slotsLeft !== 1 ? 's' : ''} · Min por inversionista: $50M</div>
                   </div>
                 </div>
               ) : (
@@ -525,7 +540,7 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
               )}
 
               {/* Add new investor form */}
-              {showAddInvestor && (
+              {showAddInvestor && canAddInvestor && (
                 <div className="bg-slate-900/50 rounded-lg p-4 space-y-3 border border-slate-700">
                   <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Nuevo Inversionista</p>
                   <div className="grid grid-cols-3 gap-3">
