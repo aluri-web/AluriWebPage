@@ -47,18 +47,22 @@ export default function InvestmentPanel({
     return formatCurrency(value)
   }
 
-  // Calculate estimated return
+  // Calculate estimated return using monthly rate derived from EA
   const estimatedReturn = useMemo(() => {
     const numericAmount = parseFloat(amount.replace(/[^0-9]/g, '')) || 0
     if (numericAmount <= 0 || !interestRateEa || !termMonths) return null
 
-    const annualReturn = numericAmount * (interestRateEa / 100)
-    const monthlyReturn = annualReturn / 12
-    const totalReturn = monthlyReturn * termMonths
+    // Convert EA to monthly rate: (1 + EA)^(1/12) - 1
+    const monthlyRate = Math.pow(1 + interestRateEa / 100, 1 / 12) - 1
+    const monthlyPayment = monthlyRate === 0
+      ? numericAmount / termMonths
+      : (numericAmount * monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1)
+    const totalReturn = monthlyPayment * termMonths
+    const profit = totalReturn - numericAmount
 
     return {
-      total: numericAmount + totalReturn,
-      profit: totalReturn,
+      total: totalReturn,
+      profit,
       percentage: interestRateEa
     }
   }, [amount, interestRateEa, termMonths])

@@ -19,6 +19,7 @@ interface Credito {
   estado: string
   estado_credito: string | null
   tasa_interes_ea: number | null
+  tasa_nominal: number | null
   monto_solicitado: number | null
   plazo: number | null
   ciudad_inmueble: string | null
@@ -93,6 +94,7 @@ export default async function InvestmentDetailPage({
         estado,
         estado_credito,
         tasa_interes_ea,
+        tasa_nominal,
         monto_solicitado,
         plazo,
         ciudad_inmueble,
@@ -135,7 +137,21 @@ export default async function InvestmentDetailPage({
   const investedAmount = Number(investment.monto_invertido || 0)
   const rate = investment.interest_rate_investor || credito?.tasa_interes_ea || 0
   const termMonths = credito?.plazo || 12
-  const expectedAnnualReturn = investedAmount * (rate / 100)
+  // Calculate monthly payment (cuota mensual) pro-rated by investor share
+  const tasaMensual = (credito?.tasa_nominal || 0) / 100
+  const loanAmount = credito?.monto_solicitado || 0
+  let cuotaMensualTotal = 0
+  if (credito?.tipo_amortizacion === 'solo_interes') {
+    cuotaMensualTotal = loanAmount * tasaMensual
+  } else {
+    cuotaMensualTotal = tasaMensual === 0
+      ? loanAmount / termMonths
+      : (loanAmount * tasaMensual * Math.pow(1 + tasaMensual, termMonths)) / (Math.pow(1 + tasaMensual, termMonths) - 1)
+  }
+  const cuotaMensualInvestor = cuotaMensualTotal * (loanAmount > 0 ? investedAmount / loanAmount : 0)
+
+  // Expected return = total payments over the life of the credit (cuota * plazo)
+  const expectedTotalReturn = Math.round(cuotaMensualInvestor * termMonths)
 
   // Property info from separate columns
   const propertyCity = credito?.ciudad_inmueble || 'Colombia'
@@ -260,7 +276,7 @@ export default async function InvestmentDetailPage({
                 <p className="text-lg lg:text-2xl font-bold text-white">{termMonths} <span className="text-sm font-normal text-zinc-500">meses</span></p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-3 gap-3 mb-6">
               <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Tipo de Credito</p>
                 <p className="text-lg font-bold text-white">
@@ -268,8 +284,12 @@ export default async function InvestmentDetailPage({
                 </p>
               </div>
               <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
+                <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Cuota Mensual</p>
+                <p className="text-lg lg:text-2xl font-bold text-amber-400">{formatCOP(Math.round(cuotaMensualInvestor))}</p>
+              </div>
+              <div className="text-center p-4 bg-zinc-800/50 rounded-xl">
                 <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2">Retorno Esperado</p>
-                <p className="text-lg lg:text-2xl font-bold text-emerald-400">{formatCOP(expectedAnnualReturn)}</p>
+                <p className="text-lg lg:text-2xl font-bold text-emerald-400">{formatCOP(expectedTotalReturn)}</p>
               </div>
             </div>
 
@@ -448,7 +468,7 @@ export default async function InvestmentDetailPage({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-500 text-sm">Retorno esperado</span>
-                  <span className="text-emerald-400 font-semibold">{formatCOP(expectedAnnualReturn)}</span>
+                  <span className="text-emerald-400 font-semibold">{formatCOP(expectedTotalReturn)}</span>
                 </div>
               </div>
             </div>

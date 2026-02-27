@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Search } from 'lucide-react'
-import { getCreditForEdit, updateCredit, searchDebtorByCedula, CreditForEdit } from './actions'
+import { X, Search, Trash2, UserPlus } from 'lucide-react'
+import { getCreditForEdit, updateCredit, searchDebtorByCedula, getCreditInvestments, removeInvestment, searchInvestorByCedula, addInvestmentToLoan, CreditForEdit, CreditInvestment } from './actions'
 
 interface EditCreditModalProps {
   creditId: string
@@ -48,18 +48,35 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
   const [coDebtorId, setCoDebtorId] = useState<string | null>(null)
   const [searchingCoDebtor, setSearchingCoDebtor] = useState(false)
 
+  // Investors
+  const [investments, setInvestments] = useState<CreditInvestment[]>([])
+  const [removingInvestmentId, setRemovingInvestmentId] = useState<string | null>(null)
+
+  // Add new investor
+  const [showAddInvestor, setShowAddInvestor] = useState(false)
+  const [newInvCedula, setNewInvCedula] = useState('')
+  const [newInvName, setNewInvName] = useState('')
+  const [newInvId, setNewInvId] = useState('')
+  const [newInvAmount, setNewInvAmount] = useState(0)
+  const [searchingNewInv, setSearchingNewInv] = useState(false)
+  const [addingInvestor, setAddingInvestor] = useState(false)
+
   useEffect(() => {
     if (!isOpen) return
     setLoading(true)
     setError(null)
     setSuccess(false)
 
-    getCreditForEdit(creditId).then(({ data, error: fetchError }) => {
-      if (fetchError || !data) {
-        setError(fetchError || 'No se pudo cargar el credito.')
+    Promise.all([
+      getCreditForEdit(creditId),
+      getCreditInvestments(creditId),
+    ]).then(([creditResult, investmentsResult]) => {
+      if (creditResult.error || !creditResult.data) {
+        setError(creditResult.error || 'No se pudo cargar el credito.')
         setLoading(false)
         return
       }
+      const data = creditResult.data
       setCredit(data)
       setMontoSolicitado(data.monto_solicitado)
       setTasaNominal(data.tasa_nominal)
@@ -84,6 +101,12 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
       setCoDebtorId(data.co_deudor_id)
       setCoDebtorName(data.co_debtor_name || '')
       setCoDebtorCedula(data.co_debtor_cedula || '')
+      setInvestments(investmentsResult.data || [])
+      setShowAddInvestor(false)
+      setNewInvCedula('')
+      setNewInvName('')
+      setNewInvId('')
+      setNewInvAmount(0)
       setLoading(false)
     })
   }, [isOpen, creditId])
@@ -121,6 +144,59 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
       setError('Co-deudor no encontrado con cedula: ' + coDebtorCedula)
     }
     setSearchingCoDebtor(false)
+  }
+
+  const handleRemoveInvestment = async (investmentId: string) => {
+    setRemovingInvestmentId(investmentId)
+    setError(null)
+    const result = await removeInvestment(investmentId)
+    if (result.error) {
+      setError(result.error)
+    } else {
+      setInvestments(prev => prev.filter(inv => inv.id !== investmentId))
+    }
+    setRemovingInvestmentId(null)
+  }
+
+  const handleSearchNewInvestor = async () => {
+    if (!newInvCedula || newInvCedula.length < 5) return
+    setSearchingNewInv(true)
+    const result = await searchInvestorByCedula(newInvCedula)
+    if (result.found && result.id) {
+      setNewInvId(result.id)
+      setNewInvName(result.full_name || '')
+    } else {
+      setError('Inversionista no encontrado con cedula: ' + newInvCedula)
+    }
+    setSearchingNewInv(false)
+  }
+
+  const handleAddInvestor = async () => {
+    if (!newInvId || newInvAmount <= 0) return
+    setAddingInvestor(true)
+    setError(null)
+
+    const result = await addInvestmentToLoan({
+      loan_id: creditId,
+      investor_id: newInvId,
+      is_new_investor: false,
+      amount: newInvAmount,
+      investment_date: new Date().toISOString().split('T')[0],
+    })
+
+    if (result.error) {
+      setError(result.error)
+    } else {
+      // Refresh investments list
+      const { data: refreshed } = await getCreditInvestments(creditId)
+      setInvestments(refreshed || [])
+      setShowAddInvestor(false)
+      setNewInvCedula('')
+      setNewInvName('')
+      setNewInvId('')
+      setNewInvAmount(0)
+    }
+    setAddingInvestor(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -387,6 +463,126 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
                   <input type="text" value={clase} onChange={(e) => setClase(e.target.value)} className={inputClass} />
                 </div>
               </div>
+            </div>
+
+            {/* Inversionistas */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-700 pb-2">
+                <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider">Inversionistas</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddInvestor(!showAddInvestor)}
+                  className="flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
+                >
+                  <UserPlus size={14} />
+                  Agregar
+                </button>
+              </div>
+
+              {investments.length > 0 ? (
+                <div className="space-y-2">
+                  {investments.map(inv => {
+                    const totalInvested = investments.reduce((sum, i) => sum + i.monto_invertido, 0)
+                    const pct = montoSolicitado > 0 ? ((inv.monto_invertido / montoSolicitado) * 100).toFixed(1) : '0'
+                    return (
+                      <div key={inv.id} className="flex items-center justify-between bg-slate-900/50 rounded-lg p-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-white text-sm font-medium">{inv.investor_name || 'Sin nombre'}</span>
+                            <span className="text-slate-500 text-xs font-mono">{inv.investor_cedula || ''}</span>
+                            <span className={`px-2 py-0.5 rounded text-xs ${inv.estado === 'activo' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'}`}>
+                              {inv.estado}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                            <span>${inv.monto_invertido.toLocaleString('es-CO')}</span>
+                            <span>{pct}% del credito</span>
+                            {inv.interest_rate_investor && <span>Tasa: {inv.interest_rate_investor}% EA</span>}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveInvestment(inv.id)}
+                          disabled={removingInvestmentId === inv.id}
+                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
+                          title="Eliminar inversion"
+                        >
+                          {removingInvestmentId === inv.id ? (
+                            <span className="text-xs">...</span>
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                        </button>
+                      </div>
+                    )
+                  })}
+                  <div className="text-xs text-slate-500 pt-1">
+                    Total invertido: ${investments.reduce((s, i) => s + i.monto_invertido, 0).toLocaleString('es-CO')} / ${montoSolicitado.toLocaleString('es-CO')}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">No hay inversionistas registrados.</p>
+              )}
+
+              {/* Add new investor form */}
+              {showAddInvestor && (
+                <div className="bg-slate-900/50 rounded-lg p-4 space-y-3 border border-slate-700">
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Nuevo Inversionista</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className={labelClass}>Cedula</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newInvCedula}
+                          onChange={(e) => setNewInvCedula(e.target.value)}
+                          className={inputClass}
+                          placeholder="Buscar por cedula"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSearchNewInvestor}
+                          disabled={searchingNewInv}
+                          className="px-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"
+                        >
+                          <Search size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Nombre</label>
+                      <input type="text" value={newInvName} disabled className={`${inputClass} opacity-60 cursor-not-allowed`} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Monto ($)</label>
+                      <input
+                        type="number"
+                        value={newInvAmount || ''}
+                        onChange={(e) => setNewInvAmount(Number(e.target.value))}
+                        className={inputClass}
+                        placeholder="Monto a invertir"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => { setShowAddInvestor(false); setNewInvCedula(''); setNewInvName(''); setNewInvId(''); setNewInvAmount(0) }}
+                      className="px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddInvestor}
+                      disabled={addingInvestor || !newInvId || newInvAmount <= 0}
+                      className="px-3 py-1.5 text-sm bg-teal-500 hover:bg-teal-600 disabled:bg-teal-500/30 text-black font-medium rounded-lg transition-colors"
+                    >
+                      {addingInvestor ? 'Agregando...' : 'Agregar'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {error && (

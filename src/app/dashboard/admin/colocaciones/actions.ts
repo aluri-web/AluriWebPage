@@ -1254,6 +1254,92 @@ export async function deleteCredit(
   }
 }
 
+// ========== GET CREDIT INVESTMENTS ==========
+
+export interface CreditInvestment {
+  id: string
+  inversionista_id: string
+  investor_name: string | null
+  investor_cedula: string | null
+  monto_invertido: number
+  interest_rate_investor: number | null
+  estado: string
+  fecha_inversion: string | null
+}
+
+export async function getCreditInvestments(creditId: string): Promise<{ data: CreditInvestment[]; error: string | null }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { data: [], error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const { data: inversiones, error } = await supabase
+    .from('inversiones')
+    .select(`
+      id, inversionista_id, monto_invertido, interest_rate_investor, estado, fecha_inversion,
+      inversionista:profiles!inversionista_id (full_name, document_id)
+    `)
+    .eq('credito_id', creditId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching investments:', error.message)
+    return { data: [], error: error.message }
+  }
+
+  return {
+    data: (inversiones || []).map(inv => {
+      const profile = inv.inversionista as unknown as { full_name: string | null; document_id: string | null } | null
+      return {
+        id: inv.id,
+        inversionista_id: inv.inversionista_id,
+        investor_name: profile?.full_name || null,
+        investor_cedula: profile?.document_id || null,
+        monto_invertido: inv.monto_invertido,
+        interest_rate_investor: inv.interest_rate_investor,
+        estado: inv.estado,
+        fecha_inversion: inv.fecha_inversion,
+      }
+    }),
+    error: null
+  }
+}
+
+// ========== REMOVE INVESTMENT ==========
+
+export async function removeInvestment(investmentId: string): Promise<{ success: boolean; error?: string }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { success: false, error: 'Configuracion del servidor incompleta.' }
+  }
+
+  const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  if (!investmentId) {
+    return { success: false, error: 'ID de inversion es requerido.' }
+  }
+
+  const { error } = await supabaseAdmin
+    .from('inversiones')
+    .delete()
+    .eq('id', investmentId)
+
+  if (error) {
+    console.error('Error removing investment:', error.message)
+    return { success: false, error: 'Error al eliminar inversion: ' + error.message }
+  }
+
+  revalidatePath('/dashboard/admin/colocaciones')
+
+  return { success: true }
+}
+
 // ========== GET CREDIT DELETE INFO ==========
 
 export async function getCreditDeleteInfo(creditId: string): Promise<{

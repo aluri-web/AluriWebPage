@@ -1,7 +1,6 @@
 import { createClient } from '../../../../utils/supabase/server'
 import { Briefcase } from 'lucide-react'
 import Link from 'next/link'
-import PortfolioChart from '../../../../components/dashboard/PortfolioChart'
 import InvestmentsTabs from './InvestmentsTabs'
 
 // Transaction record from transacciones table
@@ -163,9 +162,8 @@ export default async function MisInversionesPage() {
         </p>
       </header>
 
-      {/* Top Section: KPIs + Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* KPI Summary Card */}
+      {/* KPI Summary Card */}
+      <div className="mb-8">
         <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
           <h2 className="text-xl font-semibold mb-6 text-white">Resumen de Inversiones</h2>
           <div className="space-y-4">
@@ -201,14 +199,6 @@ export default async function MisInversionesPage() {
               <span className="text-zinc-500">Recaudado Total</span>
               <span className="text-2xl font-bold text-emerald-400">{formatCOP(recaudadoTotal)}</span>
             </div>
-          </div>
-        </div>
-
-        {/* Portfolio Chart */}
-        <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
-          <h2 className="text-xl font-semibold mb-6 text-white">Composicion del Portafolio</h2>
-          <div className="h-72">
-            <PortfolioChart invested={montoInvertidoTotal} collected={recaudadoTotal} />
           </div>
         </div>
       </div>

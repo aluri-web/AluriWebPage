@@ -62,29 +62,40 @@ export default async function InvestorDashboard() {
 
   const investmentsData = (investments || []) as unknown as Inversion[]
 
-  // Calculations - include both active and defaulted creditos in active count
-  const totalInvested = investmentsData.reduce((sum, item) => sum + Number(item.monto_invertido || 0), 0)
-  const activeProjects = investmentsData.filter(i =>
+  // Filter to active credits only (activo, mora, publicado)
+  const activeInvestments = investmentsData.filter(i =>
     i.credito?.estado === 'activo' ||
     i.credito?.estado === 'mora' ||
     i.credito?.estado === 'publicado'
-  ).length
+  )
+
+  const totalInvested = activeInvestments.reduce((sum, item) => sum + Number(item.monto_invertido || 0), 0)
+  const activeProjects = activeInvestments.length
 
   // Calculate weighted average ROI based on interest_rate_investor or credito's tasa_interes_ea
   const weightedRoi = totalInvested > 0
-    ? investmentsData.reduce((acc, item) => {
+    ? activeInvestments.reduce((acc, item) => {
         const rate = item.interest_rate_investor || item.credito?.tasa_interes_ea || 0
         return acc + (Number(item.monto_invertido) * Number(rate))
       }, 0) / totalInvested
     : 0
 
-  // Calculate expected return (simple calculation based on annual rate)
-  const totalExpectedReturn = investmentsData.reduce((acc, item) => {
+  // Calculate expected return (simple calculation based on annual rate) - active credits only
+  const totalExpectedReturn = activeInvestments.reduce((acc, item) => {
     const rate = item.interest_rate_investor || item.credito?.tasa_interes_ea || 0
     return acc + (Number(item.monto_invertido) * (1 + Number(rate) / 100))
   }, 0)
 
-  const simulatedCollected = totalExpectedReturn * 0.15
+  // Actual collected returns: sum of pago_capital + pago_interes, pro-rated by investor share - active credits only
+  const actualCollected = activeInvestments.reduce((total, inv) => {
+    const credito = inv.credito
+    if (!credito?.transacciones) return total
+    const montoSolicitado = credito.monto_solicitado || 0
+    const share = montoSolicitado > 0 ? inv.monto_invertido / montoSolicitado : 0
+    return total + credito.transacciones
+      .filter(tx => tx.tipo_transaccion === 'pago_capital' || tx.tipo_transaccion === 'pago_interes')
+      .reduce((sum, tx) => sum + Math.round(tx.monto * share), 0)
+  }, 0)
 
   // Per-credit breakdown for Balance pie chart
   const balanceChartData = investmentsData
@@ -169,10 +180,10 @@ export default async function InvestorDashboard() {
             <span className="text-zinc-500 text-sm">Distribucion</span>
           </div>
           <p className="text-lg font-bold text-white mb-1">
-            ${totalExpectedReturn.toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+            ${(totalInvested + actualCollected).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
           </p>
           <div className="flex-1">
-            <PortfolioChart invested={totalInvested} collected={simulatedCollected} />
+            <PortfolioChart invested={totalInvested} collected={actualCollected} />
           </div>
         </div>
       </div>
