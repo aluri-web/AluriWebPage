@@ -1105,6 +1105,7 @@ export async function getCreditForEdit(creditId: string): Promise<{ data: Credit
 
 export interface UpdateCreditData {
   id: string
+  codigo_credito?: string
   monto_solicitado?: number
   tasa_nominal?: number
   plazo?: number

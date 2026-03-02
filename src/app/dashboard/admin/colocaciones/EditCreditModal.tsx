@@ -18,6 +18,7 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
   const [credit, setCredit] = useState<CreditForEdit | null>(null)
 
   // Form fields
+  const [codigoCredito, setCodigoCredito] = useState('')
   const [montoSolicitado, setMontoSolicitado] = useState(0)
   const [tasaNominal, setTasaNominal] = useState(0)
   const [tasaEa, setTasaEa] = useState(0)
@@ -78,6 +79,7 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
       }
       const data = creditResult.data
       setCredit(data)
+      setCodigoCredito(data.codigo_credito || '')
       setMontoSolicitado(data.monto_solicitado)
       setTasaNominal(data.tasa_nominal)
       setTasaEa(data.tasa_interes_ea || 0)
@@ -210,6 +212,7 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
 
     const result = await updateCredit({
       id: creditId,
+      codigo_credito: codigoCredito,
       monto_solicitado: montoSolicitado,
       tasa_nominal: tasaNominal,
       plazo,
@@ -277,6 +280,23 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Codigo del Credito */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider border-b border-slate-700 pb-2">Identificacion</h3>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className={labelClass}>Codigo del Credito</label>
+                  <input
+                    type="text"
+                    value={codigoCredito}
+                    onChange={(e) => setCodigoCredito(e.target.value.toUpperCase())}
+                    placeholder="CR001"
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Deudor */}
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider border-b border-slate-700 pb-2">Deudor</h3>
