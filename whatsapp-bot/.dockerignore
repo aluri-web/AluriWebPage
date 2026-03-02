@@ -1,0 +1,8 @@
+node_modules
+auth
+.env
+*.log
+.git
+src
+tsconfig.json
+*.md

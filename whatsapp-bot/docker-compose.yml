@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  whatsapp-bot:
+    build: .
+    container_name: aluri-whatsapp-bot
+    restart: unless-stopped
+    volumes:
+      # Persistir sesión de WhatsApp
+      - ./auth:/app/auth
+    environment:
+      - ALURI_API_KEY=${ALURI_API_KEY}
+      - ALURI_API_URL=${ALURI_API_URL}
+      - NUMEROS_AUTORIZADOS=${NUMEROS_AUTORIZADOS}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
