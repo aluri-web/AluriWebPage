@@ -44,6 +44,25 @@ interface Pago {
   monto_total: number
 }
 
+interface TasaOficial {
+  id: string
+  tipo: string
+  tasa_ea: number
+  vigencia_desde: string
+  vigencia_hasta: string
+  fuente: string
+}
+
+interface TasasResponse {
+  success: boolean
+  fecha_consulta: string
+  tasas: TasaOficial[]
+  tasa_usura_ea: number | null
+  tasa_mora_diaria: number | null
+  tasa_mora_mensual: number | null
+  fuente: string
+}
+
 interface ApiResponse<T> {
   success: boolean
   error?: string
@@ -188,6 +207,15 @@ export async function obtenerPagosCredito(creditoId: string): Promise<Pago[]> {
   const endpoint = `/pagos?credito_id=${encodeURIComponent(creditoId)}`
   const data = await apiRequest<ApiResponse<Pago>>(endpoint)
   return data.pagos || []
+}
+
+// =====================
+// TASAS OFICIALES
+// =====================
+
+export async function obtenerTasas(): Promise<TasasResponse> {
+  const endpoint = '/tasas'
+  return await apiRequest<TasasResponse>(endpoint)
 }
 
 // =====================

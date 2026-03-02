@@ -8,6 +8,7 @@ import {
   obtenerPropietarios,
   obtenerResumenPropietarios,
   obtenerPagosCredito,
+  obtenerTasas,
   formatearMoneda,
   formatearFecha,
 } from './api.js'
@@ -39,6 +40,11 @@ export async function procesarMensaje(texto: string, userId?: string): Promise<s
     // Comando: mora
     if (mensaje === '/mora' || mensaje === 'mora') {
       return await comandoMora()
+    }
+
+    // Comando: tasas oficiales
+    if (mensaje === '/tasas' || mensaje === 'tasas' || mensaje === 'tasa mora' || mensaje === 'tasa de mora') {
+      return await comandoTasas()
     }
 
     // Comando: inversionistas
@@ -118,6 +124,7 @@ function obtenerAyuda(): string {
 💰 *Creditos*
 /creditos - Lista de creditos
 /mora - Creditos en mora
+/tasas - Tasas de interes vigentes
 CR-001 - Buscar credito
 /pagos CR-001 - Pagos de un credito
 
@@ -353,4 +360,48 @@ async function comandoBuscarPropietario(buscar: string): Promise<string> {
   }).join('\n\n')
 
   return `*Propietarios (${propietarios.length} encontrados)*\n\n${lista}`
+}
+
+// =====================
+// COMANDO DE TASAS
+// =====================
+
+async function comandoTasas(): Promise<string> {
+  try {
+    const data = await obtenerTasas()
+
+    if (!data.success) {
+      return 'Error al obtener las tasas oficiales.'
+    }
+
+    const tasaUsura = data.tasa_usura_ea ?? 'N/D'
+    const tasaMoraDiaria = data.tasa_mora_diaria
+      ? (data.tasa_mora_diaria * 100).toFixed(4) + '%'
+      : 'N/D'
+    const tasaMoraMensual = data.tasa_mora_mensual
+      ? (data.tasa_mora_mensual * 100).toFixed(2) + '%'
+      : 'N/D'
+
+    // Buscar IBC en las tasas
+    const ibcConsumo = data.tasas.find(t => t.tipo === 'ibc_consumo')
+    const ibc = ibcConsumo ? `${ibcConsumo.tasa_ea}%` : 'N/D'
+
+    return `*📈 Tasas Oficiales*
+_Superintendencia Financiera de Colombia_
+
+📅 Fecha: ${data.fecha_consulta}
+
+*Tasas de Referencia*
+IBC Consumo: ${ibc} EA
+Tasa de Usura: ${tasaUsura}% EA
+
+*Tasa de Mora*
+Diaria: ${tasaMoraDiaria}
+Mensual: ${tasaMoraMensual}
+
+_La tasa de mora maxima legal es la tasa de usura (1.5x el IBC)_`
+  } catch (error) {
+    console.error('Error obteniendo tasas:', error)
+    return 'Error al consultar las tasas. Intenta mas tarde.'
+  }
 }
