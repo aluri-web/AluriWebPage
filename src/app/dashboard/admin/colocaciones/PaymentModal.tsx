@@ -193,7 +193,7 @@ export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoInte
                   value={monto || ''}
                   onChange={(e) => setMonto(Number(e.target.value) || 0)}
                   min="0"
-                  step="1000"
+                  step="1"
                   placeholder="0"
                   required
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
