@@ -213,6 +213,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       tipo_transaccion: string;
       monto: number;
       fecha_aplicacion: string;
+      fecha_transaccion: string;
       referencia_pago: string;
     }[] = []
 
@@ -222,6 +223,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         tipo_transaccion: 'pago_mora',
         monto: montoMora,
         fecha_aplicacion: body.fecha_pago,
+        fecha_transaccion: body.fecha_pago,
         referencia_pago: referenciaPago
       })
     }
@@ -232,6 +234,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         tipo_transaccion: 'pago_interes',
         monto: montoInteres,
         fecha_aplicacion: body.fecha_pago,
+        fecha_transaccion: body.fecha_pago,
         referencia_pago: referenciaPago
       })
     }
@@ -242,6 +245,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         tipo_transaccion: 'pago_capital',
         monto: montoCapital,
         fecha_aplicacion: body.fecha_pago,
+        fecha_transaccion: body.fecha_pago,
         referencia_pago: referenciaPago
       })
     }
