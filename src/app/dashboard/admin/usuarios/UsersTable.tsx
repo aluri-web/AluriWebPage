@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Users, LogIn, Loader2 } from 'lucide-react'
+import { Users } from 'lucide-react'
 import EditUserModal, { UserProfile } from './EditUserModal'
 import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
-import { impersonateUser } from './actions'
 
 interface UsersTableProps {
   users: UserProfile[]
@@ -12,25 +11,6 @@ interface UsersTableProps {
 
 export default function UsersTable({ users }: UsersTableProps) {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
-  const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
-
-  const handleImpersonate = async (userId: string, role: string) => {
-    setImpersonatingId(userId)
-    try {
-      const result = await impersonateUser(userId, role)
-      if (result.url) {
-        // Redirect to the magic link
-        window.location.href = result.url
-      } else if (result.error) {
-        alert(result.error)
-        setImpersonatingId(null)
-      }
-    } catch (error) {
-      console.error('Error impersonating user:', error)
-      alert('Error al conectarse como usuario')
-      setImpersonatingId(null)
-    }
-  }
 
   // Preparar datos para exportar
   const exportData = useMemo(() => users.map(u => ({
@@ -149,31 +129,12 @@ export default function UsersTable({ users }: UsersTableProps) {
                     {formatDate(user.created_at)}
                   </td>
                   <td className="py-4 px-2">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setEditingUser(user)}
-                        className="text-amber-400 hover:text-amber-300 text-sm font-medium transition-colors"
-                      >
-                        Editar
-                      </button>
-                      {(user.role === 'inversionista' || user.role === 'propietario') && (
-                        <button
-                          onClick={() => handleImpersonate(user.id, user.role)}
-                          disabled={impersonatingId === user.id}
-                          className="flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors disabled:opacity-50"
-                          title={`Ver como ${user.role}`}
-                        >
-                          {impersonatingId === user.id ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <LogIn size={14} />
-                          )}
-                          <span className="hidden sm:inline">
-                            {user.role === 'inversionista' ? 'Ver Inv.' : 'Ver Prop.'}
-                          </span>
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      onClick={() => setEditingUser(user)}
+                      className="text-amber-400 hover:text-amber-300 text-sm font-medium transition-colors"
+                    >
+                      Editar
+                    </button>
                   </td>
                 </tr>
               ))}
