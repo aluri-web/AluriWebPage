@@ -977,7 +977,7 @@ export async function registerLoanPayment(
       credito_id: string;
       tipo_transaccion: string;
       monto: number;
-      fecha_transaccion: string;
+      fecha_aplicacion: string;
       referencia_pago: string;
     }[] = []
 
@@ -986,7 +986,7 @@ export async function registerLoanPayment(
         credito_id: credito.id,
         tipo_transaccion: 'pago_mora',
         monto: montoMora,
-        fecha_transaccion: data.payment_date,
+        fecha_aplicacion: data.payment_date,
         referencia_pago: referenciaPago
       })
     }
@@ -996,7 +996,7 @@ export async function registerLoanPayment(
         credito_id: credito.id,
         tipo_transaccion: 'pago_interes',
         monto: montoInteres,
-        fecha_transaccion: data.payment_date,
+        fecha_aplicacion: data.payment_date,
         referencia_pago: referenciaPago
       })
     }
@@ -1006,7 +1006,7 @@ export async function registerLoanPayment(
         credito_id: credito.id,
         tipo_transaccion: 'pago_capital',
         monto: montoCapital,
-        fecha_transaccion: data.payment_date,
+        fecha_aplicacion: data.payment_date,
         referencia_pago: referenciaPago
       })
     }

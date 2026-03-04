@@ -212,7 +212,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       credito_id: string;
       tipo_transaccion: string;
       monto: number;
-      fecha_transaccion: string;
+      fecha_aplicacion: string;
       referencia_pago: string;
     }[] = []
 
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         credito_id: creditoId,
         tipo_transaccion: 'pago_mora',
         monto: montoMora,
-        fecha_transaccion: body.fecha_pago,
+        fecha_aplicacion: body.fecha_pago,
         referencia_pago: referenciaPago
       })
     }
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         credito_id: creditoId,
         tipo_transaccion: 'pago_interes',
         monto: montoInteres,
-        fecha_transaccion: body.fecha_pago,
+        fecha_aplicacion: body.fecha_pago,
         referencia_pago: referenciaPago
       })
     }
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         credito_id: creditoId,
         tipo_transaccion: 'pago_capital',
         monto: montoCapital,
-        fecha_transaccion: body.fecha_pago,
+        fecha_aplicacion: body.fecha_pago,
         referencia_pago: referenciaPago
       })
     }
@@ -356,10 +356,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Obtener las transacciones de pago del crédito
     const { data: transacciones, error: txError } = await supabase
       .from('transacciones')
-      .select('id, tipo_transaccion, monto, fecha_transaccion, referencia_pago, created_at')
+      .select('id, tipo_transaccion, monto, fecha_aplicacion, referencia_pago, created_at')
       .eq('credito_id', creditoId)
       .in('tipo_transaccion', ['pago_capital', 'pago_interes', 'pago_mora'])
-      .order('fecha_transaccion', { ascending: false })
+      .order('fecha_aplicacion', { ascending: false })
 
     if (txError) {
       console.error('Error fetching pagos:', txError)
@@ -385,7 +385,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       if (!gruposPago[ref]) {
         gruposPago[ref] = {
           id: ref,
-          fecha_pago: tx.fecha_transaccion,
+          fecha_pago: tx.fecha_aplicacion,
           monto_capital: 0,
           monto_interes: 0,
           monto_mora: 0,
