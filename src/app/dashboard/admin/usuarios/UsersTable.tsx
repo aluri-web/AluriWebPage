@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Users } from 'lucide-react'
 import EditUserModal, { UserProfile } from './EditUserModal'
+import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
 
 interface UsersTableProps {
   users: UserProfile[]
@@ -10,6 +11,25 @@ interface UsersTableProps {
 
 export default function UsersTable({ users }: UsersTableProps) {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
+
+  // Preparar datos para exportar
+  const exportData = useMemo(() => users.map(u => ({
+    id: u.id,
+    nombre: u.full_name || '',
+    email: u.email || '',
+    rol: u.role,
+    estado: u.verification_status || 'pendiente',
+    fecha_registro: u.created_at,
+  })), [users])
+
+  const exportHeaders = {
+    id: 'ID',
+    nombre: 'Nombre',
+    email: 'Email',
+    rol: 'Rol',
+    estado: 'Estado',
+    fecha_registro: 'Fecha Registro',
+  }
 
   const getRoleBadgeClass = (role: string) => {
     switch (role) {
@@ -59,7 +79,18 @@ export default function UsersTable({ users }: UsersTableProps) {
   return (
     <>
       {users.length > 0 ? (
-        <div className="overflow-x-auto">
+        <div>
+          {/* Header con botón de exportar */}
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm text-slate-400">{users.length} usuarios</span>
+            <ExportExcelButton
+              data={exportData}
+              filename="usuarios_aluri"
+              sheetName="Usuarios"
+              headers={exportHeaders}
+            />
+          </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-slate-400 text-sm border-b border-slate-700 uppercase tracking-wider">
@@ -109,6 +140,7 @@ export default function UsersTable({ users }: UsersTableProps) {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center h-48 text-slate-400">

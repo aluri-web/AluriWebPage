@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Check, X, Loader2, AlertCircle, Banknote } from 'lucide-react'
 import { approveInvestment, rejectInvestment, PendingInvestment } from './actions'
+import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
 
 interface InvestmentsTableProps {
   investments: PendingInvestment[]
@@ -43,6 +44,25 @@ export default function InvestmentsTable({ investments }: InvestmentsTableProps)
       hour: '2-digit',
       minute: '2-digit'
     })
+  }
+
+  // Preparar datos para exportar
+  const exportData = useMemo(() => investments.map(inv => ({
+    fecha: inv.created_at,
+    inversionista: inv.investor?.full_name || 'Sin nombre',
+    email: inv.investor?.email || '',
+    cedula: inv.investor?.document_id || '',
+    credito: inv.credito?.codigo_credito || '',
+    monto: inv.monto_invertido || 0,
+  })), [investments])
+
+  const exportHeaders = {
+    fecha: 'Fecha',
+    inversionista: 'Inversionista',
+    email: 'Email',
+    cedula: 'Cedula',
+    credito: 'Credito',
+    monto: 'Monto Invertido',
   }
 
   const handleApprove = async (investmentId: string) => {
@@ -151,6 +171,17 @@ export default function InvestmentsTable({ investments }: InvestmentsTableProps)
           </div>
         </div>
       )}
+
+      {/* Header con botón de exportar */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm text-slate-400">{investments.length} inversiones pendientes</span>
+        <ExportExcelButton
+          data={exportData}
+          filename="inversiones_aluri"
+          sheetName="Inversiones"
+          headers={exportHeaders}
+        />
+      </div>
 
       <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
         <div className="overflow-x-auto">

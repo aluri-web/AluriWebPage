@@ -9,6 +9,7 @@ import EditCreditModal from './EditCreditModal'
 import DeleteCreditModal from './DeleteCreditModal'
 import Link from 'next/link'
 import { MoreHorizontal } from 'lucide-react'
+import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
 
 type SortField = 'code' | 'status' | 'debtor_name' | 'amount_requested' | 'ltv' | 'interest_rate_ea' | 'amount_funded' | 'created_at'
 type SortDirection = 'asc' | 'desc'
@@ -234,6 +235,49 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     setLongPressLoan(null)
   }, [])
 
+  // Preparar datos para exportar
+  const exportData = useMemo(() => loans.map(loan => ({
+    codigo: loan.code,
+    estado: loan.status,
+    deudor: loan.debtor_name,
+    cedula_deudor: loan.debtor_cedula,
+    co_deudor: loan.co_debtor_name || '',
+    ciudad: loan.property_city,
+    avaluo: loan.property_value,
+    monto_solicitado: loan.amount_requested,
+    ltv: loan.ltv,
+    riesgo: loan.risk_score,
+    tasa_nm: loan.interest_rate_nm,
+    tasa_ea: loan.interest_rate_ea,
+    comision: loan.debtor_commission,
+    fondeado: loan.amount_funded,
+    saldo_capital: loan.saldo_capital,
+    saldo_intereses: loan.saldo_intereses,
+    inversionistas: loan.investors.join(', '),
+    fecha: loan.created_at,
+  })), [loans])
+
+  const exportHeaders = {
+    codigo: 'Codigo',
+    estado: 'Estado',
+    deudor: 'Deudor',
+    cedula_deudor: 'Cedula Deudor',
+    co_deudor: 'Co-Deudor',
+    ciudad: 'Ciudad',
+    avaluo: 'Avaluo',
+    monto_solicitado: 'Monto Solicitado',
+    ltv: 'LTV %',
+    riesgo: 'Riesgo',
+    tasa_nm: 'Tasa NM %',
+    tasa_ea: 'Tasa EA %',
+    comision: 'Comision',
+    fondeado: 'Fondeado',
+    saldo_capital: 'Saldo Capital',
+    saldo_intereses: 'Saldo Intereses',
+    inversionistas: 'Inversionistas',
+    fecha: 'Fecha Creacion',
+  }
+
   if (loans.length === 0) {
     return (
       <div className="bg-slate-900 rounded-xl border border-slate-800 p-12 text-center">
@@ -245,6 +289,16 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   return (
     <>
       <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+        {/* Header con botón de exportar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-800/30">
+          <span className="text-sm text-slate-400">{loans.length} colocaciones</span>
+          <ExportExcelButton
+            data={exportData}
+            filename="colocaciones_aluri"
+            sheetName="Colocaciones"
+            headers={exportHeaders}
+          />
+        </div>
         <div
           ref={tableScrollRef}
           className="overflow-x-auto scrollbar-visible cursor-grab active:cursor-grabbing"
