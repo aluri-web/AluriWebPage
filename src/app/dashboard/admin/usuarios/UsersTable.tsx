@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Users } from 'lucide-react'
+import { Users, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import EditUserModal, { UserProfile } from './EditUserModal'
 import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
 
@@ -9,18 +9,61 @@ interface UsersTableProps {
   users: UserProfile[]
 }
 
+type SortKey = 'id' | 'full_name' | 'email' | 'role' | 'verification_status' | 'created_at'
+type SortDirection = 'asc' | 'desc'
+
 export default function UsersTable({ users }: UsersTableProps) {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey>('created_at')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
-  // Preparar datos para exportar
-  const exportData = useMemo(() => users.map(u => ({
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDirection('desc')
+    }
+  }
+
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      let comparison = 0
+
+      switch (sortKey) {
+        case 'id':
+          comparison = a.id.localeCompare(b.id)
+          break
+        case 'full_name':
+          comparison = (a.full_name || '').localeCompare(b.full_name || '')
+          break
+        case 'email':
+          comparison = (a.email || '').localeCompare(b.email || '')
+          break
+        case 'role':
+          comparison = a.role.localeCompare(b.role)
+          break
+        case 'verification_status':
+          comparison = (a.verification_status || '').localeCompare(b.verification_status || '')
+          break
+        case 'created_at':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          break
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [users, sortKey, sortDirection])
+
+  // Preparar datos para exportar (respeta el orden actual)
+  const exportData = useMemo(() => sortedUsers.map(u => ({
     id: u.id,
     nombre: u.full_name || '',
     email: u.email || '',
     rol: u.role,
     estado: u.verification_status || 'pendiente',
     fecha_registro: u.created_at,
-  })), [users])
+  })), [sortedUsers])
 
   const exportHeaders = {
     id: 'ID',
@@ -76,6 +119,33 @@ export default function UsersTable({ users }: UsersTableProps) {
     })
   }
 
+  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+    if (sortKey !== columnKey) {
+      return <ChevronsUpDown size={14} className="text-slate-600" />
+    }
+    return sortDirection === 'asc'
+      ? <ChevronUp size={14} className="text-amber-400" />
+      : <ChevronDown size={14} className="text-amber-400" />
+  }
+
+  const SortableHeader = ({
+    columnKey,
+    label,
+  }: {
+    columnKey: SortKey
+    label: string
+  }) => (
+    <th
+      className="pb-4 px-2 font-medium cursor-pointer hover:text-slate-200 transition-colors select-none"
+      onClick={() => handleSort(columnKey)}
+    >
+      <div className="flex items-center gap-1">
+        <span>{label}</span>
+        <SortIcon columnKey={columnKey} />
+      </div>
+    </th>
+  )
+
   return (
     <>
       {users.length > 0 ? (
@@ -94,17 +164,17 @@ export default function UsersTable({ users }: UsersTableProps) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-slate-400 text-sm border-b border-slate-700 uppercase tracking-wider">
-                <th className="pb-4 px-2 font-medium">ID</th>
-                <th className="pb-4 px-2 font-medium">Nombre</th>
-                <th className="pb-4 px-2 font-medium">Email</th>
-                <th className="pb-4 px-2 font-medium">Rol</th>
-                <th className="pb-4 px-2 font-medium">Estado</th>
-                <th className="pb-4 px-2 font-medium">Fecha Registro</th>
+                <SortableHeader columnKey="id" label="ID" />
+                <SortableHeader columnKey="full_name" label="Nombre" />
+                <SortableHeader columnKey="email" label="Email" />
+                <SortableHeader columnKey="role" label="Rol" />
+                <SortableHeader columnKey="verification_status" label="Estado" />
+                <SortableHeader columnKey="created_at" label="Fecha Registro" />
                 <th className="pb-4 px-2 font-medium">Acciones</th>
               </tr>
             </thead>
             <tbody className="text-sm">
-              {users.map((user) => (
+              {sortedUsers.map((user) => (
                 <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
                   <td className="py-4 px-2 font-mono text-slate-400 text-xs">
                     {user.id.slice(0, 8)}...
