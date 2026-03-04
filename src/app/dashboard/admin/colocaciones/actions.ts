@@ -912,40 +912,145 @@ export async function registerLoanPayment(
     return { success: false, error: 'El monto debe ser mayor a cero.' }
   }
 
-  try {
-    // Get admin auth token to call the API
-    const supabase = await createClient()
-    const { data: { session } } = await supabase.auth.getSession()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-    if (!session?.access_token) {
-      return { success: false, error: 'No se pudo obtener sesion de admin.' }
+  if (!supabaseUrl || !serviceRoleKey) {
+    return { success: false, error: 'Configuracion del servidor incompleta.' }
+  }
+
+  try {
+    const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+    // Buscar el crédito
+    const { data: credito, error: creditoError } = await supabase
+      .from('creditos')
+      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora')
+      .eq('id', data.loan_id)
+      .single()
+
+    if (creditoError || !credito) {
+      return { success: false, error: 'Crédito no encontrado' }
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL
-      || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+    const montoTotal = data.monto
 
-    const response = await fetch(`${baseUrl}/api/pagos`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        credito_id: data.loan_id,
-        fecha_pago: data.payment_date,
-        monto: data.monto,
-      }),
-    })
+    // CASCADA: mora → intereses → capital
+    const saldoMoraAnterior = credito.saldo_mora || 0
+    const saldoInteresesAnterior = credito.saldo_intereses || 0
+    const saldoCapitalAnterior = credito.saldo_capital || 0
 
-    const result = await response.json()
+    let restante = montoTotal
 
-    if (!response.ok || !result.success) {
-      return { success: false, error: result.error || 'Error al registrar el pago.' }
+    // 1. Primero pagar mora
+    const montoMora = Math.min(restante, saldoMoraAnterior)
+    restante -= montoMora
+
+    // 2. Luego pagar intereses
+    const montoInteres = Math.min(restante, saldoInteresesAnterior)
+    restante -= montoInteres
+
+    // 3. El sobrante va a capital
+    const montoCapital = Math.min(restante, saldoCapitalAnterior)
+
+    // Nuevos saldos
+    const nuevoSaldoMora = saldoMoraAnterior - montoMora
+    const nuevoSaldoIntereses = saldoInteresesAnterior - montoInteres
+    const nuevoSaldoCapital = saldoCapitalAnterior - montoCapital
+
+    const aplicacion = {
+      monto_mora: montoMora,
+      monto_interes: montoInteres,
+      monto_capital: montoCapital,
+      saldo_mora_anterior: saldoMoraAnterior,
+      saldo_intereses_anterior: saldoInteresesAnterior,
+      saldo_capital_anterior: saldoCapitalAnterior,
+      saldo_mora_nuevo: nuevoSaldoMora,
+      saldo_intereses_nuevo: nuevoSaldoIntereses,
+      saldo_capital_nuevo: nuevoSaldoCapital,
+    }
+
+    // Registrar transacciones individuales por tipo
+    const referenciaPago = `PAG-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+
+    const filasTransaccion: {
+      credito_id: string;
+      tipo_transaccion: string;
+      monto: number;
+      fecha_transaccion: string;
+      referencia_pago: string;
+    }[] = []
+
+    if (montoMora > 0) {
+      filasTransaccion.push({
+        credito_id: credito.id,
+        tipo_transaccion: 'pago_mora',
+        monto: montoMora,
+        fecha_transaccion: data.payment_date,
+        referencia_pago: referenciaPago
+      })
+    }
+
+    if (montoInteres > 0) {
+      filasTransaccion.push({
+        credito_id: credito.id,
+        tipo_transaccion: 'pago_interes',
+        monto: montoInteres,
+        fecha_transaccion: data.payment_date,
+        referencia_pago: referenciaPago
+      })
+    }
+
+    if (montoCapital > 0) {
+      filasTransaccion.push({
+        credito_id: credito.id,
+        tipo_transaccion: 'pago_capital',
+        monto: montoCapital,
+        fecha_transaccion: data.payment_date,
+        referencia_pago: referenciaPago
+      })
+    }
+
+    if (filasTransaccion.length > 0) {
+      const { error: txError } = await supabase
+        .from('transacciones')
+        .insert(filasTransaccion)
+
+      if (txError) {
+        console.error('Error registering payment:', txError)
+        return { success: false, error: 'Error al registrar transacciones: ' + txError.message }
+      }
+    }
+
+    // Actualizar saldos en la tabla creditos
+    const updateData: Record<string, unknown> = {
+      saldo_capital: nuevoSaldoCapital,
+      saldo_intereses: nuevoSaldoIntereses,
+      saldo_mora: nuevoSaldoMora,
+      fecha_ultimo_pago: data.payment_date,
+    }
+
+    // Si el capital quedó en 0, marcar como pagado
+    if (nuevoSaldoCapital === 0) {
+      updateData.estado = 'completed'
+      updateData.en_mora = false
+      updateData.saldo_mora = 0
+    }
+
+    const { error: updateError } = await supabase
+      .from('creditos')
+      .update(updateData)
+      .eq('id', credito.id)
+
+    if (updateError) {
+      console.error('Error actualizando saldos:', updateError)
+      return { success: false, error: 'Error al actualizar saldos: ' + updateError.message }
     }
 
     revalidatePath('/dashboard/admin/colocaciones')
+    revalidatePath(`/dashboard/admin/colocaciones/${data.loan_id}`)
 
-    return { success: true, aplicacion: result.aplicacion }
+    return { success: true, aplicacion }
 
   } catch (error) {
     console.error('Unexpected error:', error)
