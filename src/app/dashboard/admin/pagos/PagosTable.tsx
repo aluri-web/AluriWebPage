@@ -1,6 +1,8 @@
 'use client'
 
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
 import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
 
 interface PagoAgrupado {
@@ -18,6 +20,9 @@ interface PagoAgrupado {
 interface PagosTableProps {
   pagos: PagoAgrupado[]
 }
+
+type SortKey = 'fecha' | 'credito_codigo' | 'propietario' | 'capital' | 'intereses' | 'mora' | 'total' | 'referencia'
+type SortDirection = 'asc' | 'desc'
 
 function formatCOP(value: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -37,8 +42,55 @@ function formatDate(dateStr: string): string {
 }
 
 export default function PagosTable({ pagos }: PagosTableProps) {
+  const [sortKey, setSortKey] = useState<SortKey>('fecha')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDirection('desc')
+    }
+  }
+
+  const sortedPagos = useMemo(() => {
+    return [...pagos].sort((a, b) => {
+      let comparison = 0
+
+      switch (sortKey) {
+        case 'fecha':
+          comparison = new Date(a.fecha).getTime() - new Date(b.fecha).getTime()
+          break
+        case 'credito_codigo':
+          comparison = a.credito_codigo.localeCompare(b.credito_codigo)
+          break
+        case 'propietario':
+          comparison = a.propietario.localeCompare(b.propietario)
+          break
+        case 'capital':
+          comparison = a.capital - b.capital
+          break
+        case 'intereses':
+          comparison = a.intereses - b.intereses
+          break
+        case 'mora':
+          comparison = a.mora - b.mora
+          break
+        case 'total':
+          comparison = a.total - b.total
+          break
+        case 'referencia':
+          comparison = a.referencia.localeCompare(b.referencia)
+          break
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [pagos, sortKey, sortDirection])
+
   // Preparar datos para exportar
-  const exportData = pagos.map(p => ({
+  const exportData = sortedPagos.map(p => ({
     fecha: p.fecha,
     credito: p.credito_codigo,
     propietario: p.propietario,
@@ -60,6 +112,35 @@ export default function PagosTable({ pagos }: PagosTableProps) {
     referencia: 'Referencia',
   }
 
+  const SortIcon = ({ columnKey }: { columnKey: SortKey }) => {
+    if (sortKey !== columnKey) {
+      return <ChevronsUpDown size={14} className="text-slate-600" />
+    }
+    return sortDirection === 'asc'
+      ? <ChevronUp size={14} className="text-amber-400" />
+      : <ChevronDown size={14} className="text-amber-400" />
+  }
+
+  const SortableHeader = ({
+    columnKey,
+    label,
+    align = 'left'
+  }: {
+    columnKey: SortKey
+    label: string
+    align?: 'left' | 'right'
+  }) => (
+    <th
+      className={`px-4 py-3 text-${align} text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-200 transition-colors select-none`}
+      onClick={() => handleSort(columnKey)}
+    >
+      <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : ''}`}>
+        <span>{label}</span>
+        <SortIcon columnKey={columnKey} />
+      </div>
+    </th>
+  )
+
   return (
     <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
       {/* Header con botón de exportar */}
@@ -77,34 +158,18 @@ export default function PagosTable({ pagos }: PagosTableProps) {
         <table className="w-full">
           <thead>
             <tr className="border-b border-slate-800 bg-slate-800/50">
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Fecha
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Credito
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Propietario
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Capital
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Intereses
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Mora
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Total
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                Referencia
-              </th>
+              <SortableHeader columnKey="fecha" label="Fecha" />
+              <SortableHeader columnKey="credito_codigo" label="Credito" />
+              <SortableHeader columnKey="propietario" label="Propietario" />
+              <SortableHeader columnKey="capital" label="Capital" align="right" />
+              <SortableHeader columnKey="intereses" label="Intereses" align="right" />
+              <SortableHeader columnKey="mora" label="Mora" align="right" />
+              <SortableHeader columnKey="total" label="Total" align="right" />
+              <SortableHeader columnKey="referencia" label="Referencia" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {pagos.map((pago) => (
+            {sortedPagos.map((pago) => (
               <tr key={pago.referencia} className="hover:bg-slate-800/30 transition-colors">
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
                   {formatDate(pago.fecha)}
