@@ -261,7 +261,12 @@ export default async function InvestmentDetailPage({
           {/* Investment Performance */}
           <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-700">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white">Mi Inversion</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-white">Mi Inversion</h2>
+                <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-300 text-xs font-mono">
+                  {credito?.codigo_credito || ''}
+                </span>
+              </div>
               <span className={`px-3 py-1 rounded text-sm font-medium ${status.bgClass} ${status.textClass}`}>
                 {status.label}
               </span>

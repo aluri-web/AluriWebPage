@@ -8,6 +8,25 @@ interface SolicitudPago {
   monto: number // Monto total del pago — se distribuye automáticamente: mora → intereses → capital
 }
 
+/**
+ * Calcula los meses de interés debidos entre dos fechas.
+ * Replica la lógica de la función SQL public.months_of_interest_due()
+ */
+function monthsOfInterestDue(baseDate: Date, targetDate: Date, anticipada: boolean): number {
+  let periods = (targetDate.getFullYear() - baseDate.getFullYear()) * 12
+    + (targetDate.getMonth() - baseDate.getMonth())
+
+  if (targetDate.getDate() >= baseDate.getDate()) {
+    periods += 1
+  }
+
+  if (!anticipada) {
+    periods -= 1
+  }
+
+  return Math.max(0, periods)
+}
+
 interface AplicacionPago {
   monto_mora: number
   monto_interes: number
@@ -104,7 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
 
     const { data: credito, error: creditoError } = await supabase
       .from('creditos')
-      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora')
+      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, tasa_nominal, tipo_liquidacion, tipo_amortizacion, valor_colocado, fecha_desembolso, fecha_ultimo_pago, tasa_mora, plazo')
       .eq(isUUID ? 'id' : 'codigo_credito', body.credito_id)
       .single()
 
@@ -119,10 +138,61 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
     const montoCredito = credito.monto_solicitado || 0
 
     // =========================================
+    // RECALCULAR saldo_intereses EN TIEMPO REAL
+    // (misma lógica que el cron SQL calcular_mora_diaria)
+    // =========================================
+    const tasaNominal = credito.tasa_nominal || 0
+    const esAnticipada = (credito.tipo_liquidacion || 'vencida') === 'anticipada'
+    const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
+    const principal = credito.valor_colocado || credito.monto_solicitado || 0
+    const fechaPago = new Date(body.fecha_pago + 'T12:00:00') // Usar fecha del pago como referencia
+
+    let saldoInteresesCalculado = 0
+
+    if (tasaNominal > 0 && credito.fecha_desembolso) {
+      if (esSoloInteres) {
+        // SOLO INTERES: los pagos cubren intereses del plazo COMPLETO antes de tocar capital
+        // Total intereses previstos = plazo * cuota_mensual_interes
+        const plazoMeses = credito.plazo || 12
+        const totalInterestForTerm = plazoMeses * (principal * tasaNominal / 100)
+
+        // Sumar todos los pagos de interés ya registrados
+        const { data: interestPayments } = await supabase
+          .from('transacciones')
+          .select('monto')
+          .eq('credito_id', creditoId)
+          .eq('tipo_transaccion', 'pago_interes')
+
+        const totalInterestPaid = (interestPayments || []).reduce((sum, t) => sum + (t.monto || 0), 0)
+        saldoInteresesCalculado = Math.max(0, Math.round(totalInterestForTerm - totalInterestPaid))
+      } else {
+        // FRANCESA: desde último pago de interés (o desembolso)
+        const { data: lastInterestPayment } = await supabase
+          .from('transacciones')
+          .select('fecha_transaccion')
+          .eq('credito_id', creditoId)
+          .eq('tipo_transaccion', 'pago_interes')
+          .order('fecha_transaccion', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const baseDate = lastInterestPayment?.fecha_transaccion
+          ? new Date(lastInterestPayment.fecha_transaccion + 'T12:00:00')
+          : new Date(credito.fecha_desembolso + 'T12:00:00')
+
+        const monthsDue = monthsOfInterestDue(baseDate, fechaPago, esAnticipada)
+        saldoInteresesCalculado = Math.round(
+          monthsDue * ((credito.saldo_capital || 0) * tasaNominal / 100)
+        )
+      }
+    }
+
+    // =========================================
     // CASCADA: mora → intereses → capital
+    // Usa saldo_intereses RECALCULADO, no el guardado
     // =========================================
     const saldoMoraAnterior = credito.saldo_mora || 0
-    const saldoInteresesAnterior = credito.saldo_intereses || 0
+    const saldoInteresesAnterior = saldoInteresesCalculado
     const saldoCapitalAnterior = credito.saldo_capital || 0
 
     let restante = montoTotal
