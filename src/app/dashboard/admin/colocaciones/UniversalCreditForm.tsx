@@ -487,7 +487,7 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
     if (result.success) {
       showToast('success', 'Credito creado exitosamente')
       reset({
-        code: 'CR-' + (parseInt(formData.code.split('-')[1]) + 1).toString().padStart(3, '0'),
+        code: 'CR' + ((parseInt(formData.code.replace(/CR-?/, '')) || 0) + 1).toString().padStart(3, '0'),
         estado: 'publicado', // Reset to default estado
         debtor_cedula: '',
         debtor_id: '',

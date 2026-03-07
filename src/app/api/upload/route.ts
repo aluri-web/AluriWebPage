@@ -26,12 +26,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No se proporcionó archivo' }, { status: 400 })
     }
 
-    if (!file.type.startsWith('image/')) {
-      return NextResponse.json({ error: 'El archivo debe ser una imagen' }, { status: 400 })
+    const isImage = file.type.startsWith('image/')
+    const isPdf = file.type === 'application/pdf'
+    if (!isImage && !isPdf) {
+      return NextResponse.json({ error: 'El archivo debe ser una imagen o PDF' }, { status: 400 })
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: 'El archivo excede 5MB' }, { status: 400 })
+    const maxSize = isPdf ? 10 * 1024 * 1024 : 5 * 1024 * 1024
+    if (file.size > maxSize) {
+      return NextResponse.json({ error: `El archivo excede ${isPdf ? '10' : '5'}MB` }, { status: 400 })
     }
 
     // Use service role for storage upload (bypasses RLS)

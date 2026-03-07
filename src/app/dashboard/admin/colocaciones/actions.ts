@@ -683,21 +683,22 @@ export async function getNextLoanCode(): Promise<string> {
   const { data } = await supabase
     .from('creditos')
     .select('codigo_credito')
-    .order('codigo_credito', { ascending: false })
-    .limit(1)
-    .single()
 
-  if (!data?.codigo_credito) {
-    return 'CR-001'
+  if (!data || data.length === 0) {
+    return 'CR001'
   }
 
-  const match = data.codigo_credito.match(/CR-(\d+)/)
-  if (match) {
-    const nextNum = parseInt(match[1]) + 1
-    return `CR-${nextNum.toString().padStart(3, '0')}`
+  let maxNum = 0
+  for (const row of data) {
+    const match = row.codigo_credito?.match(/CR-?(\d+)/)
+    if (match) {
+      const num = parseInt(match[1])
+      if (num > maxNum) maxNum = num
+    }
   }
 
-  return 'CR-001'
+  const nextNum = maxNum + 1
+  return `CR${nextNum.toString().padStart(3, '0')}`
 }
 
 // ========== ADD INVESTMENT TO EXISTING LOAN ==========

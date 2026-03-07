@@ -7,7 +7,8 @@ import {
   LayoutDashboard,
   FileText,
   Bell,
-  Settings
+  Settings,
+  PlusCircle
 } from 'lucide-react'
 import { getUnreadCount } from '../../app/dashboard/propietario/notificaciones/actions'
 
@@ -15,6 +16,7 @@ const mainNavItems = [
   { href: '/dashboard/propietario', label: 'Panel', icon: LayoutDashboard },
   { href: '/dashboard/propietario/creditos', label: 'Mis Creditos', icon: FileText },
   { href: '/dashboard/propietario/notificaciones', label: 'Notificaciones', icon: Bell },
+  { href: '/dashboard/propietario/solicitar-credito', label: 'Solicitar Credito', icon: PlusCircle },
 ]
 
 const configNavItems = [
