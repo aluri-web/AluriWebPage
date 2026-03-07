@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { X, Search, Trash2, UserPlus } from 'lucide-react'
 import { getCreditForEdit, updateCredit, searchDebtorByCedula, getCreditInvestments, removeInvestment, searchInvestorByCedula, addInvestmentToLoan, CreditForEdit, CreditInvestment } from './actions'
+import PropertyPhotoUpload from './PropertyPhotoUpload'
 
 interface EditCreditModalProps {
   creditId: string
@@ -36,6 +37,7 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
   const [ingresos, setIngresos] = useState(0)
   const [profesion, setProfesion] = useState('')
   const [clase, setClase] = useState('')
+  const [photos, setPhotos] = useState<string[]>([])
 
   // Debtor
   const [debtorCedula, setDebtorCedula] = useState('')
@@ -97,6 +99,7 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
       setIngresos(data.ingresos_mensuales || 0)
       setProfesion(data.profesion || '')
       setClase(data.clase || '')
+      setPhotos(data.fotos_inmueble || [])
       setDebtorId(data.cliente_id)
       setDebtorName(data.debtor_name || '')
       setDebtorCedula(data.debtor_cedula || '')
@@ -231,6 +234,7 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
       clase,
       cliente_id: debtorId,
       co_deudor_id: coDebtorId,
+      fotos_inmueble: photos,
     })
 
     if (result.error) {
@@ -475,6 +479,17 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Fotos del Inmueble */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-slate-300 uppercase tracking-wider border-b border-slate-700 pb-2">Fotos del Inmueble</h3>
+              <PropertyPhotoUpload
+                photos={photos}
+                onChange={setPhotos}
+                loanCode={codigoCredito || 'temp'}
+                maxPhotos={10}
+              />
             </div>
 
             {/* Perfil de Riesgo */}

@@ -1153,6 +1153,7 @@ export interface CreditForEdit {
   ingresos_mensuales: number | null
   profesion: string | null
   clase: string | null
+  fotos_inmueble: string[]
 }
 
 export async function getCreditForEdit(creditId: string): Promise<{ data: CreditForEdit | null; error: string | null }> {
@@ -1173,7 +1174,7 @@ export async function getCreditForEdit(creditId: string): Promise<{ data: Credit
       comision_deudor, comision_aluri_pct,
       tipo_contrato, tipo_amortizacion, tipo_liquidacion, tipo_persona,
       direccion_inmueble, ciudad_inmueble, tipo_inmueble, valor_comercial, ltv,
-      ingresos_mensuales, profesion, clase
+      ingresos_mensuales, profesion, clase, fotos_inmueble
     `)
     .eq('id', creditId)
     .single()
@@ -1203,6 +1204,7 @@ export async function getCreditForEdit(creditId: string): Promise<{ data: Credit
   return {
     data: {
       ...credit,
+      fotos_inmueble: credit.fotos_inmueble || [],
       debtor_name: debtor?.full_name || null,
       debtor_cedula: debtor?.document_id || null,
       co_debtor_name: coDebtor?.full_name || null,
@@ -1235,6 +1237,7 @@ export interface UpdateCreditData {
   clase?: string
   cliente_id?: string
   co_deudor_id?: string | null
+  fotos_inmueble?: string[]
 }
 
 export async function updateCredit(

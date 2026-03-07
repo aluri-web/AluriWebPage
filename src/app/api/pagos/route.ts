@@ -123,7 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
 
     const { data: credito, error: creditoError } = await supabase
       .from('creditos')
-      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, tasa_nominal, tipo_liquidacion, tipo_amortizacion, valor_colocado, fecha_desembolso, fecha_ultimo_pago, tasa_mora, plazo')
+      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, tasa_nominal, tipo_liquidacion, tipo_amortizacion, valor_colocado, fecha_desembolso, fecha_ultimo_pago, plazo')
       .eq(isUUID ? 'id' : 'codigo_credito', body.credito_id)
       .single()
 
@@ -188,10 +188,47 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
     }
 
     // =========================================
-    // CASCADA: mora → intereses → capital
-    // Usa saldo_intereses RECALCULADO, no el guardado
+    // RECALCULAR saldo_mora SEGÚN FECHA DEL PAGO
+    // Usa tasa de usura SFC (EA → diaria)
     // =========================================
-    const saldoMoraAnterior = credito.saldo_mora || 0
+    let saldoMoraCalculado = 0
+
+    if (credito.fecha_ultimo_pago && credito.fecha_desembolso) {
+      const fechaUltimoPago = new Date(credito.fecha_ultimo_pago + 'T12:00:00')
+      const diaPago = new Date(credito.fecha_desembolso + 'T12:00:00').getDate()
+
+      // Calcular próximo vencimiento = fecha_ultimo_pago + 1 mes, ajustado al día de pago
+      const proximoVencimiento = new Date(fechaUltimoPago)
+      proximoVencimiento.setMonth(proximoVencimiento.getMonth() + 1)
+      const lastDayOfMonth = new Date(proximoVencimiento.getFullYear(), proximoVencimiento.getMonth() + 1, 0).getDate()
+      proximoVencimiento.setDate(Math.min(diaPago, lastDayOfMonth))
+
+      if (fechaPago > proximoVencimiento) {
+        const diasMora = Math.floor((fechaPago.getTime() - proximoVencimiento.getTime()) / (1000 * 60 * 60 * 24))
+
+        // Obtener tasa de usura vigente de la SFC para la fecha del pago
+        const { data: tasaRow } = await supabase
+          .from('tasas_oficiales')
+          .select('tasa_ea')
+          .eq('tipo', 'usura_consumo')
+          .lte('vigencia_desde', body.fecha_pago)
+          .gte('vigencia_hasta', body.fecha_pago)
+          .order('vigencia_desde', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const tasaUsuraEA = tasaRow?.tasa_ea || 24.36 // Fallback SFC
+        const tasaMoraDiaria = Math.pow(1 + tasaUsuraEA / 100, 1 / 365) - 1
+
+        saldoMoraCalculado = Math.round((credito.saldo_capital || 0) * tasaMoraDiaria * diasMora)
+      }
+    }
+
+    // =========================================
+    // CASCADA: mora → intereses → capital
+    // Usa saldo_intereses y saldo_mora RECALCULADOS, no los guardados
+    // =========================================
+    const saldoMoraAnterior = saldoMoraCalculado
     const saldoInteresesAnterior = saldoInteresesCalculado
     const saldoCapitalAnterior = credito.saldo_capital || 0
 
