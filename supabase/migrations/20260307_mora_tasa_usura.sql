@@ -52,7 +52,8 @@ END;
 $$;
 
 -- 3. Reemplazar función calcular_mora_diaria()
---    Ahora usa calcular_tasa_mora_diaria() en vez de tasa fija por crédito
+--    Interés compuesto diario, base = capital + intereses
+--    Tasa de usura SFC por periodo (EA → diaria)
 CREATE OR REPLACE FUNCTION public.calcular_mora_diaria()
 RETURNS void
 LANGUAGE plpgsql
@@ -66,8 +67,9 @@ DECLARE
   -- Mora
   v_dia_pago INTEGER;
   v_proximo_vencimiento DATE;
-  v_dias_mora INTEGER;
   v_saldo_mora NUMERIC(15,2);
+  v_base_mora NUMERIC(15,2);
+  v_mora_date DATE;
   v_tasa_mora_diaria NUMERIC(12,10);
   v_mora_flag BOOLEAN;
   -- Intereses
@@ -83,9 +85,6 @@ DECLARE
   v_base_date DATE;
 BEGIN
   v_hoy := (CURRENT_TIMESTAMP AT TIME ZONE 'America/Bogota')::DATE;
-
-  -- Obtener tasa de mora diaria basada en usura vigente (SFC)
-  v_tasa_mora_diaria := public.calcular_tasa_mora_diaria(v_hoy);
 
   FOR r IN
     SELECT id, fecha_desembolso, fecha_ultimo_pago, saldo_capital,
@@ -140,7 +139,9 @@ BEGIN
 
     -- =====================
     -- CÁLCULO DE MORA
-    -- Usa tasa de usura SFC (EA → diaria)
+    -- Interés compuesto diario
+    -- Base = capital + intereses impagos
+    -- Tasa de usura SFC por periodo
     -- =====================
     v_mora_flag := false;
     v_saldo_mora := 0;
@@ -161,8 +162,19 @@ BEGIN
       );
 
       IF v_hoy > v_proximo_vencimiento THEN
-        v_dias_mora := v_hoy - v_proximo_vencimiento;
-        v_saldo_mora := ROUND(r.saldo_capital * v_tasa_mora_diaria * v_dias_mora, 0);
+        -- Base = capital + intereses impagos
+        v_base_mora := COALESCE(r.saldo_capital, 0) + v_saldo_intereses;
+        v_saldo_mora := 0;
+        v_mora_date := v_proximo_vencimiento;
+
+        -- Iterar día a día con interés compuesto y tasa por periodo
+        WHILE v_mora_date < v_hoy LOOP
+          v_tasa_mora_diaria := public.calcular_tasa_mora_diaria(v_mora_date);
+          v_saldo_mora := v_saldo_mora + (v_base_mora + v_saldo_mora) * v_tasa_mora_diaria;
+          v_mora_date := v_mora_date + 1;
+        END LOOP;
+
+        v_saldo_mora := ROUND(v_saldo_mora, 0);
         v_mora_flag := true;
         v_en_mora := v_en_mora + 1;
       END IF;

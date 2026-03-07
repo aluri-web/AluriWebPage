@@ -189,8 +189,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
 
     // =========================================
     // RECALCULAR saldo_mora SEGÚN FECHA DEL PAGO
-    // Usa tasa de usura SFC (EA → diaria)
+    // Interés compuesto diario, base = capital + intereses
+    // Tasa de usura SFC por periodo (EA → diaria)
     // =========================================
+    const toDateStr = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
     let saldoMoraCalculado = 0
 
     if (credito.fecha_ultimo_pago && credito.fecha_desembolso) {
@@ -204,23 +208,35 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       proximoVencimiento.setDate(Math.min(diaPago, lastDayOfMonth))
 
       if (fechaPago > proximoVencimiento) {
-        const diasMora = Math.floor((fechaPago.getTime() - proximoVencimiento.getTime()) / (1000 * 60 * 60 * 24))
-
-        // Obtener tasa de usura vigente de la SFC para la fecha del pago
-        const { data: tasaRow } = await supabase
+        // Obtener todas las tasas de usura que cubren el periodo de mora
+        const fechaInicioMora = toDateStr(proximoVencimiento)
+        const { data: tasasRows } = await supabase
           .from('tasas_oficiales')
-          .select('tasa_ea')
+          .select('tasa_ea, vigencia_desde, vigencia_hasta')
           .eq('tipo', 'usura_consumo')
           .lte('vigencia_desde', body.fecha_pago)
-          .gte('vigencia_hasta', body.fecha_pago)
-          .order('vigencia_desde', { ascending: false })
-          .limit(1)
-          .maybeSingle()
+          .gte('vigencia_hasta', fechaInicioMora)
+          .order('vigencia_desde', { ascending: true })
 
-        const tasaUsuraEA = tasaRow?.tasa_ea || 25.52 // Fallback SFC marzo 2026
-        const tasaMoraDiaria = Math.pow(1 + tasaUsuraEA / 100, 1 / 365) - 1
+        // Base = capital + intereses impagos
+        const baseMora = (credito.saldo_capital || 0) + saldoInteresesCalculado
+        let moraAcumulada = 0
+        const curDate = new Date(proximoVencimiento)
 
-        saldoMoraCalculado = Math.round((credito.saldo_capital || 0) * tasaMoraDiaria * diasMora)
+        while (curDate < fechaPago) {
+          const dStr = toDateStr(curDate)
+          const tasaMatch = (tasasRows || []).find(t =>
+            dStr >= t.vigencia_desde && dStr <= t.vigencia_hasta
+          )
+          const tasaEA = tasaMatch?.tasa_ea || 25.52
+          const tasaDiaria = Math.pow(1 + tasaEA / 100, 1 / 365) - 1
+
+          // Compuesto: mora del día sobre base + mora acumulada
+          moraAcumulada += (baseMora + moraAcumulada) * tasaDiaria
+          curDate.setDate(curDate.getDate() + 1)
+        }
+
+        saldoMoraCalculado = Math.round(moraAcumulada)
       }
     }
 
