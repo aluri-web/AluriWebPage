@@ -1,11 +1,12 @@
 import { Settings, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import { getProfile } from './actions'
+import { getProfile, getTasas } from './actions'
 import ConfigForm from './ConfigForm'
+import TasasSection from './TasasSection'
 import { redirect } from 'next/navigation'
 
 export default async function ConfiguracionPage() {
-  const result = await getProfile()
+  const [result, tasasResult] = await Promise.all([getProfile(), getTasas()])
 
   if (result.error) {
     redirect('/login')
@@ -29,7 +30,7 @@ export default async function ConfiguracionPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">Configuracion</h1>
             <p className="text-slate-400 text-sm mt-0.5">
-              Administra tu perfil y seguridad
+              Administra tu perfil, seguridad y tasas oficiales
             </p>
           </div>
         </div>
@@ -37,6 +38,9 @@ export default async function ConfiguracionPage() {
 
       {/* Form */}
       <ConfigForm initialData={result.data!} />
+
+      {/* Tasas Oficiales */}
+      <TasasSection initialTasas={tasasResult.data || []} />
     </div>
   )
 }

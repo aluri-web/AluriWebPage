@@ -159,6 +159,115 @@ export async function uploadAvatar(formData: FormData) {
   return { success: true, message: 'Foto actualizada correctamente', avatarUrl: publicUrl }
 }
 
+// =====================
+// TASAS OFICIALES
+// =====================
+
+export async function getTasas() {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autorizado' }
+
+  const { data, error } = await supabase
+    .from('tasas_oficiales')
+    .select('id, tipo, tasa_ea, vigencia_desde, vigencia_hasta, created_at')
+    .order('vigencia_desde', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching tasas:', error.message)
+    return { error: 'Error al obtener tasas' }
+  }
+
+  return { data: data || [] }
+}
+
+export async function createTasa(formData: FormData) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autorizado' }
+
+  // Verify admin role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    return { error: 'Solo administradores pueden modificar tasas' }
+  }
+
+  const tipo = formData.get('tipo') as string
+  const tasa_ea = parseFloat(formData.get('tasa_ea') as string)
+  const vigencia_desde = formData.get('vigencia_desde') as string
+  const vigencia_hasta = formData.get('vigencia_hasta') as string
+
+  if (!tipo || !vigencia_desde || !vigencia_hasta) {
+    return { error: 'Todos los campos son requeridos' }
+  }
+
+  if (isNaN(tasa_ea) || tasa_ea <= 0 || tasa_ea > 100) {
+    return { error: 'La tasa debe estar entre 0 y 100' }
+  }
+
+  if (vigencia_hasta < vigencia_desde) {
+    return { error: 'La fecha hasta no puede ser anterior a la fecha desde' }
+  }
+
+  const { error } = await supabase
+    .from('tasas_oficiales')
+    .insert({
+      tipo,
+      tasa_ea,
+      vigencia_desde,
+      vigencia_hasta,
+      created_by: user.id
+    })
+
+  if (error) {
+    if (error.code === '23505') {
+      return { error: 'Ya existe una tasa de ese tipo para ese periodo' }
+    }
+    console.error('Error creating tasa:', error.message)
+    return { error: 'Error al crear tasa: ' + error.message }
+  }
+
+  revalidatePath('/dashboard/admin/configuracion')
+  return { success: true, message: 'Tasa agregada correctamente' }
+}
+
+export async function deleteTasa(id: string) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autorizado' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    return { error: 'Solo administradores pueden eliminar tasas' }
+  }
+
+  const { error } = await supabase
+    .from('tasas_oficiales')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    console.error('Error deleting tasa:', error.message)
+    return { error: 'Error al eliminar tasa: ' + error.message }
+  }
+
+  revalidatePath('/dashboard/admin/configuracion')
+  return { success: true, message: 'Tasa eliminada' }
+}
+
 export async function getProfile() {
   const supabase = await createClient()
 
