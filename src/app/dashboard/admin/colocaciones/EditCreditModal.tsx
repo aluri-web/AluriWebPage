@@ -178,8 +178,8 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
 
   const handleAddInvestor = async () => {
     if (!newInvId || newInvAmount <= 0) return
-    if (newInvAmount < 50_000_000) {
-      setError('El monto minimo de inversion es $50,000,000.')
+    if (newInvAmount < 40_000_000) {
+      setError('El monto minimo de inversion es $40,000,000.')
       return
     }
     setAddingInvestor(true)
@@ -248,7 +248,7 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
 
   if (!isOpen) return null
 
-  const MIN_INVESTMENT = 50_000_000
+  const MIN_INVESTMENT = 40_000_000
   const MAX_INVESTORS = 5
   const totalInvestedAmount = investments.reduce((sum, i) => sum + i.monto_invertido, 0)
   const remainingForInvestors = montoSolicitado - totalInvestedAmount
@@ -567,7 +567,7 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
                   })}
                   <div className="text-xs text-slate-500 pt-1 space-y-0.5">
                     <div>Total invertido: ${totalInvestedAmount.toLocaleString('es-CO')} / ${montoSolicitado.toLocaleString('es-CO')}</div>
-                    <div>Disponible: ${remainingForInvestors.toLocaleString('es-CO')} · {slotsLeft} cupo{slotsLeft !== 1 ? 's' : ''} · Min por inversionista: $50M</div>
+                    <div>Disponible: ${remainingForInvestors.toLocaleString('es-CO')} · {slotsLeft} cupo{slotsLeft !== 1 ? 's' : ''} · Min por inversionista: $40M</div>
                   </div>
                 </div>
               ) : (

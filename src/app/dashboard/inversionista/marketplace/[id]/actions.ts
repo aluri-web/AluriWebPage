@@ -66,7 +66,7 @@ export async function getLoanDetail(loanId: string): Promise<{ data: CreditoOppo
   return { data: data as unknown as CreditoOpportunity, error: null }
 }
 
-const MIN_INVESTMENT = 50_000_000
+const MIN_INVESTMENT = 40_000_000
 const MAX_INVESTORS = 5
 
 export async function investInLoan(

@@ -329,8 +329,8 @@ export async function createFullLoanRecord(
     return { success: false, error: 'Maximo 5 inversionistas por credito.' }
   }
 
-  // Validate minimum investment per investor ($50M)
-  const MIN_INVESTMENT = 50_000_000
+  // Validate minimum investment per investor ($40M)
+  const MIN_INVESTMENT = 40_000_000
   for (const inv of data.investors) {
     if (inv.amount > 0 && inv.amount < MIN_INVESTMENT) {
       return { success: false, error: `Cada inversionista debe aportar minimo $${MIN_INVESTMENT.toLocaleString('es-CO')}.` }
@@ -732,7 +732,7 @@ export async function addInvestmentToLoan(
 
   const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey)
 
-  const MIN_INVESTMENT = 50_000_000
+  const MIN_INVESTMENT = 40_000_000
   const MAX_INVESTORS = 5
 
   // Validation

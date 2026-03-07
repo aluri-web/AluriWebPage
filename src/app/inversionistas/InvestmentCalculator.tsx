@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 
 export default function InvestmentCalculator() {
-  const [amount, setAmount] = useState(50000000)
+  const [amount, setAmount] = useState(40000000)
   const [term, setTerm] = useState(12)
   const monthlyRate = 0.017 // 1.7% monthly
 
@@ -42,7 +42,7 @@ export default function InvestmentCalculator() {
             onChange={(e) => setAmount(Number(e.target.value))}
           />
           <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>$50M</span>
+            <span>$40M</span>
             <span>$1,000M</span>
           </div>
         </div>

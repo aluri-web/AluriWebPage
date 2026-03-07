@@ -70,7 +70,7 @@ export default function InversionistasPage() {
                 <p className="text-sm text-slate-400">Rentabilidad E.A. Promedio</p>
               </div>
               <div className="text-center">
-                <p className="text-4xl font-black text-primary mb-2">$50M</p>
+                <p className="text-4xl font-black text-primary mb-2">$40M</p>
                 <p className="text-sm text-slate-400">Inversion Minima COP</p>
               </div>
               <div className="text-center">

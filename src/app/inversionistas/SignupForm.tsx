@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 const montoOptions = [
-  { label: '$50M - $100M', value: '50M-100M' },
+  { label: '$40M - $100M', value: '40M-100M' },
   { label: '$100M - $200M', value: '100M-200M' },
   { label: '$200M - $400M', value: '200M-400M' },
 ]

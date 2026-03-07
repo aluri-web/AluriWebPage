@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { investInLoan } from './actions'
 import { CheckCircle, AlertCircle, Loader2, Info } from 'lucide-react'
 
-const MIN_INVESTMENT = 50_000_000
+const MIN_INVESTMENT = 40_000_000
 const MAX_INVESTORS = 5
 
 interface InvestmentPanelProps {
