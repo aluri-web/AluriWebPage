@@ -217,7 +217,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
           .limit(1)
           .maybeSingle()
 
-        const tasaUsuraEA = tasaRow?.tasa_ea || 24.36 // Fallback SFC
+        const tasaUsuraEA = tasaRow?.tasa_ea || 25.52 // Fallback SFC marzo 2026
         const tasaMoraDiaria = Math.pow(1 + tasaUsuraEA / 100, 1 / 365) - 1
 
         saldoMoraCalculado = Math.round((credito.saldo_capital || 0) * tasaMoraDiaria * diasMora)

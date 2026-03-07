@@ -72,9 +72,9 @@ BEGIN
   -- Obtener tasa de usura vigente
   v_tasa_usura := public.obtener_tasa_vigente('usura_consumo', p_fecha);
 
-  -- Si no hay tasa registrada, usar 24.36% (valor actual)
+  -- Si no hay tasa registrada, usar 25.52% (marzo 2026 SFC)
   IF v_tasa_usura IS NULL THEN
-    v_tasa_usura := 24.36;
+    v_tasa_usura := 25.52;
   END IF;
 
   -- Convertir EA a tasa diaria: (1 + tasa_ea/100)^(1/365) - 1
@@ -88,10 +88,10 @@ $$;
 INSERT INTO public.tasas_oficiales (tipo, tasa_ea, vigencia_desde, vigencia_hasta) VALUES
   ('ibc_consumo', 16.24, '2026-01-01', '2026-01-31'),
   ('usura_consumo', 24.36, '2026-01-01', '2026-01-31'),
-  ('ibc_consumo', 15.87, '2026-02-01', '2026-02-28'),
-  ('usura_consumo', 23.81, '2026-02-01', '2026-02-28'),
-  ('ibc_consumo', 15.50, '2026-03-01', '2026-03-31'),
-  ('usura_consumo', 23.25, '2026-03-01', '2026-03-31');
+  ('ibc_consumo', 16.82, '2026-02-01', '2026-02-28'),
+  ('usura_consumo', 25.23, '2026-02-01', '2026-02-28'),
+  ('ibc_consumo', 17.01, '2026-03-01', '2026-03-31'),
+  ('usura_consumo', 25.52, '2026-03-01', '2026-03-31');
 
 -- Comentarios
 COMMENT ON TABLE public.tasas_oficiales IS 'Tasas de interés oficiales certificadas por la Superintendencia Financiera de Colombia';

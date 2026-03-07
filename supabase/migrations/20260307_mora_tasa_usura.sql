@@ -5,14 +5,53 @@
 -- Fecha: 2026-03-07
 -- =============================================================
 
--- 1. Actualizar tasa de usura de marzo 2026
---    Tasa diaria 0.0597% → EA ≈ 24.36%
+-- 1. Corregir tasas de usura con datos oficiales SFC
+--    Enero: 24.36% (correcto), Febrero: 25.23%, Marzo: 25.52%
 UPDATE public.tasas_oficiales
-SET tasa_ea = 24.36
+SET tasa_ea = 25.23
+WHERE tipo = 'usura_consumo'
+  AND vigencia_desde = '2026-02-01';
+
+UPDATE public.tasas_oficiales
+SET tasa_ea = 16.82
+WHERE tipo = 'ibc_consumo'
+  AND vigencia_desde = '2026-02-01';
+
+UPDATE public.tasas_oficiales
+SET tasa_ea = 25.52
 WHERE tipo = 'usura_consumo'
   AND vigencia_desde = '2026-03-01';
 
--- 2. Reemplazar función calcular_mora_diaria()
+UPDATE public.tasas_oficiales
+SET tasa_ea = 17.01
+WHERE tipo = 'ibc_consumo'
+  AND vigencia_desde = '2026-03-01';
+
+-- 2. Actualizar fallback en calcular_tasa_mora_diaria()
+CREATE OR REPLACE FUNCTION public.calcular_tasa_mora_diaria(p_fecha DATE DEFAULT CURRENT_DATE)
+RETURNS NUMERIC
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  v_tasa_usura NUMERIC;
+  v_tasa_diaria NUMERIC;
+BEGIN
+  v_tasa_usura := public.obtener_tasa_vigente('usura_consumo', p_fecha);
+
+  -- Si no hay tasa registrada, usar 25.52% (marzo 2026 SFC)
+  IF v_tasa_usura IS NULL THEN
+    v_tasa_usura := 25.52;
+  END IF;
+
+  -- Convertir EA a tasa diaria: (1 + tasa_ea/100)^(1/365) - 1
+  v_tasa_diaria := POWER(1 + (v_tasa_usura / 100.0), 1.0 / 365.0) - 1;
+
+  RETURN v_tasa_diaria;
+END;
+$$;
+
+-- 3. Reemplazar función calcular_mora_diaria()
 --    Ahora usa calcular_tasa_mora_diaria() en vez de tasa fija por crédito
 CREATE OR REPLACE FUNCTION public.calcular_mora_diaria()
 RETURNS void
@@ -155,3 +194,6 @@ EXCEPTION WHEN OTHERS THEN
   RAISE;
 END;
 $$;
+
+-- 4. Recalcular mora en todos los créditos activos con las tasas corregidas
+SELECT public.calcular_mora_diaria();
