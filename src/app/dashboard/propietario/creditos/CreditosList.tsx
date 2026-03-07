@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { FileText, Building2, DollarSign, Hash, Calendar, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react'
 import AbonosTable from '../../../../components/dashboard/AbonosTable'
+import ExtractoModal from './ExtractoModal'
 
 type SortField = 'codigo' | 'estado' | 'monto' | 'fecha'
 type SortDirection = 'asc' | 'desc'
@@ -329,14 +330,17 @@ export default function CreditosList({ creditos }: CreditosListProps) {
 
               {/* Pagar Cuota + Abonos Toggle */}
               <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between">
-                <a
-                  href="https://backend.paymentsway.co/Linkabierto/OGMzNGY2N2UtZTFiMC00ZmU0LTg5N2QtYWVlMTdmYzdiMDQ3"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  Pagar cuota
-                </a>
+                <div className="flex items-center gap-3">
+                  <a
+                    href="https://backend.paymentsway.co/Linkabierto/OGMzNGY2N2UtZTFiMC00ZmU0LTg5N2QtYWVlMTdmYzdiMDQ3"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    Pagar cuota
+                  </a>
+                  <ExtractoModal creditoId={credito.id} codigoCredito={credito.codigo_credito} />
+                </div>
                 {credito.transacciones && credito.transacciones.length > 0 && (
                   <button
                     onClick={() => toggleAbonos(credito.id)}
