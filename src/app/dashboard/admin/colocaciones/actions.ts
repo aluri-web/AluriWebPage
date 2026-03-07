@@ -507,6 +507,7 @@ export interface LoanTableRow {
   saldo_capital: number
   saldo_intereses: number
   saldo_mora: number
+  en_mora: boolean
 }
 
 export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; error: string | null }> {
@@ -534,6 +535,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       saldo_capital,
       saldo_intereses,
       saldo_mora,
+      en_mora,
       created_at,
       cliente:profiles!cliente_id (
         full_name,
@@ -668,6 +670,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       saldo_capital: (credito as any).saldo_capital || 0,
       saldo_intereses: (credito as any).saldo_intereses || 0,
       saldo_mora: (credito as any).saldo_mora || 0,
+      en_mora: (credito as any).en_mora || false,
     }
   })
 

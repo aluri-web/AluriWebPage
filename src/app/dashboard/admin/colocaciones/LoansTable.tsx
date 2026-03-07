@@ -350,6 +350,9 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
               <tr className="border-b border-slate-800 bg-slate-800/50">
                 <SortableHeader field="code" className="text-left" sticky>Codigo</SortableHeader>
                 <SortableHeader field="status" className="text-left">Estado</SortableHeader>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                  Mora
+                </th>
                 <SortableHeader field="debtor_name" className="text-left">Deudor</SortableHeader>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Co-Deudor
@@ -406,6 +409,19 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {getStatusBadge(loan.status)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-center">
+                      {loan.status === 'active' || loan.status === 'defaulted' ? (
+                        <span className={`px-2 py-1 text-xs font-medium rounded border ${
+                          loan.en_mora
+                            ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                            : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                        }`}>
+                          {loan.en_mora ? 'En Mora' : 'Al Dia'}
+                        </span>
+                      ) : (
+                        <span className="text-slate-600">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div>
