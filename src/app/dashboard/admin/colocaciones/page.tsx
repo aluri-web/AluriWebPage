@@ -35,10 +35,6 @@ export default async function ColocacionesPage() {
 
       {/* Table Section */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Creditos Registrados</h2>
-          <span className="text-sm text-slate-500">{loansResult.data.length} registros</span>
-        </div>
         <LoansTable loans={loansResult.data} investors={investorsResult.data} />
       </section>
     </div>

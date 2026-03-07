@@ -19,7 +19,10 @@ interface LoansTableProps {
   investors: InvestorOption[]
 }
 
+type Tab = 'colocados' | 'no_colocados'
+
 export default function LoansTable({ loans, investors }: LoansTableProps) {
+  const [activeTab, setActiveTab] = useState<Tab>('colocados')
   const [selectedLoan, setSelectedLoan] = useState<LoanTableRow | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
@@ -33,6 +36,9 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const [editCreditId, setEditCreditId] = useState<string | null>(null)
   const [deleteCreditId, setDeleteCreditId] = useState<string | null>(null)
+
+  const colocados = useMemo(() => loans.filter(l => l.status !== 'cancelled'), [loans])
+  const noColocados = useMemo(() => loans.filter(l => l.status === 'cancelled'), [loans])
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     const container = tableScrollRef.current
@@ -69,9 +75,11 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     }
   }, [])
 
+  const currentLoans = activeTab === 'colocados' ? colocados : noColocados
+
   // Sorted loans
   const sortedLoans = useMemo(() => {
-    return [...loans].sort((a, b) => {
+    return [...currentLoans].sort((a, b) => {
       let comparison = 0
       switch (sortField) {
         case 'code':
@@ -101,7 +109,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
       }
       return sortDirection === 'asc' ? comparison : -comparison
     })
-  }, [loans, sortField, sortDirection])
+  }, [currentLoans, sortField, sortDirection])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -286,12 +294,45 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     )
   }
 
+  const emptyMessage = activeTab === 'colocados'
+    ? 'No hay creditos colocados'
+    : 'No hay creditos no colocados'
+
   return (
     <>
+      {/* Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setActiveTab('colocados')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === 'colocados'
+              ? 'bg-teal-500 text-black'
+              : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+          }`}
+        >
+          Colocados ({colocados.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('no_colocados')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === 'no_colocados'
+              ? 'bg-teal-500 text-black'
+              : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+          }`}
+        >
+          No Colocados ({noColocados.length})
+        </button>
+      </div>
+
+      {currentLoans.length === 0 ? (
+        <div className="bg-slate-900 rounded-xl border border-slate-800 p-12 text-center">
+          <p className="text-slate-500">{emptyMessage}</p>
+        </div>
+      ) : (
       <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
         {/* Header con botón de exportar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-800/30">
-          <span className="text-sm text-slate-400">{loans.length} colocaciones</span>
+          <span className="text-sm text-slate-400">{currentLoans.length} colocaciones</span>
           <ExportExcelButton
             data={exportData}
             filename="colocaciones_aluri"
@@ -492,6 +533,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           </table>
         </div>
       </div>
+      )}
 
       {/* Add Investment Modal */}
       {selectedLoan && (

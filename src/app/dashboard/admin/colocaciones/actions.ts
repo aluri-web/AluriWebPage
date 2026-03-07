@@ -690,9 +690,10 @@ export async function getNextLoanCode(): Promise<string> {
 
   let maxNum = 0
   for (const row of data) {
-    const match = row.codigo_credito?.match(/CR-?(\d+)/)
-    if (match) {
-      const num = parseInt(match[1])
+    // Extract all digits after "CR" (ignoring dashes or other chars)
+    const digits = row.codigo_credito?.replace(/[^0-9]/g, '')
+    if (digits) {
+      const num = parseInt(digits)
       if (num > maxNum) maxNum = num
     }
   }

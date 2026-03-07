@@ -689,7 +689,11 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
                   <div>
                     <label className="block text-sm text-slate-400 mb-1.5">Codigo</label>
                     <input {...register('code', { required: true })} type="text"
-                      className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white font-mono focus:outline-none focus:border-teal-500" />
+                      placeholder="CR001"
+                      className={`w-full px-3 py-2.5 bg-slate-800 border rounded-lg text-white font-mono focus:outline-none ${watchCode && !/^CR\d{3,}$/.test(watchCode) ? 'border-red-500 focus:border-red-500' : 'border-slate-700 focus:border-teal-500'}`} />
+                    {watchCode && !/^CR\d{3,}$/.test(watchCode) && (
+                      <p className="text-red-400 text-xs mt-1">Formato correcto: CR001 (sin guion)</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm text-slate-400 mb-1.5">Estado Inicial</label>
