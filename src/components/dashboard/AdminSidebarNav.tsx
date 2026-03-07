@@ -10,7 +10,8 @@ import {
   Wallet,
   HandCoins,
   Code2,
-  Receipt
+  Receipt,
+  FolderOpen
 } from 'lucide-react'
 
 const mainNavItems = [
@@ -19,6 +20,7 @@ const mainNavItems = [
   { href: '/dashboard/admin/inversiones', label: 'Tesoreria', icon: Wallet },
   { href: '/dashboard/admin/colocaciones', label: 'Colocaciones', icon: HandCoins },
   { href: '/dashboard/admin/pagos', label: 'Pagos', icon: Receipt },
+  { href: '/dashboard/admin/dataroom', label: 'Dataroom', icon: FolderOpen },
 ]
 
 const configNavItems = [
