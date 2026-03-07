@@ -225,7 +225,7 @@ export default function DataroomPage() {
                     srcDoc={htmlContent || ''}
                     className="flex-1 w-full bg-white"
                     title={selectedName}
-                    sandbox="allow-same-origin"
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
                   />
                 )}
               </>
@@ -257,7 +257,7 @@ export default function DataroomPage() {
             srcDoc={htmlContent}
             className="flex-1 w-full bg-white"
             title={selectedName}
-            sandbox="allow-same-origin"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
           />
         </div>
       )}
