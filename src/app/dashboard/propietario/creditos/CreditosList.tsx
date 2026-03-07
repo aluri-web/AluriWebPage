@@ -327,9 +327,17 @@ export default function CreditosList({ creditos }: CreditosListProps) {
                 </div>
               )}
 
-              {/* Abonos Toggle */}
-              {credito.transacciones && credito.transacciones.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-gray-100">
+              {/* Pagar Cuota + Abonos Toggle */}
+              <div className="mt-6 pt-6 border-t border-gray-100 flex items-center justify-between">
+                <a
+                  href="https://backend.paymentsway.co/Linkabierto/OGMzNGY2N2UtZTFiMC00ZmU0LTg5N2QtYWVlMTdmYzdiMDQ3"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  Pagar cuota
+                </a>
+                {credito.transacciones && credito.transacciones.length > 0 && (
                   <button
                     onClick={() => toggleAbonos(credito.id)}
                     className="flex items-center gap-2 text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
@@ -337,15 +345,14 @@ export default function CreditosList({ creditos }: CreditosListProps) {
                     {expandedAbonos.has(credito.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     {expandedAbonos.has(credito.id) ? 'Ocultar Abonos' : 'Ver Abonos'}
                   </button>
-
-                  {expandedAbonos.has(credito.id) && (
-                    <div className="mt-4 rounded-xl border border-gray-200 overflow-hidden">
-                      <AbonosTable
-                        transacciones={credito.transacciones}
-                        valorColocado={credito.valor_colocado || credito.monto_solicitado}
-                      />
-                    </div>
-                  )}
+                )}
+              </div>
+              {credito.transacciones && credito.transacciones.length > 0 && expandedAbonos.has(credito.id) && (
+                <div className="mt-4 rounded-xl border border-gray-200 overflow-hidden">
+                  <AbonosTable
+                    transacciones={credito.transacciones}
+                    valorColocado={credito.valor_colocado || credito.monto_solicitado}
+                  />
                 </div>
               )}
             </div>
