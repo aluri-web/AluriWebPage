@@ -14,42 +14,33 @@ function formatCOP(value: number): string {
 export default async function AdminDashboard() {
   const supabase = await createClient()
 
-  // 1. Usuarios Totales
-  const { count: totalUsers } = await supabase
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-
-  // 2. Créditos Activos (estado = 'activo' o 'publicado')
-  const { count: activeLoans } = await supabase
-    .from('creditos')
-    .select('*', { count: 'exact', head: true })
-    .in('estado', ['activo', 'publicado'])
-
-  // 3. Capital Total (suma de monto_invertido de todas las inversiones)
-  const { data: inversionesData } = await supabase
-    .from('inversiones')
-    .select('monto_invertido')
-
-  const totalCapital = inversionesData?.reduce((sum, inv) => sum + (inv.monto_invertido || 0), 0) || 0
-
-  // 4. Créditos En Mora (en_mora = true, calculado por cron diario)
-  const { count: defaultedLoans } = await supabase
-    .from('creditos')
-    .select('*', { count: 'exact', head: true })
-    .eq('en_mora', true)
-
-  // 5. Actividad Reciente - últimas inversiones
-  const { data: recentInvestments } = await supabase
-    .from('inversiones')
-    .select(`
+  // Run all queries in parallel for faster page load
+  const [
+    { count: totalUsers },
+    { count: activeLoans },
+    { data: inversionesData },
+    { count: defaultedLoans },
+    { data: recentInvestments },
+  ] = await Promise.all([
+    // 1. Usuarios Totales
+    supabase.from('profiles').select('*', { count: 'exact', head: true }),
+    // 2. Créditos Activos
+    supabase.from('creditos').select('*', { count: 'exact', head: true }).in('estado', ['activo', 'publicado']),
+    // 3. Capital Total
+    supabase.from('inversiones').select('monto_invertido'),
+    // 4. Créditos En Mora
+    supabase.from('creditos').select('*', { count: 'exact', head: true }).eq('en_mora', true),
+    // 5. Actividad Reciente
+    supabase.from('inversiones').select(`
       id,
       monto_invertido,
       created_at,
       investor:profiles!inversionista_id (full_name, email),
       credito:creditos!credito_id (codigo_credito, ciudad_inmueble)
-    `)
-    .order('created_at', { ascending: false })
-    .limit(5)
+    `).order('created_at', { ascending: false }).limit(5),
+  ])
+
+  const totalCapital = inversionesData?.reduce((sum, inv) => sum + (inv.monto_invertido || 0), 0) || 0
 
   return (
     <div className="text-white p-8">

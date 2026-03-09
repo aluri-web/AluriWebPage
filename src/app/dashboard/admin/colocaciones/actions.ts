@@ -549,11 +549,12 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
     return { data: [], error: creditosError.message }
   }
 
-  // Get all inversiones with investor names
+  // Get all inversiones with investor names and amounts in a single query
   const { data: inversiones, error: invError } = await supabase
     .from('inversiones')
     .select(`
       credito_id,
+      monto_invertido,
       inversionista:profiles!inversionista_id (
         full_name
       )
@@ -561,10 +562,11 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
     .eq('estado', 'activo')
 
   const investorsByCredito: Record<string, string[]> = {}
+  const montoFundedByCredito: Record<string, number> = {}
   if (!invError && inversiones) {
     inversiones.forEach(inv => {
       const creditoId = inv.credito_id
-      // Handle Supabase join which may return array or single object
+      // Investor names
       const investorData = inv.inversionista as unknown as { full_name: string | null } | null
       const name = investorData?.full_name || 'Sin nombre'
       if (!investorsByCredito[creditoId]) {
@@ -573,27 +575,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       if (!investorsByCredito[creditoId].includes(name)) {
         investorsByCredito[creditoId].push(name)
       }
-    })
-  }
-
-  // Calculate monto_funded from inversiones
-  const montoFundedByCredito: Record<string, number> = {}
-  if (!invError && inversiones) {
-    inversiones.forEach(inv => {
-      const creditoId = inv.credito_id
-      // We need to get the amount, but we didn't select it - fix this
-    })
-  }
-
-  // Get inversiones with amounts for funding calculation
-  const { data: inversionesWithAmounts } = await supabase
-    .from('inversiones')
-    .select('credito_id, monto_invertido')
-    .eq('estado', 'activo')
-
-  if (inversionesWithAmounts) {
-    inversionesWithAmounts.forEach(inv => {
-      const creditoId = inv.credito_id
+      // Funded amounts
       if (!montoFundedByCredito[creditoId]) {
         montoFundedByCredito[creditoId] = 0
       }
