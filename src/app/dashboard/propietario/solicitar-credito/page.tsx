@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { MapPin, FileText, Camera, ChevronRight, ChevronLeft, Upload, X, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import { submitCreditRequest } from './actions'
+import { uploadFile, deleteFile } from '@/utils/uploadFile'
 
 const DOCUMENT_TYPES = [
   { key: 'libertad_tradicion', label: 'Certificado de Libertad y Tradicion' },
@@ -56,21 +57,12 @@ export default function SolicitarCreditoPage() {
   const handleUpload = async (file: File, key: string, type: 'doc' | 'foto') => {
     setUploading(key)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('loanCode', 'solicitudes')
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      })
-
-      const result = await response.json()
+      const result = await uploadFile(file, 'solicitudes')
       if (result.success && result.url) {
         if (type === 'doc') {
-          setDocumentos(prev => ({ ...prev, [key]: result.url }))
+          setDocumentos(prev => ({ ...prev, [key]: result.url! }))
         } else {
-          setFotos(prev => ({ ...prev, [key]: result.url }))
+          setFotos(prev => ({ ...prev, [key]: result.url! }))
         }
       } else {
         setError(result.error || 'Error al subir archivo')
@@ -86,13 +78,7 @@ export default function SolicitarCreditoPage() {
     const url = type === 'doc' ? documentos[key] : fotos[key]
     if (!url) return
 
-    try {
-      await fetch('/api/upload', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      })
-    } catch { /* ignore */ }
+    await deleteFile(url)
 
     if (type === 'doc') {
       setDocumentos(prev => {

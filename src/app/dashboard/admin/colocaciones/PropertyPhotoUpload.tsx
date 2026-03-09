@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { ImagePlus, X, Loader2, Image as ImageIcon } from 'lucide-react'
+import { uploadFile, deleteFile } from '@/utils/uploadFile'
 
 interface PropertyPhotoUploadProps {
   photos: string[]
@@ -52,16 +53,7 @@ export default function PropertyPhotoUpload({
       }
 
       try {
-        const formData = new FormData()
-        formData.append('file', file)
-        formData.append('loanCode', loanCode)
-
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        })
-
-        const result = await response.json()
+        const result = await uploadFile(file, loanCode)
 
         if (result.success && result.url) {
           newUrls.push(result.url)
@@ -86,17 +78,7 @@ export default function PropertyPhotoUpload({
   }
 
   const handleRemovePhoto = async (urlToRemove: string) => {
-    try {
-      await fetch('/api/upload', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: urlToRemove }),
-      })
-    } catch (error) {
-      console.error('Error deleting file:', error)
-    }
+    await deleteFile(urlToRemove)
 
     // Remove from state regardless of deletion result
     onChange(photos.filter(url => url !== urlToRemove))

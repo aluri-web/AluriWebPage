@@ -14,6 +14,11 @@ const staticPages = [
 ];
 
 const nextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '25mb',
+    },
+  },
   async redirects() {
     return [
       {

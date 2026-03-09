@@ -6,7 +6,7 @@ const BUCKET = 'properties'
 
 /**
  * POST /api/upload
- * Upload a property photo to Supabase Storage.
+ * Upload a property photo or PDF to Supabase Storage.
  * Uses cookie-based auth (no Bearer token needed from client).
  */
 export async function POST(request: NextRequest) {
@@ -32,9 +32,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'El archivo debe ser una imagen o PDF' }, { status: 400 })
     }
 
-    const maxSize = isPdf ? 10 * 1024 * 1024 : 5 * 1024 * 1024
+    const maxSize = isPdf ? 25 * 1024 * 1024 : 5 * 1024 * 1024
     if (file.size > maxSize) {
-      return NextResponse.json({ error: `El archivo excede ${isPdf ? '10' : '5'}MB` }, { status: 400 })
+      return NextResponse.json({ error: `El archivo excede ${isPdf ? '25' : '5'}MB` }, { status: 400 })
     }
 
     // Use service role for storage upload (bypasses RLS)
@@ -47,12 +47,16 @@ export async function POST(request: NextRequest) {
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_')
     const path = `${loanCode}/${timestamp}_${sanitizedName}`
 
+    // Convert File to Buffer for reliable upload of large files
+    const buffer = Buffer.from(await file.arrayBuffer())
+
     const { error: uploadError } = await adminSupabase
       .storage
       .from(BUCKET)
-      .upload(path, file, {
+      .upload(path, buffer, {
         cacheControl: '3600',
         upsert: false,
+        contentType: file.type,
       })
 
     if (uploadError) {
