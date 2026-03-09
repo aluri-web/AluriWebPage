@@ -39,6 +39,8 @@ export async function login(formData: FormData) {
     redirect('/dashboard/admin/colocaciones')
   } else if (profile?.role === 'propietario') {
     redirect('/dashboard/propietario')
+  } else if (profile?.role === 'demo') {
+    redirect('/dashboard/demo')
   } else {
     redirect('/dashboard/inversionista')
   }

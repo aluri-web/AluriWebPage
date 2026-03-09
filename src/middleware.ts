@@ -48,7 +48,6 @@ export async function middleware(request: NextRequest) {
 
     // Solo redirigir si hay un rol válido y el usuario está en un dashboard incorrecto
     if (role) {
-      const isInCorrectDashboard = pathname.startsWith(`/dashboard/${role}`)
       const isExactDashboard = pathname === '/dashboard'
 
       // Si está en /dashboard exacto, redirigir a su dashboard correspondiente
@@ -56,9 +55,17 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(`/dashboard/${role}`, request.url))
       }
 
-      // Si está en un dashboard que NO le corresponde, redirigir al suyo
-      if (!isInCorrectDashboard) {
-        return NextResponse.redirect(new URL(`/dashboard/${role}`, request.url))
+      // Demo: puede acceder a /dashboard/demo/* solamente
+      if (role === 'demo') {
+        if (!pathname.startsWith('/dashboard/demo')) {
+          return NextResponse.redirect(new URL('/dashboard/demo', request.url))
+        }
+      } else {
+        // Otros roles: solo su dashboard correspondiente
+        const isInCorrectDashboard = pathname.startsWith(`/dashboard/${role}`)
+        if (!isInCorrectDashboard) {
+          return NextResponse.redirect(new URL(`/dashboard/${role}`, request.url))
+        }
       }
     }
   }
