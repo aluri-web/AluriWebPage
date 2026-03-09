@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Upload, Trash2, FileText, Loader2, FolderOpen, Maximize2, X } from 'lucide-react'
+import { Upload, Trash2, FileText, Loader2, FolderOpen, Maximize2, X, Download } from 'lucide-react'
 
 interface DataroomDocument {
   name: string
@@ -86,6 +86,20 @@ export default function DataroomPage() {
         fileInputRef.current.value = ''
       }
     }
+  }
+
+  const handleDownload = () => {
+    if (!htmlContent || !selectedName) return
+
+    const blob = new Blob([htmlContent], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${selectedName}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const handleDelete = async (fileName: string) => {
@@ -207,13 +221,22 @@ export default function DataroomPage() {
               <>
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-800/30">
                   <span className="text-sm text-white font-medium">{selectedName}</span>
-                  <button
-                    onClick={() => setFullscreen(true)}
-                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                    title="Pantalla completa"
-                  >
-                    <Maximize2 size={16} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={handleDownload}
+                      className="p-1.5 text-slate-400 hover:text-teal-400 hover:bg-slate-700 rounded-lg transition-colors"
+                      title="Descargar HTML"
+                    >
+                      <Download size={16} />
+                    </button>
+                    <button
+                      onClick={() => setFullscreen(true)}
+                      className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                      title="Pantalla completa"
+                    >
+                      <Maximize2 size={16} />
+                    </button>
+                  </div>
                 </div>
                 {loadingDoc ? (
                   <div className="flex-1 flex items-center justify-center text-slate-400">
