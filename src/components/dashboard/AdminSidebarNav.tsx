@@ -11,7 +11,8 @@ import {
   HandCoins,
   Code2,
   Receipt,
-  FolderOpen
+  FolderOpen,
+  ClipboardList
 } from 'lucide-react'
 
 const mainNavItems = [
@@ -19,6 +20,7 @@ const mainNavItems = [
   { href: '/dashboard/admin/usuarios', label: 'Usuarios', icon: Users },
   { href: '/dashboard/admin/inversiones', label: 'Tesoreria', icon: Wallet },
   { href: '/dashboard/admin/colocaciones', label: 'Colocaciones', icon: HandCoins },
+  { href: '/dashboard/admin/solicitudes', label: 'Solicitudes', icon: ClipboardList },
   { href: '/dashboard/admin/pagos', label: 'Pagos', icon: Receipt },
   { href: '/dashboard/admin/dataroom', label: 'Dataroom', icon: FolderOpen },
 ]

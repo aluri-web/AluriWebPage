@@ -73,7 +73,37 @@ export async function submitCreditRequest(
       return { success: false, error: 'Error al enviar la solicitud.' }
     }
 
+    // Notify all admins about the new solicitud
+    const formatCOP = (v: number) =>
+      new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v)
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    const nombre = profile?.full_name || 'Propietario'
+
+    const { data: admins } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('role', 'admin')
+
+    if (admins && admins.length > 0) {
+      const notifications = admins.map(admin => ({
+        user_id: admin.id,
+        tipo: 'nueva_solicitud_credito',
+        titulo: 'Nueva solicitud de credito',
+        mensaje: `${nombre} ha solicitado un credito por ${formatCOP(data.monto_requerido)} en ${data.ciudad}`,
+        metadata: {},
+      }))
+
+      await supabase.from('notificaciones').insert(notifications)
+    }
+
     revalidatePath('/dashboard/propietario/solicitar-credito')
+    revalidatePath('/dashboard/propietario/mis-solicitudes')
     return { success: true }
   } catch (error) {
     console.error('Error in submitCreditRequest:', error)
