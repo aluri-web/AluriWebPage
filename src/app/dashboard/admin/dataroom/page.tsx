@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Upload, Trash2, FileText, Loader2, FolderOpen, Maximize2, X, Download } from 'lucide-react'
+import { Upload, Trash2, FileText, Loader2, FolderOpen, Maximize2, X, Download, Globe, Lock } from 'lucide-react'
 
 interface DataroomDocument {
   name: string
@@ -9,18 +9,22 @@ interface DataroomDocument {
   url: string
   createdAt: string
   size: number
+  visibility: 'publico' | 'privado'
+  folder: string
 }
 
 export default function DataroomPage() {
   const [documents, setDocuments] = useState<DataroomDocument[]>([])
   const [selectedName, setSelectedName] = useState<string>('')
-  const [selectedDoc, setSelectedDoc] = useState<string | null>(null) // doc.name as key
+  const [selectedDoc, setSelectedDoc] = useState<string | null>(null)
   const [htmlContent, setHtmlContent] = useState<string | null>(null)
   const [loadingDoc, setLoadingDoc] = useState(false)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
+  const [uploadVisibility, setUploadVisibility] = useState<'privado' | 'publico'>('privado')
+  const [filterVisibility, setFilterVisibility] = useState<'todos' | 'publico' | 'privado'>('todos')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const fetchDocuments = async () => {
@@ -41,8 +45,12 @@ export default function DataroomPage() {
     fetchDocuments()
   }, [])
 
+  const filteredDocs = filterVisibility === 'todos'
+    ? documents
+    : documents.filter((d) => d.visibility === filterVisibility)
+
   const selectDocument = async (doc: DataroomDocument) => {
-    setSelectedDoc(doc.name)
+    setSelectedDoc(doc.name + doc.folder)
     setSelectedName(doc.displayName)
     setLoadingDoc(true)
     try {
@@ -65,6 +73,7 @@ export default function DataroomPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('visibility', uploadVisibility)
 
       const res = await fetch('/api/dataroom', {
         method: 'POST',
@@ -102,25 +111,26 @@ export default function DataroomPage() {
     URL.revokeObjectURL(url)
   }
 
-  const handleDelete = async (fileName: string) => {
+  const handleDelete = async (doc: DataroomDocument) => {
     if (!confirm('Eliminar este documento?')) return
 
-    setDeleting(fileName)
+    const key = doc.name + doc.folder
+    setDeleting(key)
     try {
       const res = await fetch('/api/dataroom', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileName }),
+        body: JSON.stringify({ fileName: doc.name, folder: doc.folder }),
       })
 
       const data = await res.json()
       if (data.success) {
-        if (selectedDoc === fileName) {
+        if (selectedDoc === key) {
           setSelectedDoc(null)
           setSelectedName('')
           setHtmlContent(null)
         }
-        setDocuments(prev => prev.filter(d => d.name !== fileName))
+        setDocuments((prev) => prev.filter((d) => !(d.name === doc.name && d.folder === doc.folder)))
       }
     } catch (error) {
       console.error('Error deleting:', error)
@@ -129,14 +139,48 @@ export default function DataroomPage() {
     }
   }
 
+  const publicCount = documents.filter((d) => d.visibility === 'publico').length
+  const privateCount = documents.filter((d) => d.visibility === 'privado').length
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Dataroom</h1>
-          <p className="text-sm text-slate-400 mt-1">Documentos internos de la empresa</p>
+          <p className="text-sm text-slate-400 mt-1">
+            Documentos internos de la empresa
+            <span className="ml-3 text-slate-500">
+              {publicCount} publico{publicCount !== 1 ? 's' : ''} · {privateCount} privado{privateCount !== 1 ? 's' : ''}
+            </span>
+          </p>
         </div>
-        <div>
+        <div className="flex items-center gap-3">
+          {/* Upload visibility toggle */}
+          <div className="flex items-center bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+            <button
+              onClick={() => setUploadVisibility('privado')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                uploadVisibility === 'privado'
+                  ? 'bg-slate-600 text-white'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Lock size={13} />
+              Privado
+            </button>
+            <button
+              onClick={() => setUploadVisibility('publico')}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-colors ${
+                uploadVisibility === 'publico'
+                  ? 'bg-teal-500/20 text-teal-400'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Globe size={13} />
+              Publico
+            </button>
+          </div>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -179,39 +223,86 @@ export default function DataroomPage() {
       ) : (
         <div className="flex gap-6 h-[calc(100vh-180px)]">
           {/* Document list */}
-          <div className="w-72 flex-shrink-0 bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col">
-            <div className="px-4 py-3 border-b border-slate-800 bg-slate-800/30">
-              <span className="text-sm text-slate-400">{documents.length} documento{documents.length !== 1 ? 's' : ''}</span>
+          <div className="w-80 flex-shrink-0 bg-slate-900 rounded-xl border border-slate-800 overflow-hidden flex flex-col">
+            {/* Filter tabs */}
+            <div className="px-2 py-2 border-b border-slate-800 bg-slate-800/30 flex gap-1">
+              {(['todos', 'publico', 'privado'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setFilterVisibility(tab)}
+                  className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    filterVisibility === tab
+                      ? 'bg-slate-700 text-white'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {tab === 'todos' ? 'Todos' : tab === 'publico' ? 'Publicos' : 'Privados'}
+                </button>
+              ))}
+            </div>
+            <div className="px-4 py-2 border-b border-slate-800">
+              <span className="text-xs text-slate-500">
+                {filteredDocs.length} documento{filteredDocs.length !== 1 ? 's' : ''}
+              </span>
             </div>
             <div className="flex-1 overflow-y-auto divide-y divide-slate-800">
-              {documents.map(doc => (
-                <div
-                  key={doc.name}
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors group ${
-                    selectedDoc === doc.name
-                      ? 'bg-teal-500/10 border-l-2 border-teal-400'
-                      : 'hover:bg-slate-800/50 border-l-2 border-transparent'
-                  }`}
-                  onClick={() => selectDocument(doc)}
-                >
-                  <FileText size={18} className={selectedDoc === doc.name ? 'text-teal-400' : 'text-slate-500'} />
-                  <span className={`flex-1 text-sm truncate ${selectedDoc === doc.name ? 'text-teal-400 font-medium' : 'text-slate-300'}`}>
-                    {doc.displayName}
-                  </span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(doc.name) }}
-                    disabled={deleting === doc.name}
-                    className="p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-                    title="Eliminar"
+              {filteredDocs.map((doc) => {
+                const key = doc.name + doc.folder
+                return (
+                  <div
+                    key={key}
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors group ${
+                      selectedDoc === key
+                        ? 'bg-teal-500/10 border-l-2 border-teal-400'
+                        : 'hover:bg-slate-800/50 border-l-2 border-transparent'
+                    }`}
+                    onClick={() => selectDocument(doc)}
                   >
-                    {deleting === doc.name ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Trash2 size={14} />
-                    )}
-                  </button>
-                </div>
-              ))}
+                    <FileText
+                      size={18}
+                      className={selectedDoc === key ? 'text-teal-400' : 'text-slate-500'}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span
+                        className={`text-sm truncate block ${
+                          selectedDoc === key ? 'text-teal-400 font-medium' : 'text-slate-300'
+                        }`}
+                      >
+                        {doc.displayName}
+                      </span>
+                      <span className="flex items-center gap-1 mt-0.5">
+                        {doc.visibility === 'publico' ? (
+                          <Globe size={10} className="text-teal-400" />
+                        ) : (
+                          <Lock size={10} className="text-slate-500" />
+                        )}
+                        <span
+                          className={`text-[10px] uppercase tracking-wider ${
+                            doc.visibility === 'publico' ? 'text-teal-400' : 'text-slate-500'
+                          }`}
+                        >
+                          {doc.visibility}
+                        </span>
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(doc)
+                      }}
+                      disabled={deleting === key}
+                      className="p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                      title="Eliminar"
+                    >
+                      {deleting === key ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
