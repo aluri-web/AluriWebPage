@@ -12,7 +12,8 @@ import {
   Code2,
   Receipt,
   FolderOpen,
-  ClipboardList
+  ClipboardList,
+  Bot
 } from 'lucide-react'
 
 const mainNavItems = [
@@ -23,6 +24,7 @@ const mainNavItems = [
   { href: '/dashboard/admin/solicitudes', label: 'Solicitudes', icon: ClipboardList },
   { href: '/dashboard/admin/pagos', label: 'Pagos', icon: Receipt },
   { href: '/dashboard/admin/dataroom', label: 'Dataroom', icon: FolderOpen },
+  { href: '/dashboard/admin/agentes-ia', label: 'Agentes IA', icon: Bot },
 ]
 
 const configNavItems = [
