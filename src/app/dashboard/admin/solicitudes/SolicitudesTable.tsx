@@ -14,6 +14,7 @@ import {
   Eye,
   ExternalLink,
   Loader2,
+  Download,
 } from 'lucide-react'
 import { updateEstadoSolicitud, type SolicitudRow } from './actions'
 
@@ -83,6 +84,30 @@ function getDocCount(docs: { tipo: string; url: string }[]): number {
 function getPhotoCount(fotos: { tipo: string; url: string }[]): number {
   const uploaded = new Set(fotos.map(f => f.tipo))
   return PHOTO_TYPES.filter(pt => uploaded.has(pt.key)).length
+}
+
+async function downloadFile(url: string, filename: string) {
+  try {
+    const res = await fetch(url)
+    const blob = await res.blob()
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(blobUrl)
+  } catch {
+    window.open(url, '_blank')
+  }
+}
+
+function getFileExtension(url: string): string {
+  const path = new URL(url).pathname
+  const ext = path.split('.').pop()?.toLowerCase()
+  if (ext && ['pdf', 'jpg', 'jpeg', 'png', 'webp'].includes(ext)) return `.${ext}`
+  return ''
 }
 
 export default function SolicitudesTable({ solicitudes }: { solicitudes: SolicitudRow[] }) {
@@ -219,6 +244,35 @@ export default function SolicitudesTable({ solicitudes }: { solicitudes: Solicit
                       {/* Expanded detail */}
                       {isExpanded && (
                         <div className="px-6 pb-6 pt-2 bg-slate-800/50 border-t border-slate-700/50">
+                          {/* Download all */}
+                          {(docCount > 0 || photoCount > 0) && (
+                            <div className="flex justify-end mb-4">
+                              <button
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  const allFiles = [
+                                    ...sol.documentos.map(d => ({
+                                      url: d.url,
+                                      name: `${DOCUMENT_TYPES.find(dt => dt.key === d.tipo)?.label || d.tipo}${getFileExtension(d.url)}`,
+                                    })),
+                                    ...sol.fotos.map(f => ({
+                                      url: f.url,
+                                      name: `${PHOTO_TYPES.find(pt => pt.key === f.tipo)?.label || f.tipo}${getFileExtension(f.url)}`,
+                                    })),
+                                  ]
+                                  for (const file of allFiles) {
+                                    await downloadFile(file.url, file.name)
+                                    await new Promise(r => setTimeout(r, 300))
+                                  }
+                                }}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-colors"
+                              >
+                                <Download size={14} />
+                                Descargar todo ({docCount + photoCount} archivos)
+                              </button>
+                            </div>
+                          )}
+
                           {/* Property info */}
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                             <div>
@@ -277,15 +331,28 @@ export default function SolicitudesTable({ solicitudes }: { solicitudes: Solicit
                                     {uploaded ? <CheckCircle size={14} /> : <XCircle size={14} />}
                                     <span className="flex-1 truncate">{dt.label}</span>
                                     {uploaded && (
-                                      <a
-                                        href={uploaded.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={e => e.stopPropagation()}
-                                        className="p-1 hover:text-white transition-colors"
-                                      >
-                                        <ExternalLink size={12} />
-                                      </a>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            downloadFile(uploaded.url, `${dt.label}${getFileExtension(uploaded.url)}`)
+                                          }}
+                                          className="p-1 hover:text-white transition-colors"
+                                          title="Descargar"
+                                        >
+                                          <Download size={12} />
+                                        </button>
+                                        <a
+                                          href={uploaded.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={e => e.stopPropagation()}
+                                          className="p-1 hover:text-white transition-colors"
+                                          title="Abrir en nueva pestaña"
+                                        >
+                                          <ExternalLink size={12} />
+                                        </a>
+                                      </div>
                                     )}
                                   </div>
                                 )
@@ -304,19 +371,31 @@ export default function SolicitudesTable({ solicitudes }: { solicitudes: Solicit
                                 return (
                                   <div key={pt.key} className="space-y-1">
                                     {uploaded ? (
-                                      <a
-                                        href={uploaded.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={e => e.stopPropagation()}
-                                        className="block"
-                                      >
-                                        <img
-                                          src={uploaded.url}
-                                          alt={pt.label}
-                                          className="w-full h-24 object-cover rounded-lg border border-emerald-500/30"
-                                        />
-                                      </a>
+                                      <div className="relative group/photo">
+                                        <a
+                                          href={uploaded.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={e => e.stopPropagation()}
+                                          className="block"
+                                        >
+                                          <img
+                                            src={uploaded.url}
+                                            alt={pt.label}
+                                            className="w-full h-24 object-cover rounded-lg border border-emerald-500/30"
+                                          />
+                                        </a>
+                                        <button
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            downloadFile(uploaded.url, `${pt.label}${getFileExtension(uploaded.url)}`)
+                                          }}
+                                          className="absolute top-1 right-1 p-1.5 bg-black/70 rounded-md text-white/70 hover:text-white opacity-0 group-hover/photo:opacity-100 transition-opacity"
+                                          title="Descargar"
+                                        >
+                                          <Download size={12} />
+                                        </button>
+                                      </div>
                                     ) : (
                                       <div className="w-full h-24 rounded-lg border border-slate-600/30 bg-slate-700/30 flex items-center justify-center">
                                         <XCircle size={18} className="text-slate-500" />
