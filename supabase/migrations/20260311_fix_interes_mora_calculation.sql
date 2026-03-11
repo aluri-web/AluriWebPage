@@ -2,6 +2,7 @@
 -- Migración: Corregir cálculo de intereses y mora
 --
 -- REGLAS VERIFICADAS CON EXCEL SFC:
+-- 0. La causación empieza el día DESPUÉS del desembolso
 -- 1. Interés Corriente: Capital del día ACTUAL × Tasa Diaria
 -- 2. Interés Moratorio: Capital del día ANTERIOR × Tasa Mora Diaria
 -- 3. Tasa Diaria = (1 + Tasa_EA/100)^(1/365) - 1
@@ -63,6 +64,7 @@ BEGIN
     WHERE estado_credito != 'pagado'
       AND saldo_capital > 0
       AND fecha_desembolso IS NOT NULL
+      AND fecha_desembolso < v_hoy  -- Solo créditos desembolsados ANTES de hoy (causación empieza día después)
   LOOP
     v_procesados := v_procesados + 1;
 
@@ -181,7 +183,7 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$;
 
-COMMENT ON FUNCTION public.calcular_mora_diaria IS 'Calcula intereses diarios (corriente sobre capital actual, mora sobre capital anterior) usando tasas base 365 días y tasa de usura SFC';
+COMMENT ON FUNCTION public.calcular_mora_diaria IS 'Calcula intereses diarios (corriente sobre capital actual, mora sobre capital anterior) usando tasas base 365 días y tasa de usura SFC. La causación empieza el día DESPUÉS del desembolso.';
 
 -- 5. Inicializar saldo_capital_anterior para créditos existentes
 UPDATE public.creditos

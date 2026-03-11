@@ -3,6 +3,7 @@
  * Calculadora de intereses y distribución a inversionistas
  *
  * REGLAS DE CÁLCULO (verificadas con Excel SFC):
+ * - La causación empieza el día DESPUÉS del desembolso (no en la fecha de desembolso)
  * - Interés Corriente: Capital del día ACTUAL × Tasa Diaria
  * - Interés Moratorio: Capital del día ANTERIOR × Tasa Mora Diaria
  * - Tasa Diaria = (1 + Tasa_EA/100)^(1/365) - 1
@@ -183,11 +184,14 @@ export async function obtenerCreditosPendientes(
   fechaHoy: string,
   limite: number = 50
 ): Promise<Credito[]> {
+  // Solo procesar créditos desembolsados ANTES de hoy
+  // (la causación empieza el día DESPUÉS del desembolso)
   const { data, error } = await supabase
     .from('creditos')
     .select('*')
     .in('estado_credito', ESTADOS_CREDITO_ACTIVO)
     .gt('saldo_capital', 0)
+    .lt('fecha_desembolso', fechaHoy)  // Solo créditos desembolsados antes de hoy
     .or(`ultima_causacion.is.null,ultima_causacion.lt.${fechaHoy}`)
     .limit(limite)
 
