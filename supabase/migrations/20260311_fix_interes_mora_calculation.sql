@@ -8,6 +8,8 @@
 -- 3. Tasa Diaria = (1 + Tasa_EA/100)^(1/365) - 1
 -- 4. Solo el interés corriente se capitaliza (agrega al capital)
 -- 5. La mora se acumula por separado, NO se capitaliza
+-- 6. PRECISIÓN: Usar NUMERIC(20,10) para cálculos intermedios (igual que Excel)
+--    Solo redondear al guardar valores finales en DB (ROUND(..., 0) para pesos)
 --
 -- Fecha: 2026-03-11
 -- =============================================================
@@ -44,16 +46,16 @@ DECLARE
   -- Mora
   v_dia_pago INTEGER;
   v_proximo_vencimiento DATE;
-  v_saldo_mora NUMERIC(15,2);
-  v_base_mora NUMERIC(15,2);
-  v_capital_anterior NUMERIC(15,2);
+  v_saldo_mora NUMERIC(20,10);          -- Alta precisión para cálculos
+  v_base_mora NUMERIC(20,10);
+  v_capital_anterior NUMERIC(20,10);
   v_mora_date DATE;
-  v_tasa_mora_diaria NUMERIC(12,10);
+  v_tasa_mora_diaria NUMERIC(20,15);    -- 15 decimales como Excel
   v_mora_flag BOOLEAN;
   -- Intereses
-  v_tasa_diaria NUMERIC(12,10);
-  v_interes_diario NUMERIC(15,2);
-  v_nuevo_capital NUMERIC(15,2);
+  v_tasa_diaria NUMERIC(20,15);         -- 15 decimales como Excel
+  v_interes_diario NUMERIC(20,10);      -- Alta precisión para cálculos
+  v_nuevo_capital NUMERIC(20,10);
 BEGIN
   v_hoy := (CURRENT_TIMESTAMP AT TIME ZONE 'America/Bogota')::DATE;
 
@@ -72,9 +74,11 @@ BEGIN
     -- CÁLCULO DE INTERÉS CORRIENTE
     -- Fórmula: (1 + tasa_ea/100)^(1/365) - 1
     -- Se calcula sobre el capital ACTUAL
+    -- PRECISIÓN: Mantener todos los decimales durante el cálculo
     -- =====================
-    v_tasa_diaria := POWER(1 + (COALESCE(r.tasa_nominal, 0) / 100.0), 1.0 / 365.0) - 1;
-    v_interes_diario := ROUND(r.saldo_capital * v_tasa_diaria, 0);
+    v_tasa_diaria := POWER(1.0 + (COALESCE(r.tasa_nominal, 0) / 100.0), 1.0 / 365.0) - 1.0;
+    -- NO redondear aquí - mantener precisión completa
+    v_interes_diario := r.saldo_capital * v_tasa_diaria;
 
     -- Capital anterior para mora (si no existe, usar capital actual)
     v_capital_anterior := COALESCE(r.saldo_capital_anterior, r.saldo_capital);
@@ -108,7 +112,8 @@ BEGIN
 
         -- Mora sobre capital ANTERIOR (no actual)
         -- Solo un día de mora a la vez (el del día anterior)
-        v_saldo_mora := ROUND(v_capital_anterior * v_tasa_mora_diaria, 0);
+        -- NO redondear aquí - mantener precisión completa
+        v_saldo_mora := v_capital_anterior * v_tasa_mora_diaria;
         v_mora_flag := true;
         v_en_mora := v_en_mora + 1;
       END IF;
@@ -116,23 +121,24 @@ BEGIN
 
     -- =====================
     -- ACTUALIZAR CAPITAL
-    -- Nuevo capital = capital actual + interés corriente
+    -- Nuevo capital = capital actual + interés corriente (redondeado)
     -- (solo corriente se capitaliza, mora NO)
+    -- REDONDEAR AQUÍ para guardar en DB (pesos colombianos sin centavos)
     -- =====================
-    v_nuevo_capital := r.saldo_capital + v_interes_diario;
+    v_nuevo_capital := r.saldo_capital + ROUND(v_interes_diario, 0);
 
     -- =====================
-    -- UPDATE CRÉDITO
+    -- UPDATE CRÉDITO (valores redondeados para DB)
     -- =====================
     UPDATE public.creditos
     SET saldo_capital = v_nuevo_capital,
         saldo_capital_anterior = r.saldo_capital,
-        saldo_intereses = COALESCE(saldo_intereses, 0) + v_interes_diario,
+        saldo_intereses = COALESCE(saldo_intereses, 0) + ROUND(v_interes_diario, 0),
         en_mora = v_mora_flag,
-        saldo_mora = COALESCE(saldo_mora, 0) + v_saldo_mora
+        saldo_mora = COALESCE(saldo_mora, 0) + ROUND(v_saldo_mora, 0)
     WHERE id = r.id;
 
-    -- Insertar causación diaria
+    -- Insertar causación diaria (tasas con precisión completa, montos redondeados)
     INSERT INTO public.causaciones_diarias (
       credito_id,
       fecha_causacion,
@@ -150,10 +156,10 @@ BEGIN
       r.saldo_capital,
       v_capital_anterior,
       r.tasa_nominal,
-      v_tasa_diaria,
-      v_tasa_mora_diaria,
-      v_interes_diario,
-      v_saldo_mora,
+      v_tasa_diaria,              -- Mantener precisión completa de la tasa
+      v_tasa_mora_diaria,         -- Mantener precisión completa de la tasa
+      ROUND(v_interes_diario, 0), -- Redondear para pesos
+      ROUND(v_saldo_mora, 0),     -- Redondear para pesos
       CASE WHEN v_mora_flag THEN (v_hoy - v_proximo_vencimiento) ELSE 0 END
     )
     ON CONFLICT (credito_id, fecha_causacion) DO UPDATE SET

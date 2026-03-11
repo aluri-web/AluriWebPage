@@ -28,14 +28,29 @@ import { SupabaseClient } from '@supabase/supabase-js'
 // ============================================
 
 /**
+ * Precisión de Excel: IEEE 754 double-precision (15-17 dígitos significativos)
+ * NO redondear durante cálculos intermedios - solo al final para guardar en DB
+ */
+
+/**
  * Calcula la tasa diaria efectiva desde la tasa EA (Efectiva Anual)
  * Fórmula: tasa_diaria = (1 + tasa_ea/100)^(1/365) - 1
+ * Mantiene precisión completa de JavaScript (15+ dígitos)
  *
  * @param tasaEA - Tasa efectiva anual en porcentaje (ej: 25.34 para 25.34%)
- * @returns Tasa diaria en decimal (ej: 0.000619 para 0.0619%)
+ * @returns Tasa diaria en decimal con máxima precisión
  */
 export function calcularTasaDiaria(tasaEA: number): number {
+  // Mantener precisión completa - NO redondear
   return Math.pow(1 + tasaEA / 100, 1 / DIAS_ANIO) - 1
+}
+
+/**
+ * Redondea al peso más cercano (sin centavos) - solo usar al final
+ * Equivalente a ROUND(x, 0) en Excel
+ */
+export function redondearPeso(valor: number): number {
+  return Math.round(valor)
 }
 
 /**
@@ -113,10 +128,13 @@ export function calcularDiasMora(
 
 /**
  * Calcula el interés y mora diaria para un crédito
+ * MANTIENE PRECISIÓN COMPLETA - NO redondea durante el cálculo
  *
  * IMPORTANTE:
  * - Interés Corriente: se calcula sobre el capital ACTUAL
  * - Interés Moratorio: se calcula sobre el capital del día ANTERIOR
+ * - Los valores se devuelven con precisión completa (15+ dígitos)
+ * - El redondeo se hace solo al guardar en la base de datos
  *
  * @param saldoCapital - Capital actual del crédito
  * @param saldoCapitalAnterior - Capital del día anterior (para mora)
@@ -131,19 +149,19 @@ export function calcularInteresDiario(
   tasaUsuraEA: number,
   diasMora: number
 ): CalculoInteresDiario {
-  // Tasa diaria corriente (del crédito)
+  // Tasa diaria corriente (del crédito) - precisión completa
   const tasaDiaria = calcularTasaDiaria(tasaNominalEA)
 
-  // Tasa diaria de mora (usura SFC)
+  // Tasa diaria de mora (usura SFC) - precisión completa
   const tasaMoraDiaria = calcularTasaDiaria(tasaUsuraEA)
 
-  // Interés corriente: sobre capital ACTUAL
-  const interesDiario = Math.round(saldoCapital * tasaDiaria)
+  // Interés corriente: sobre capital ACTUAL - SIN redondear
+  const interesDiario = saldoCapital * tasaDiaria
 
-  // Mora: sobre capital ANTERIOR (solo si hay días de mora)
+  // Mora: sobre capital ANTERIOR (solo si hay días de mora) - SIN redondear
   let moraDiaria = 0
   if (diasMora > 0) {
-    moraDiaria = Math.round(saldoCapitalAnterior * tasaMoraDiaria)
+    moraDiaria = saldoCapitalAnterior * tasaMoraDiaria
   }
 
   return {
@@ -157,6 +175,7 @@ export function calcularInteresDiario(
 
 /**
  * Distribuye el interés y mora entre los inversionistas según participación
+ * MANTIENE PRECISIÓN COMPLETA - redondea solo al guardar en DB
  */
 export function distribuirEntreInversionistas(
   inversiones: Inversion[],
@@ -167,8 +186,9 @@ export function distribuirEntreInversionistas(
     inversionId: inv.id,
     inversionistaId: inv.inversionista_id,
     porcentaje: inv.porcentaje_participacion,
-    interes: Math.round(interesDiario * (inv.porcentaje_participacion / 100)),
-    mora: Math.round(moraDiaria * (inv.porcentaje_participacion / 100))
+    // Precisión completa - el redondeo se hace al guardar en DB
+    interes: interesDiario * (inv.porcentaje_participacion / 100),
+    mora: moraDiaria * (inv.porcentaje_participacion / 100)
   }))
 }
 
@@ -282,20 +302,24 @@ export async function procesarCausacionCredito(
       diasMora
     )
 
-    resultado.interesCausado = calculo.interesDiario
-    resultado.moraCausada = calculo.moraDiaria
+    // Redondear solo para guardar en DB (precisión de pesos colombianos)
+    const interesDiarioRedondeado = redondearPeso(calculo.interesDiario)
+    const moraDiariaRedondeada = redondearPeso(calculo.moraDiaria)
 
-    // 5. Insertar causación diaria
+    resultado.interesCausado = interesDiarioRedondeado
+    resultado.moraCausada = moraDiariaRedondeada
+
+    // 5. Insertar causación diaria (valores redondeados para DB)
     const causacion: CausacionDiaria = {
       credito_id: credito.id,
       fecha_causacion: fechaHoy,
       saldo_base: credito.saldo_capital,
       saldo_base_anterior: saldoCapitalAnterior,
       tasa_nominal: credito.tasa_nominal,
-      tasa_diaria: calculo.tasaDiaria,
-      tasa_mora_diaria: calculo.tasaMoraDiaria,
-      interes_causado: calculo.interesDiario,
-      mora_causada: calculo.moraDiaria,
+      tasa_diaria: calculo.tasaDiaria,  // Mantener precisión completa
+      tasa_mora_diaria: calculo.tasaMoraDiaria,  // Mantener precisión completa
+      interes_causado: interesDiarioRedondeado,
+      mora_causada: moraDiariaRedondeada,
       dias_mora: diasMora
     }
 
@@ -311,14 +335,14 @@ export async function procesarCausacionCredito(
     const inversiones = await obtenerInversionesActivas(supabase, credito.id)
 
     if (inversiones.length > 0) {
-      // 7. Distribuir entre inversionistas
+      // 7. Distribuir entre inversionistas (con precisión completa)
       const distribuciones = distribuirEntreInversionistas(
         inversiones,
         calculo.interesDiario,
         calculo.moraDiaria
       )
 
-      // 8. Insertar distribuciones a inversionistas
+      // 8. Insertar distribuciones a inversionistas (redondeando para DB)
       const causacionesInversionistas: CausacionInversionista[] = distribuciones.map(dist => ({
         causacion_id: causacionInsertada.id,
         inversion_id: dist.inversionId,
@@ -326,8 +350,8 @@ export async function procesarCausacionCredito(
         credito_id: credito.id,
         fecha_causacion: fechaHoy,
         porcentaje_participacion: dist.porcentaje,
-        interes_atribuido: dist.interes,
-        mora_atribuida: dist.mora
+        interes_atribuido: redondearPeso(dist.interes),
+        mora_atribuida: redondearPeso(dist.mora)
       }))
 
       const { error: errorDistribucion } = await supabase
@@ -336,14 +360,14 @@ export async function procesarCausacionCredito(
 
       if (errorDistribucion) throw new Error(`Error insertando distribución: ${errorDistribucion.message}`)
 
-      // 9. Actualizar acumulados en inversiones
+      // 9. Actualizar acumulados en inversiones (redondeando para DB)
       for (const dist of distribuciones) {
         const inversion = inversiones.find(i => i.id === dist.inversionId)!
         await supabase
           .from('inversiones')
           .update({
-            interes_acumulado: (inversion.interes_acumulado || 0) + dist.interes,
-            mora_acumulada: (inversion.mora_acumulada || 0) + dist.mora,
+            interes_acumulado: (inversion.interes_acumulado || 0) + redondearPeso(dist.interes),
+            mora_acumulada: (inversion.mora_acumulada || 0) + redondearPeso(dist.mora),
             ultima_causacion: fechaHoy
           })
           .eq('id', dist.inversionId)
@@ -352,43 +376,45 @@ export async function procesarCausacionCredito(
       resultado.inversionistasActualizados = inversiones.length
     }
 
-    // 10. Actualizar crédito
+    // 10. Actualizar crédito (usando valores redondeados para DB)
     // El nuevo capital = capital actual + interés corriente
     // (solo corriente se agrega al capital, mora se mantiene separada)
-    const nuevoSaldoCapital = credito.saldo_capital + calculo.interesDiario
+    const nuevoSaldoCapital = credito.saldo_capital + interesDiarioRedondeado
 
     await supabase
       .from('creditos')
       .update({
         saldo_capital: nuevoSaldoCapital,
         saldo_capital_anterior: credito.saldo_capital,
-        saldo_intereses: (credito.saldo_intereses || 0) + calculo.interesDiario,
-        saldo_mora: (credito.saldo_mora || 0) + calculo.moraDiaria,
+        saldo_intereses: (credito.saldo_intereses || 0) + interesDiarioRedondeado,
+        saldo_mora: (credito.saldo_mora || 0) + moraDiariaRedondeada,
         ultima_causacion: fechaHoy,
         dias_mora_actual: diasMora,
-        interes_acumulado_total: (credito.interes_acumulado_total || 0) + calculo.interesDiario
+        interes_acumulado_total: (credito.interes_acumulado_total || 0) + interesDiarioRedondeado
       })
       .eq('id', credito.id)
 
-    // 11. Registrar transacción de auditoría
-    if (calculo.interesDiario > 0) {
+    // 11. Registrar transacción de auditoría (valores redondeados)
+    if (interesDiarioRedondeado > 0) {
       await supabase.from('transacciones').insert({
         credito_id: credito.id,
         tipo_transaccion: 'causacion_interes',
-        concepto: `Causación diaria de interés - ${fechaHoy} (Tasa ${(calculo.tasaDiaria * 100).toFixed(4)}%)`,
-        monto: calculo.interesDiario,
+        // Mostrar tasa con 10 decimales para auditoría (precisión Excel)
+        concepto: `Causación diaria de interés - ${fechaHoy} (Tasa ${(calculo.tasaDiaria * 100).toFixed(10)}%)`,
+        monto: interesDiarioRedondeado,
         fecha_transaccion: new Date().toISOString(),
         fecha_aplicacion: fechaHoy,
         usuario_registro: 'SISTEMA_CRON'
       })
     }
 
-    if (calculo.moraDiaria > 0) {
+    if (moraDiariaRedondeada > 0) {
       await supabase.from('transacciones').insert({
         credito_id: credito.id,
         tipo_transaccion: 'causacion_mora',
-        concepto: `Causación diaria de mora (${diasMora} días) - ${fechaHoy} (Tasa Usura ${(calculo.tasaMoraDiaria * 100).toFixed(4)}%)`,
-        monto: calculo.moraDiaria,
+        // Mostrar tasa con 10 decimales para auditoría (precisión Excel)
+        concepto: `Causación diaria de mora (${diasMora} días) - ${fechaHoy} (Tasa Usura ${(calculo.tasaMoraDiaria * 100).toFixed(10)}%)`,
+        monto: moraDiariaRedondeada,
         fecha_transaccion: new Date().toISOString(),
         fecha_aplicacion: fechaHoy,
         usuario_registro: 'SISTEMA_CRON'
