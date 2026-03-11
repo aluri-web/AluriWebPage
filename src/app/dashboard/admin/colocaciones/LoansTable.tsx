@@ -14,6 +14,8 @@ import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
 type SortField = 'code' | 'status' | 'debtor_name' | 'amount_requested' | 'ltv' | 'interest_rate_ea' | 'amount_funded' | 'created_at'
 type SortDirection = 'asc' | 'desc'
 
+const PAGE_SIZE = 20
+
 interface LoansTableProps {
   loans: LoanTableRow[]
   investors: InvestorOption[]
@@ -36,6 +38,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const longPressTimer = useRef<NodeJS.Timeout | null>(null)
   const [editCreditId, setEditCreditId] = useState<string | null>(null)
   const [deleteCreditId, setDeleteCreditId] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const colocados = useMemo(() => loans.filter(l => l.status !== 'cancelled'), [loans])
   const noColocados = useMemo(() => loans.filter(l => l.status === 'cancelled'), [loans])
@@ -111,6 +114,11 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     })
   }, [currentLoans, sortField, sortDirection])
 
+  const totalPages = Math.ceil(sortedLoans.length / PAGE_SIZE)
+  const paginatedLoans = sortedLoans.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const showingFrom = sortedLoans.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const showingTo = Math.min(currentPage * PAGE_SIZE, sortedLoans.length)
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
@@ -118,6 +126,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
       setSortField(field)
       setSortDirection('asc')
     }
+    setCurrentPage(1)
   }
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -128,7 +137,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const SortableHeader = ({ field, children, className = '', sticky = false }: { field: SortField; children: React.ReactNode; className?: string; sticky?: boolean }) => (
     <th
       onClick={() => handleSort(field)}
-      className={`px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-200 transition-colors select-none whitespace-nowrap ${className} ${sticky ? 'sticky left-0 z-10 bg-slate-800/95 backdrop-blur-sm shadow-[2px_0_4px_rgba(0,0,0,0.3)]' : ''}`}
+      className={`px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-200 transition-colors select-none whitespace-nowrap ${className} ${sticky ? 'sticky left-0 z-10 bg-slate-800 shadow-[2px_0_4px_rgba(0,0,0,0.3)]' : ''}`}
     >
       <div className="flex items-center gap-1.5">
         {children}
@@ -303,7 +312,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
       {/* Tabs */}
       <div className="flex gap-2 mb-4">
         <button
-          onClick={() => setActiveTab('colocados')}
+          onClick={() => { setActiveTab('colocados'); setCurrentPage(1) }}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'colocados'
               ? 'bg-teal-500 text-black'
@@ -313,7 +322,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           Colocados ({colocados.length})
         </button>
         <button
-          onClick={() => setActiveTab('no_colocados')}
+          onClick={() => { setActiveTab('no_colocados'); setCurrentPage(1) }}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             activeTab === 'no_colocados'
               ? 'bg-teal-500 text-black'
@@ -345,7 +354,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           className="overflow-x-auto scrollbar-visible cursor-grab active:cursor-grabbing"
           onMouseDown={handleDragStart}
         >
-          <table className="w-full min-w-[2200px]" style={{ userSelect: isDragging ? 'none' : undefined }}>
+          <table className="w-full min-w-[1400px]" style={{ userSelect: isDragging ? 'none' : undefined }}>
             <thead>
               <tr className="border-b border-slate-800 bg-slate-800/50">
                 <SortableHeader field="code" className="text-left" sticky>Codigo</SortableHeader>
@@ -386,7 +395,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {sortedLoans.map((loan) => {
+              {paginatedLoans.map((loan) => {
                 const requested = loan.amount_requested || 0
                 const funded = loan.amount_funded || 0
                 const remaining = requested - funded
@@ -402,7 +411,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                     onTouchStart={() => handleLongPressStart(loan)}
                     onTouchEnd={handleLongPressEnd}
                   >
-                    <td className="px-4 py-3 whitespace-nowrap sticky left-0 z-10 bg-slate-900/95 backdrop-blur-sm shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
+                    <td className="px-4 py-3 whitespace-nowrap sticky left-0 z-10 bg-slate-900 shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
                       <span className="px-2 py-1 bg-slate-800 text-teal-400 text-xs font-mono rounded">
                         {loan.code}
                       </span>
@@ -548,6 +557,33 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
             </tbody>
           </table>
         </div>
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800 bg-slate-800/30">
+            <span className="text-sm text-slate-400">
+              Mostrando {showingFrom}-{showingTo} de {sortedLoans.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                Anterior
+              </button>
+              <span className="text-sm text-slate-400 px-2">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-sm rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       )}
 

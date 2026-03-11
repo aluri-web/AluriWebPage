@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import React, { useState, useMemo, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ChevronDown,
@@ -206,43 +206,44 @@ export default function SolicitudesTable({ solicitudes }: { solicitudes: Solicit
                 const canApprove = docCount === 5 && photoCount === 5
 
                 return (
-                  <tr key={sol.id} className="border-b border-slate-700/50 last:border-0">
-                    <td colSpan={9} className="p-0">
-                      {/* Row */}
-                      <button
-                        onClick={() => toggleExpand(sol.id)}
-                        className="w-full flex items-center hover:bg-slate-700/30 transition-colors"
-                      >
-                        <span className="py-3 px-4 text-left text-slate-300 w-[110px] shrink-0">{formatDate(sol.created_at)}</span>
-                        <span className="py-3 px-4 text-left text-white font-medium flex-1 min-w-0 truncate">
-                          {sol.solicitante?.full_name || 'Sin nombre'}
+                  <React.Fragment key={sol.id}>
+                    {/* Clickable data row */}
+                    <tr
+                      onClick={() => toggleExpand(sol.id)}
+                      className="border-b border-slate-700/50 last:border-0 hover:bg-slate-700/30 transition-colors cursor-pointer"
+                    >
+                      <td className="py-3 px-4 text-left text-slate-300 whitespace-nowrap">{formatDate(sol.created_at)}</td>
+                      <td className="py-3 px-4 text-left text-white font-medium truncate max-w-[200px]">
+                        {sol.solicitante?.full_name || 'Sin nombre'}
+                      </td>
+                      <td className="py-3 px-4 text-left text-slate-300 truncate max-w-[120px]">{sol.ciudad}</td>
+                      <td className="py-3 px-4 text-right text-slate-300 whitespace-nowrap">{formatCOP(sol.monto_requerido)}</td>
+                      <td className="py-3 px-4 text-right text-slate-300 whitespace-nowrap">{ltv}%</td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <span className={`text-xs font-medium ${docCount === 5 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {docCount}/5
                         </span>
-                        <span className="py-3 px-4 text-left text-slate-300 w-[120px] shrink-0 truncate">{sol.ciudad}</span>
-                        <span className="py-3 px-4 text-right text-slate-300 w-[140px] shrink-0">{formatCOP(sol.monto_requerido)}</span>
-                        <span className="py-3 px-4 text-right text-slate-300 w-[70px] shrink-0">{ltv}%</span>
-                        <span className="py-3 px-4 text-center w-[70px] shrink-0">
-                          <span className={`text-xs font-medium ${docCount === 5 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {docCount}/5
-                          </span>
+                      </td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <span className={`text-xs font-medium ${photoCount === 5 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                          {photoCount}/5
                         </span>
-                        <span className="py-3 px-4 text-center w-[70px] shrink-0">
-                          <span className={`text-xs font-medium ${photoCount === 5 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {photoCount}/5
-                          </span>
+                      </td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${status.class}`}>
+                          <StatusIcon size={12} />
+                          {status.label}
                         </span>
-                        <span className="py-3 px-4 text-center w-[120px] shrink-0">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${status.class}`}>
-                            <StatusIcon size={12} />
-                            {status.label}
-                          </span>
-                        </span>
-                        <span className="py-3 px-4 text-center w-[40px] shrink-0">
-                          {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                        </span>
-                      </button>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                      </td>
+                    </tr>
 
-                      {/* Expanded detail */}
-                      {isExpanded && (
+                    {/* Expanded detail row */}
+                    {isExpanded && (
+                    <tr className="border-b border-slate-700/50">
+                      <td colSpan={9} className="p-0">
                         <div className="px-6 pb-6 pt-2 bg-slate-800/50 border-t border-slate-700/50">
                           {/* Download all */}
                           {(docCount > 0 || photoCount > 0) && (
@@ -459,9 +460,10 @@ export default function SolicitudesTable({ solicitudes }: { solicitudes: Solicit
                             )}
                           </div>
                         </div>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+                    )}
+                  </React.Fragment>
                 )
               })}
             </tbody>
