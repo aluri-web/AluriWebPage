@@ -11,17 +11,22 @@ export interface Credito {
   id: string
   codigo_credito: string
   cliente_id: string
-  saldo_capital: number
-  saldo_capital_anterior?: number  // Capital del día anterior (para mora)
+  // Dos capitales paralelos (lógica Excel)
+  saldo_capital: number              // Capital REAL (acumulado)
+  saldo_capital_esperado: number     // Capital ESPERADO (si pagos a tiempo)
+  saldo_capital_anterior?: number    // Capital del día anterior (para mora)
   saldo_intereses: number
   saldo_mora: number
-  tasa_nominal: number             // Tasa EA del crédito
+  tasa_nominal: number               // Tasa EA del crédito
   tasa_mora?: number
   estado_credito: string
   fecha_desembolso: string
   fecha_ultimo_pago?: string
+  fecha_proximo_pago?: string        // Próxima fecha de pago esperada
+  monto_pago_esperado?: number       // Monto del pago mensual esperado
   ultima_causacion?: string
   dias_mora_actual: number
+  en_mora: boolean                   // Si está en mora actualmente
   interes_acumulado_total: number
 }
 
@@ -41,15 +46,21 @@ export interface Inversion {
 export interface CausacionDiaria {
   id?: string
   credito_id: string
-  fecha_causacion: string  // DATE en formato YYYY-MM-DD
-  saldo_base: number           // Capital del día actual (para interés corriente)
-  saldo_base_anterior?: number // Capital del día anterior (para mora)
-  tasa_nominal: number         // Tasa EA del crédito
-  tasa_diaria: number          // Tasa diaria corriente
-  tasa_mora_diaria?: number    // Tasa diaria de mora (usura SFC)
-  interes_causado: number
-  mora_causada: number
+  fecha_causacion: string        // DATE en formato YYYY-MM-DD
+  // Dos capitales paralelos (lógica Excel)
+  capital_esperado: number       // Capital ESPERADO (base para Int. Corriente)
+  capital_real: number           // Capital REAL (acumulado)
+  saldo_base?: number            // Deprecated: usar capital_esperado
+  saldo_base_anterior?: number   // Capital del día anterior
+  tasa_nominal: number           // Tasa EA del crédito
+  tasa_diaria: number            // Tasa diaria corriente (4 decimales como Excel)
+  tasa_mora_diaria: number       // Tasa diaria de mora (usura SFC)
+  interes_causado: number        // Int. Corriente (sobre capital_esperado)
+  mora_causada: number           // Int. Moratorio cuando en_mora = true
+  interes_moratorio_potencial: number  // Int. Moratorio SIEMPRE (potencial)
   dias_mora: number
+  en_mora: boolean               // Si el crédito está en mora este día
+  monto_para_colocarse: number   // Capital Real - Capital Esperado
 }
 
 export interface CausacionInversionista {
@@ -69,11 +80,16 @@ export interface CausacionInversionista {
 // ============================================
 
 export interface CalculoInteresDiario {
-  tasaDiaria: number          // Tasa efectiva diaria (corriente)
-  tasaMoraDiaria: number      // Tasa diaria de mora (usura SFC)
-  interesDiario: number       // Interés calculado del día
-  moraDiaria: number          // Mora del día (si aplica)
-  diasMora: number            // Días de mora
+  tasaDiaria: number              // Tasa efectiva diaria (corriente) - 4 decimales
+  tasaMoraDiaria: number          // Tasa diaria de mora (usura SFC) - 4 decimales
+  interesDiario: number           // Int. Corriente (sobre capital ESPERADO)
+  moraDiaria: number              // Int. Moratorio cuando en_mora = true
+  interesMoratorioPotencial: number  // Int. Moratorio SIEMPRE (potencial)
+  diasMora: number                // Días de mora
+  capitalEsperado: number         // Capital esperado usado
+  capitalReal: number             // Capital real usado
+  enMora: boolean                 // Si está en mora
+  montoParaColocarse: number      // Diferencia para ponerse al día
 }
 
 export interface DistribucionInversionista {
@@ -117,7 +133,9 @@ export const ESTADOS_CREDITO_ACTIVO = ['activo'] as const
 export const DIAS_ANIO = 365    // Días base para cálculo anual (EA → diaria)
 
 // Tasas de usura oficiales SFC por mes (fallback si no hay conexión a BD)
+// Redondeadas a 4 decimales como en Excel
 export const TASAS_USURA_SFC: Record<string, number> = {
+  '2025-12': 25.02,  // Diciembre 2025
   '2026-01': 24.36,  // Enero 2026
   '2026-02': 25.23,  // Febrero 2026
   '2026-03': 25.52,  // Marzo 2026

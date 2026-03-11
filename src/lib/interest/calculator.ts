@@ -2,12 +2,28 @@
  * Sistema de Causación Diaria de Intereses
  * Calculadora de intereses y distribución a inversionistas
  *
- * REGLAS DE CÁLCULO (verificadas con Excel SFC):
- * - La causación empieza el día DESPUÉS del desembolso (no en la fecha de desembolso)
- * - Interés Corriente: Capital del día ACTUAL × Tasa Diaria
- * - Interés Moratorio: Capital del día ANTERIOR × Tasa Mora Diaria
- * - Tasa Diaria = (1 + Tasa_EA/100)^(1/365) - 1
- * - Tasa Mora = Tasa de Usura SFC vigente
+ * REGLAS DE CÁLCULO (verificadas con Excel SFC - Lógica de Liquidación):
+ *
+ * DOS CAPITALES PARALELOS:
+ * - CAPITAL ESPERADO: Capital si pagos se hicieran a tiempo (base para Int. Corriente)
+ * - CAPITAL REAL: Capital acumulado actual (crece con intereses no pagados)
+ *
+ * CÁLCULOS:
+ * - La causación empieza el día DESPUÉS del desembolso
+ * - Int. Corriente = Capital ESPERADO × Tasa Diaria (NO sobre Capital Real)
+ * - Int. Moratorio = Capital ESPERADO × Tasa Mora (SIEMPRE se calcula, incluso sin mora)
+ * - Tasa Diaria = (1 + Tasa_EA/100)^(1/365) - 1 → redondeada a 4 decimales (0.0619%)
+ * - Tasa Mora = Tasa de Usura SFC vigente por mes
+ *
+ * PAGOS:
+ * - FECHA PAGO: día del mes igual al día de desembolso
+ * - MONTO ESPERADO: pago mensual de intereses
+ * - En fecha de pago, Capital Esperado se reduce por el monto esperado
+ * - Capital Real solo se reduce con pagos reales (ABONO)
+ *
+ * MORA:
+ * - EN MORA = true cuando no se paga en la fecha de pago
+ * - MONTO PARA COLOCARSE = Capital Real - Capital Esperado (cuando en mora)
  */
 
 import type {
@@ -93,83 +109,171 @@ export async function obtenerTasaUsuraDB(
 }
 
 /**
+ * Calcula la fecha del próximo pago esperado
+ * El día de pago es el mismo día del mes que el desembolso
+ */
+export function calcularFechaProximoPago(
+  fechaDesembolso: string,
+  fechaActual: Date
+): Date {
+  const desembolso = new Date(fechaDesembolso)
+  const diaPago = desembolso.getDate()
+
+  // Encontrar el próximo día de pago
+  let proximoPago = new Date(fechaActual)
+  proximoPago.setDate(diaPago)
+
+  // Si ya pasó este mes, ir al siguiente
+  if (proximoPago <= fechaActual) {
+    proximoPago.setMonth(proximoPago.getMonth() + 1)
+  }
+
+  // Ajustar si el día no existe en ese mes
+  const ultimoDiaMes = new Date(
+    proximoPago.getFullYear(),
+    proximoPago.getMonth() + 1,
+    0
+  ).getDate()
+  proximoPago.setDate(Math.min(diaPago, ultimoDiaMes))
+
+  return proximoPago
+}
+
+/**
+ * Verifica si hoy es día de pago
+ */
+export function esDiaDePago(
+  fechaDesembolso: string,
+  fechaActual: Date
+): boolean {
+  const desembolso = new Date(fechaDesembolso)
+  return fechaActual.getDate() === desembolso.getDate()
+}
+
+/**
  * Calcula los días de mora basado en fecha de último pago y fecha de vencimiento
  */
 export function calcularDiasMora(
   fechaUltimoPago: string | null,
   fechaDesembolso: string,
   fechaActual: Date
-): number {
-  if (!fechaUltimoPago) return 0
-
+): { diasMora: number; enMora: boolean; fechaVencimiento: Date | null } {
   // Día de pago = día del desembolso
   const desembolso = new Date(fechaDesembolso)
   const diaPago = desembolso.getDate()
 
-  // Próximo vencimiento = fecha último pago + 1 mes
-  const ultimoPago = new Date(fechaUltimoPago)
-  const proximoVencimiento = new Date(ultimoPago)
-  proximoVencimiento.setMonth(proximoVencimiento.getMonth() + 1)
+  // Calcular el vencimiento más reciente
+  let fechaVencimiento = new Date(fechaActual)
+  fechaVencimiento.setDate(diaPago)
 
-  // Ajustar día de vencimiento (manejar meses con menos días)
+  // Si el día de pago de este mes aún no llega, el vencimiento es del mes anterior
+  if (fechaVencimiento > fechaActual) {
+    fechaVencimiento.setMonth(fechaVencimiento.getMonth() - 1)
+  }
+
+  // Ajustar si el día no existe en ese mes
   const ultimoDiaMes = new Date(
-    proximoVencimiento.getFullYear(),
-    proximoVencimiento.getMonth() + 1,
+    fechaVencimiento.getFullYear(),
+    fechaVencimiento.getMonth() + 1,
     0
   ).getDate()
-  proximoVencimiento.setDate(Math.min(diaPago, ultimoDiaMes))
+  fechaVencimiento.setDate(Math.min(diaPago, ultimoDiaMes))
 
-  // Calcular diferencia en días
-  const diffTime = fechaActual.getTime() - proximoVencimiento.getTime()
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  // Si no hay fecha de último pago, verificar si ya pasó el primer vencimiento
+  if (!fechaUltimoPago) {
+    // Primer pago debería ser un mes después del desembolso
+    const primerVencimiento = new Date(desembolso)
+    primerVencimiento.setMonth(primerVencimiento.getMonth() + 1)
 
-  return diffDays > 0 ? diffDays : 0
+    if (fechaActual > primerVencimiento) {
+      const diffTime = fechaActual.getTime() - primerVencimiento.getTime()
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+      return { diasMora: diffDays, enMora: true, fechaVencimiento: primerVencimiento }
+    }
+    return { diasMora: 0, enMora: false, fechaVencimiento: null }
+  }
+
+  // Verificar si el último pago cubre el vencimiento más reciente
+  const ultimoPago = new Date(fechaUltimoPago)
+
+  if (ultimoPago >= fechaVencimiento) {
+    // Pago al día
+    return { diasMora: 0, enMora: false, fechaVencimiento }
+  }
+
+  // Calcular días de mora desde el vencimiento no cubierto
+  // El vencimiento no cubierto es el del mes siguiente al último pago
+  const vencimientoNoCubierto = new Date(ultimoPago)
+  vencimientoNoCubierto.setMonth(vencimientoNoCubierto.getMonth() + 1)
+  vencimientoNoCubierto.setDate(Math.min(diaPago, new Date(
+    vencimientoNoCubierto.getFullYear(),
+    vencimientoNoCubierto.getMonth() + 1,
+    0
+  ).getDate()))
+
+  if (fechaActual > vencimientoNoCubierto) {
+    const diffTime = fechaActual.getTime() - vencimientoNoCubierto.getTime()
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+    return { diasMora: diffDays, enMora: true, fechaVencimiento: vencimientoNoCubierto }
+  }
+
+  return { diasMora: 0, enMora: false, fechaVencimiento: null }
 }
 
 /**
- * Calcula el interés y mora diaria para un crédito
- * MANTIENE PRECISIÓN COMPLETA - NO redondea durante el cálculo
+ * Calcula el interés y mora diaria para un crédito (Lógica Excel)
  *
- * IMPORTANTE:
- * - Interés Corriente: se calcula sobre el capital ACTUAL
- * - Interés Moratorio: se calcula sobre el capital del día ANTERIOR
- * - Los valores se devuelven con precisión completa (15+ dígitos)
- * - El redondeo se hace solo al guardar en la base de datos
+ * IMPORTANTE (diferencias con lógica anterior):
+ * - Int. Corriente: se calcula sobre CAPITAL ESPERADO (no Real)
+ * - Int. Moratorio Potencial: SIEMPRE se calcula (incluso sin mora)
+ * - Int. Moratorio: solo se cobra cuando enMora = true
+ * - Monto para colocarse: Capital Real - Capital Esperado
  *
- * @param saldoCapital - Capital actual del crédito
- * @param saldoCapitalAnterior - Capital del día anterior (para mora)
+ * @param capitalEsperado - Capital si pagos a tiempo (base para Int. Corriente)
+ * @param capitalReal - Capital real acumulado
  * @param tasaNominalEA - Tasa EA del crédito
  * @param tasaUsuraEA - Tasa de usura SFC vigente
  * @param diasMora - Días de mora actuales
+ * @param enMora - Si el crédito está actualmente en mora
  */
 export function calcularInteresDiario(
-  saldoCapital: number,
-  saldoCapitalAnterior: number,
+  capitalEsperado: number,
+  capitalReal: number,
   tasaNominalEA: number,
   tasaUsuraEA: number,
-  diasMora: number
+  diasMora: number,
+  enMora: boolean = false
 ): CalculoInteresDiario {
-  // Tasa diaria corriente (del crédito) - precisión completa
+  // Tasa diaria corriente (del crédito)
   const tasaDiaria = calcularTasaDiaria(tasaNominalEA)
 
-  // Tasa diaria de mora (usura SFC) - precisión completa
+  // Tasa diaria de mora (usura SFC)
   const tasaMoraDiaria = calcularTasaDiaria(tasaUsuraEA)
 
-  // Interés corriente: sobre capital ACTUAL - SIN redondear
-  const interesDiario = saldoCapital * tasaDiaria
+  // Int. Corriente: sobre CAPITAL ESPERADO (no Real) - Lógica Excel
+  const interesDiario = capitalEsperado * tasaDiaria
 
-  // Mora: sobre capital ANTERIOR (solo si hay días de mora) - SIN redondear
-  let moraDiaria = 0
-  if (diasMora > 0) {
-    moraDiaria = saldoCapitalAnterior * tasaMoraDiaria
-  }
+  // Int. Moratorio Potencial: SIEMPRE se calcula sobre Capital Esperado
+  // Esto muestra el costo potencial de no pagar
+  const interesMoratorioPotencial = capitalEsperado * tasaMoraDiaria
+
+  // Int. Moratorio efectivo: solo cuando está en mora
+  const moraDiaria = enMora ? interesMoratorioPotencial : 0
+
+  // Monto para colocarse al día: diferencia entre Real y Esperado
+  const montoParaColocarse = capitalReal - capitalEsperado
 
   return {
     tasaDiaria,
     tasaMoraDiaria,
     interesDiario,
     moraDiaria,
-    diasMora
+    interesMoratorioPotencial,
+    diasMora,
+    capitalEsperado,
+    capitalReal,
+    enMora,
+    montoParaColocarse
   }
 }
 
@@ -220,17 +324,17 @@ export async function obtenerCreditosPendientes(
 }
 
 /**
- * Obtiene el capital del día anterior para un crédito
- * Si no existe causación anterior, usa el capital actual
+ * Obtiene los capitales del día anterior para un crédito
+ * Si no existe causación anterior, retorna null
  */
-export async function obtenerCapitalAnterior(
+export async function obtenerCapitalesAnteriores(
   supabase: SupabaseClient,
   creditoId: string,
   fechaHoy: string
-): Promise<number | null> {
+): Promise<{ capitalEsperado: number; capitalReal: number } | null> {
   const { data, error } = await supabase
     .from('causaciones_diarias')
-    .select('saldo_base')
+    .select('capital_esperado, capital_real')
     .eq('credito_id', creditoId)
     .lt('fecha_causacion', fechaHoy)
     .order('fecha_causacion', { ascending: false })
@@ -241,7 +345,10 @@ export async function obtenerCapitalAnterior(
     return null // No hay causación anterior
   }
 
-  return data.saldo_base
+  return {
+    capitalEsperado: data.capital_esperado,
+    capitalReal: data.capital_real
+  }
 }
 
 /**
@@ -262,7 +369,11 @@ export async function obtenerInversionesActivas(
 }
 
 /**
- * Procesa la causación diaria para un crédito individual
+ * Procesa la causación diaria para un crédito individual (Lógica Excel)
+ *
+ * Maneja dos capitales paralelos:
+ * - Capital Esperado: base para cálculo de intereses, se reduce en fechas de pago
+ * - Capital Real: capital acumulado, solo se reduce con pagos reales
  */
 export async function procesarCausacionCredito(
   supabase: SupabaseClient,
@@ -279,48 +390,82 @@ export async function procesarCausacionCredito(
   }
 
   try {
-    // 1. Calcular días de mora
-    const diasMora = calcularDiasMora(
+    const fechaActual = new Date(fechaHoy)
+
+    // 1. Obtener capitales del día anterior o usar valores iniciales
+    const capitalesAnteriores = await obtenerCapitalesAnteriores(supabase, credito.id, fechaHoy)
+
+    let capitalEsperado: number
+    let capitalReal: number
+
+    if (capitalesAnteriores) {
+      capitalEsperado = capitalesAnteriores.capitalEsperado
+      capitalReal = capitalesAnteriores.capitalReal
+    } else {
+      // Primer día: ambos capitales son iguales al capital inicial
+      capitalEsperado = credito.saldo_capital_esperado || credito.saldo_capital
+      capitalReal = credito.saldo_capital
+    }
+
+    // 2. Calcular días de mora y estado
+    const moraInfo = calcularDiasMora(
       credito.fecha_ultimo_pago || null,
       credito.fecha_desembolso,
-      new Date(fechaHoy)
+      fechaActual
     )
 
-    // 2. Obtener capital del día anterior (para mora)
-    const capitalAnterior = await obtenerCapitalAnterior(supabase, credito.id, fechaHoy)
-    const saldoCapitalAnterior = capitalAnterior ?? credito.saldo_capital
+    // 3. Verificar si hoy es día de pago esperado
+    const esPagoDia = esDiaDePago(credito.fecha_desembolso, fechaActual)
+    const montoEsperado = credito.monto_pago_esperado || 0
 
-    // 3. Obtener tasa de usura vigente
+    // Si es día de pago, reducir el capital esperado (aunque no haya pago real)
+    if (esPagoDia && montoEsperado > 0) {
+      capitalEsperado = Math.max(0, capitalEsperado - montoEsperado)
+    }
+
+    // 4. Obtener tasa de usura vigente
     const tasaUsura = await obtenerTasaUsuraDB(supabase, fechaHoy)
 
-    // 4. Calcular interés y mora diaria
+    // 5. Calcular interés y mora diaria (lógica Excel)
     const calculo = calcularInteresDiario(
-      credito.saldo_capital,      // Capital actual (para corriente)
-      saldoCapitalAnterior,       // Capital anterior (para mora)
-      credito.tasa_nominal,       // Tasa EA del crédito
-      tasaUsura,                  // Tasa usura SFC
-      diasMora
+      capitalEsperado,              // Base para Int. Corriente
+      capitalReal,                  // Capital real acumulado
+      credito.tasa_nominal,         // Tasa EA del crédito
+      tasaUsura,                    // Tasa usura SFC
+      moraInfo.diasMora,
+      moraInfo.enMora
     )
 
-    // Redondear solo para guardar en DB (precisión de pesos colombianos)
+    // Redondear para guardar en DB
     const interesDiarioRedondeado = redondearPeso(calculo.interesDiario)
     const moraDiariaRedondeada = redondearPeso(calculo.moraDiaria)
+    const moratorioPotencialRedondeado = redondearPeso(calculo.interesMoratorioPotencial)
+    const montoParaColocarseRedondeado = redondearPeso(calculo.montoParaColocarse)
 
     resultado.interesCausado = interesDiarioRedondeado
     resultado.moraCausada = moraDiariaRedondeada
 
-    // 5. Insertar causación diaria (valores redondeados para DB)
+    // 6. Actualizar capitales para el día siguiente
+    // Capital Esperado crece con interés calculado
+    const nuevoCapitalEsperado = capitalEsperado + interesDiarioRedondeado
+    // Capital Real también crece con interés
+    const nuevoCapitalReal = capitalReal + interesDiarioRedondeado
+
+    // 7. Insertar causación diaria
     const causacion: CausacionDiaria = {
       credito_id: credito.id,
       fecha_causacion: fechaHoy,
-      saldo_base: credito.saldo_capital,
-      saldo_base_anterior: saldoCapitalAnterior,
+      capital_esperado: capitalEsperado,
+      capital_real: capitalReal,
       tasa_nominal: credito.tasa_nominal,
-      tasa_diaria: calculo.tasaDiaria,  // Mantener precisión completa
-      tasa_mora_diaria: calculo.tasaMoraDiaria,  // Mantener precisión completa
+      tasa_diaria: calculo.tasaDiaria,
+      tasa_mora_diaria: calculo.tasaMoraDiaria,
       interes_causado: interesDiarioRedondeado,
       mora_causada: moraDiariaRedondeada,
-      dias_mora: diasMora
+      interes_moratorio_potencial: moratorioPotencialRedondeado,
+      dias_mora: moraInfo.diasMora,
+      en_mora: moraInfo.enMora,
+      monto_para_colocarse: montoParaColocarseRedondeado
     }
 
     const { data: causacionInsertada, error: errorCausacion } = await supabase
@@ -331,18 +476,16 @@ export async function procesarCausacionCredito(
 
     if (errorCausacion) throw new Error(`Error insertando causación: ${errorCausacion.message}`)
 
-    // 6. Obtener inversiones activas
+    // 8. Obtener y procesar inversiones activas
     const inversiones = await obtenerInversionesActivas(supabase, credito.id)
 
     if (inversiones.length > 0) {
-      // 7. Distribuir entre inversionistas (con precisión completa)
       const distribuciones = distribuirEntreInversionistas(
         inversiones,
         calculo.interesDiario,
         calculo.moraDiaria
       )
 
-      // 8. Insertar distribuciones a inversionistas (redondeando para DB)
       const causacionesInversionistas: CausacionInversionista[] = distribuciones.map(dist => ({
         causacion_id: causacionInsertada.id,
         inversion_id: dist.inversionId,
@@ -360,7 +503,6 @@ export async function procesarCausacionCredito(
 
       if (errorDistribucion) throw new Error(`Error insertando distribución: ${errorDistribucion.message}`)
 
-      // 9. Actualizar acumulados en inversiones (redondeando para DB)
       for (const dist of distribuciones) {
         const inversion = inversiones.find(i => i.id === dist.inversionId)!
         await supabase
@@ -376,31 +518,28 @@ export async function procesarCausacionCredito(
       resultado.inversionistasActualizados = inversiones.length
     }
 
-    // 10. Actualizar crédito (usando valores redondeados para DB)
-    // El nuevo capital = capital actual + interés corriente
-    // (solo corriente se agrega al capital, mora se mantiene separada)
-    const nuevoSaldoCapital = credito.saldo_capital + interesDiarioRedondeado
-
+    // 9. Actualizar crédito con ambos capitales
     await supabase
       .from('creditos')
       .update({
-        saldo_capital: nuevoSaldoCapital,
-        saldo_capital_anterior: credito.saldo_capital,
+        saldo_capital: nuevoCapitalReal,
+        saldo_capital_esperado: nuevoCapitalEsperado,
+        saldo_capital_anterior: capitalReal,
         saldo_intereses: (credito.saldo_intereses || 0) + interesDiarioRedondeado,
         saldo_mora: (credito.saldo_mora || 0) + moraDiariaRedondeada,
         ultima_causacion: fechaHoy,
-        dias_mora_actual: diasMora,
+        dias_mora_actual: moraInfo.diasMora,
+        en_mora: moraInfo.enMora,
         interes_acumulado_total: (credito.interes_acumulado_total || 0) + interesDiarioRedondeado
       })
       .eq('id', credito.id)
 
-    // 11. Registrar transacción de auditoría (valores redondeados)
+    // 10. Registrar transacciones de auditoría
     if (interesDiarioRedondeado > 0) {
       await supabase.from('transacciones').insert({
         credito_id: credito.id,
         tipo_transaccion: 'causacion_interes',
-        // Mostrar tasa con 10 decimales para auditoría (precisión Excel)
-        concepto: `Causación diaria de interés - ${fechaHoy} (Tasa ${(calculo.tasaDiaria * 100).toFixed(10)}%)`,
+        concepto: `Causación diaria - ${fechaHoy} | Cap.Esp: $${capitalEsperado.toLocaleString()} | Tasa: ${(calculo.tasaDiaria * 100).toFixed(4)}%`,
         monto: interesDiarioRedondeado,
         fecha_transaccion: new Date().toISOString(),
         fecha_aplicacion: fechaHoy,
@@ -412,8 +551,7 @@ export async function procesarCausacionCredito(
       await supabase.from('transacciones').insert({
         credito_id: credito.id,
         tipo_transaccion: 'causacion_mora',
-        // Mostrar tasa con 10 decimales para auditoría (precisión Excel)
-        concepto: `Causación diaria de mora (${diasMora} días) - ${fechaHoy} (Tasa Usura ${(calculo.tasaMoraDiaria * 100).toFixed(10)}%)`,
+        concepto: `Mora (${moraInfo.diasMora} días) - ${fechaHoy} | Tasa Usura: ${(calculo.tasaMoraDiaria * 100).toFixed(4)}%`,
         monto: moraDiariaRedondeada,
         fecha_transaccion: new Date().toISOString(),
         fecha_aplicacion: fechaHoy,
