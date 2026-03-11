@@ -12,9 +12,10 @@ export interface Credito {
   codigo_credito: string
   cliente_id: string
   saldo_capital: number
+  saldo_capital_anterior?: number  // Capital del día anterior (para mora)
   saldo_intereses: number
   saldo_mora: number
-  tasa_nominal: number
+  tasa_nominal: number             // Tasa EA del crédito
   tasa_mora?: number
   estado_credito: string
   fecha_desembolso: string
@@ -41,9 +42,11 @@ export interface CausacionDiaria {
   id?: string
   credito_id: string
   fecha_causacion: string  // DATE en formato YYYY-MM-DD
-  saldo_base: number
-  tasa_nominal: number
-  tasa_diaria: number
+  saldo_base: number           // Capital del día actual (para interés corriente)
+  saldo_base_anterior?: number // Capital del día anterior (para mora)
+  tasa_nominal: number         // Tasa EA del crédito
+  tasa_diaria: number          // Tasa diaria corriente
+  tasa_mora_diaria?: number    // Tasa diaria de mora (usura SFC)
   interes_causado: number
   mora_causada: number
   dias_mora: number
@@ -66,7 +69,8 @@ export interface CausacionInversionista {
 // ============================================
 
 export interface CalculoInteresDiario {
-  tasaDiaria: number          // Tasa efectiva diaria
+  tasaDiaria: number          // Tasa efectiva diaria (corriente)
+  tasaMoraDiaria: number      // Tasa diaria de mora (usura SFC)
   interesDiario: number       // Interés calculado del día
   moraDiaria: number          // Mora del día (si aplica)
   diasMora: number            // Días de mora
@@ -110,5 +114,14 @@ export interface ResumenEjecucion {
 // ============================================
 
 export const ESTADOS_CREDITO_ACTIVO = ['activo'] as const
-export const FACTOR_MORA = 1.5  // Tasa de mora = tasa nominal × 1.5
-export const DIAS_MES = 30      // Días base para cálculo mensual
+export const DIAS_ANIO = 365    // Días base para cálculo anual (EA → diaria)
+
+// Tasas de usura oficiales SFC por mes (fallback si no hay conexión a BD)
+export const TASAS_USURA_SFC: Record<string, number> = {
+  '2026-01': 24.36,  // Enero 2026
+  '2026-02': 25.23,  // Febrero 2026
+  '2026-03': 25.52,  // Marzo 2026
+}
+
+// Tasa de usura por defecto (última conocida)
+export const TASA_USURA_DEFAULT = 25.52
