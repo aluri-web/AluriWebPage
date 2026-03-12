@@ -217,6 +217,42 @@ const tools: Tool[] = [
       required: ["tabla"],
     },
   },
+
+  // ========== CAUSACIONES ==========
+  {
+    name: "obtener_causaciones",
+    description: "Obtiene la tabla de causación diaria de intereses para un crédito específico, similar al Excel de liquidación. Incluye capital esperado, capital real, interés diario, mora, etc.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        credito_id: {
+          type: "string",
+          description: "ID o código del crédito (ej: CR018 o UUID)",
+        },
+        limite: {
+          type: "number",
+          description: "Número máximo de registros (default: 100)",
+        },
+      },
+      required: ["credito_id"],
+    },
+  },
+
+  // ========== DETALLE CRÉDITO ==========
+  {
+    name: "obtener_credito_detalle",
+    description: "Obtiene todos los detalles de un crédito específico: fecha desembolso, tasas, saldos, estado de mora, etc.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        credito_id: {
+          type: "string",
+          description: "ID o código del crédito (ej: CR018 o UUID)",
+        },
+      },
+      required: ["credito_id"],
+    },
+  },
 ];
 
 // Crear el servidor MCP
@@ -350,6 +386,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "obtener_esquema_tabla": {
         const { tabla } = args as { tabla: string };
         const result = await apiRequest(`/esquema?tabla=${encodeURIComponent(tabla)}`, "GET", undefined, true);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      // ========== CAUSACIONES ==========
+      case "obtener_causaciones": {
+        const { credito_id, limite } = args as { credito_id: string; limite?: number };
+        const lim = limite || 100;
+        const result = await apiRequest(`/causaciones?credito_id=${encodeURIComponent(credito_id)}&limite=${lim}`, "GET", undefined, true);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      // ========== DETALLE CRÉDITO ==========
+      case "obtener_credito_detalle": {
+        const { credito_id } = args as { credito_id: string };
+        const result = await apiRequest(`/creditos/${encodeURIComponent(credito_id)}`, "GET", undefined, true);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
