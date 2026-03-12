@@ -34,4 +34,5 @@ APPLY_THIS_SQL_TO_SUPABASE.sql
 *_DELETE.sqlnul
 .claude/settings.local.json
 .claude/settings.json
+.mcp.json
 tsconfig.tsbuildinfo
