@@ -107,7 +107,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           comparison = (a.amount_funded || 0) - (b.amount_funded || 0)
           break
         case 'created_at':
-          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          comparison = new Date(a.fecha_desembolso || a.created_at).getTime() - new Date(b.fecha_desembolso || b.created_at).getTime()
           break
       }
       return sortDirection === 'asc' ? comparison : -comparison
@@ -271,7 +271,8 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     saldo_capital: loan.saldo_capital,
     saldo_intereses: loan.saldo_intereses,
     inversionistas: loan.investors.join(', '),
-    fecha: loan.created_at,
+    fecha_desembolso: loan.fecha_desembolso || '',
+    fecha_creacion: loan.created_at,
   })), [loans])
 
   const exportHeaders = {
@@ -292,7 +293,8 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     saldo_capital: 'Saldo Capital',
     saldo_intereses: 'Saldo Intereses',
     inversionistas: 'Inversionistas',
-    fecha: 'Fecha Creacion',
+    fecha_desembolso: 'Fecha Desembolso',
+    fecha_creacion: 'Fecha Creacion',
   }
 
   if (loans.length === 0) {
@@ -388,7 +390,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Inversionistas
                 </th>
-                <SortableHeader field="created_at" className="text-left">Fecha</SortableHeader>
+                <SortableHeader field="created_at" className="text-left">Desembolso</SortableHeader>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Acciones
                 </th>
@@ -496,7 +498,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
-                      {formatDate(loan.created_at)}
+                      {loan.fecha_desembolso ? formatDate(loan.fecha_desembolso) : <span className="text-slate-600">-</span>}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1">

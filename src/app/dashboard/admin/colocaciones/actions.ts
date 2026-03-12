@@ -504,6 +504,7 @@ export interface LoanTableRow {
   risk_label: string | null
   investors: string[]
   created_at: string
+  fecha_desembolso: string | null
   saldo_capital: number
   saldo_intereses: number
   saldo_mora: number
@@ -537,6 +538,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       saldo_mora,
       en_mora,
       created_at,
+      fecha_desembolso,
       cliente:profiles!cliente_id (
         full_name,
         document_id
@@ -649,6 +651,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       risk_label: risk.label,
       investors: investorsByCredito[credito.id] || [],
       created_at: credito.created_at,
+      fecha_desembolso: (credito as any).fecha_desembolso || null,
       saldo_capital: (credito as any).saldo_capital || 0,
       saldo_intereses: (credito as any).saldo_intereses || 0,
       saldo_mora: (credito as any).saldo_mora || 0,

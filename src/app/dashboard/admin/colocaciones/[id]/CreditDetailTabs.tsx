@@ -86,6 +86,14 @@ function AdminViewContent({ credit }: { credit: any }) {
               <span className="block text-sm text-slate-500 mb-1">Plazo</span>
               <span className="text-lg font-medium text-white">{credit.plazo} Meses</span>
             </div>
+            {credit.fecha_desembolso && (
+              <div>
+                <span className="block text-sm text-slate-500 mb-1">Fecha de Desembolso</span>
+                <span className="text-lg font-medium text-white">
+                  {new Date(credit.fecha_desembolso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </span>
+              </div>
+            )}
             <div>
               <span className="block text-sm text-slate-500 mb-1">Tipo de Contrato</span>
               <span className="text-lg font-medium text-white capitalize">{credit.tipo_contrato?.replace('_', ' ') || 'N/A'}</span>

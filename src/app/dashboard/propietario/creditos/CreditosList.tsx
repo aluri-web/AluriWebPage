@@ -29,6 +29,7 @@ interface Credito {
   tipo_inmueble: string | null
   valor_comercial: number | null
   created_at: string
+  fecha_desembolso: string | null
   inversiones: { monto_invertido: number }[]
   transacciones: Transaccion[]
 }
@@ -219,8 +220,8 @@ export default function CreditosList({ creditos }: CreditosListProps) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-gray-400">Creado</p>
-                  <p className="text-sm text-gray-600">{formatDate(credito.created_at)}</p>
+                  <p className="text-xs text-gray-400">{credito.fecha_desembolso ? 'Desembolso' : 'Creado'}</p>
+                  <p className="text-sm text-gray-600">{formatDate(credito.fecha_desembolso || credito.created_at)}</p>
                 </div>
               </div>
             </div>

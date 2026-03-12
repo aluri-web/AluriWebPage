@@ -307,6 +307,14 @@ export default function MarketplacePage() {
                         <p className="text-gray-600 text-xs uppercase tracking-wider mb-1">Plazo</p>
                         <p className="text-white font-semibold">{loan.plazo ? `${loan.plazo}m` : '-'}</p>
                       </div>
+                      {loan.fecha_desembolso && (
+                        <div className="col-span-2">
+                          <p className="text-gray-600 text-xs uppercase tracking-wider mb-1">Desembolso</p>
+                          <p className="text-white font-semibold">
+                            {new Date(loan.fecha_desembolso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-gray-600 text-xs uppercase tracking-wider mb-1">Monto</p>
                         <p className="text-white font-semibold">{formatCompactCurrency(loan.monto_solicitado)}</p>

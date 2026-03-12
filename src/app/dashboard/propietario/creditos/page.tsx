@@ -22,6 +22,7 @@ export default async function CreditosPage() {
       tipo_inmueble,
       valor_comercial,
       created_at,
+      fecha_desembolso,
       inversiones(monto_invertido),
       transacciones(id, tipo_transaccion, monto, fecha_aplicacion, referencia_pago)
     `)
