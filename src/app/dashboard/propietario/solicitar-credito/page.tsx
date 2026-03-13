@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { MapPin, FileText, Camera, ChevronRight, ChevronLeft, Upload, X, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react'
+import { MapPin, FileText, Camera, ChevronRight, ChevronLeft, Upload, X, CheckCircle, AlertTriangle, Loader2, User } from 'lucide-react'
 import { submitCreditRequest } from './actions'
 import { uploadFile, deleteFile } from '@/utils/uploadFile'
 
@@ -26,9 +26,13 @@ const formatCOP = (value: number) =>
 
 const STEPS = [
   { label: 'Datos del Inmueble', icon: MapPin },
+  { label: 'Solicitante', icon: User },
   { label: 'Documentos', icon: FileText },
   { label: 'Fotos', icon: Camera },
 ]
+
+const SELECT_CLASS = 'w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
+const INPUT_CLASS = 'w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
 
 export default function SolicitarCreditoPage() {
   const [step, setStep] = useState(0)
@@ -36,14 +40,38 @@ export default function SolicitarCreditoPage() {
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1 fields
+  // Step 0: Property fields
   const [direccion, setDireccion] = useState('')
   const [ciudad, setCiudad] = useState('')
   const [tieneHipoteca, setTieneHipoteca] = useState(false)
   const [aNombreSolicitante, setANombreSolicitante] = useState(true)
   const [montoRequerido, setMontoRequerido] = useState(0)
   const [valorInmueble, setValorInmueble] = useState(0)
+  const [plazoMeses, setPlazoMeses] = useState(12)
   const [usoDinero, setUsoDinero] = useState('')
+
+  // Step 1: Solicitante fields (common)
+  const [rolDiligencia, setRolDiligencia] = useState<'deudor' | 'codeudor'>('deudor')
+  const [tipoPersona, setTipoPersona] = useState<'natural' | 'juridica'>('natural')
+
+  // Step 1: Persona Natural
+  const [nombreDeudor, setNombreDeudor] = useState('')
+  const [ingresoMensual, setIngresoMensual] = useState(0)
+  const [tipoIngreso, setTipoIngreso] = useState('')
+  const [situacionHabitacional, setSituacionHabitacional] = useState('')
+  const [estadoCivil, setEstadoCivil] = useState('')
+  const [personasACargo, setPersonasACargo] = useState('')
+  const [nivelEducativo, setNivelEducativo] = useState('')
+  const [rangoEdad, setRangoEdad] = useState('')
+
+  // Step 1: Persona Juridica
+  const [nombreEmpresa, setNombreEmpresa] = useState('')
+  const [tipoSociedad, setTipoSociedad] = useState('')
+  const [fechaConstitucion, setFechaConstitucion] = useState('')
+  const [tamanoEmpresa, setTamanoEmpresa] = useState('')
+  const [resultadoOperativo, setResultadoOperativo] = useState('')
+  const [endeudamientoTotal, setEndeudamientoTotal] = useState('')
+  const [coberturaDSCR, setCoberturaDSCR] = useState('')
 
   // Step 2 & 3 uploads
   const [documentos, setDocumentos] = useState<Record<string, string>>({})
@@ -52,7 +80,17 @@ export default function SolicitarCreditoPage() {
 
   const ltv = valorInmueble > 0 ? (montoRequerido / valorInmueble) * 100 : 0
   const ltvValid = ltv <= 60
-  const step1Valid = direccion.trim() !== '' && ciudad.trim() !== '' && montoRequerido > 0 && valorInmueble > 0 && ltvValid
+  const step0Valid = direccion.trim() !== '' && ciudad.trim() !== '' && montoRequerido > 0 && valorInmueble > 0 && ltvValid
+
+  const step1NaturalValid = nombreDeudor.trim() !== '' && ingresoMensual > 0 && tipoIngreso !== '' && situacionHabitacional !== '' && estadoCivil !== '' && personasACargo !== '' && nivelEducativo !== '' && rangoEdad !== ''
+  const step1JuridicaValid = nombreEmpresa.trim() !== '' && tipoSociedad !== '' && fechaConstitucion !== '' && tamanoEmpresa !== '' && resultadoOperativo !== '' && endeudamientoTotal !== '' && coberturaDSCR !== ''
+  const step1Valid = tipoPersona === 'natural' ? step1NaturalValid : step1JuridicaValid
+
+  const canAdvance = (fromStep: number) => {
+    if (fromStep === 0) return step0Valid
+    if (fromStep === 1) return step1Valid
+    return true
+  }
 
   const handleUpload = async (file: File, key: string, type: 'doc' | 'foto') => {
     setUploading(key)
@@ -101,6 +139,31 @@ export default function SolicitarCreditoPage() {
       const docsArray = Object.entries(documentos).map(([tipo, url]) => ({ tipo, url }))
       const fotosArray = Object.entries(fotos).map(([tipo, url]) => ({ tipo, url }))
 
+      const solicitante = tipoPersona === 'natural'
+        ? {
+            rol: rolDiligencia,
+            tipo_persona: 'natural' as const,
+            nombre: nombreDeudor,
+            ingreso_mensual: ingresoMensual,
+            tipo_ingreso: tipoIngreso,
+            situacion_habitacional: situacionHabitacional,
+            estado_civil: estadoCivil,
+            personas_a_cargo: personasACargo,
+            nivel_educativo: nivelEducativo,
+            rango_edad: rangoEdad,
+          }
+        : {
+            rol: rolDiligencia,
+            tipo_persona: 'juridica' as const,
+            nombre_empresa: nombreEmpresa,
+            tipo_sociedad: tipoSociedad,
+            fecha_constitucion: fechaConstitucion,
+            tamano_empresa: tamanoEmpresa,
+            resultado_operativo: resultadoOperativo,
+            endeudamiento_total: endeudamientoTotal,
+            cobertura_dscr: coberturaDSCR,
+          }
+
       const result = await submitCreditRequest({
         direccion_inmueble: direccion,
         ciudad,
@@ -108,7 +171,9 @@ export default function SolicitarCreditoPage() {
         a_nombre_solicitante: aNombreSolicitante,
         monto_requerido: montoRequerido,
         valor_inmueble: valorInmueble,
+        plazo_meses: plazoMeses,
         uso_dinero: usoDinero,
+        solicitante,
         documentos: docsArray,
         fotos: fotosArray,
       })
@@ -133,6 +198,8 @@ export default function SolicitarCreditoPage() {
     )
   }
 
+  const lastStep = STEPS.length - 1
+
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold text-gray-900 mb-8">Solicitar Credito</h1>
@@ -146,7 +213,7 @@ export default function SolicitarCreditoPage() {
           return (
             <div key={s.label} className="flex items-center gap-2 flex-1">
               <button
-                onClick={() => { if (i < step || (i === 1 && step1Valid) || (i === 2 && step1Valid)) setStep(i) }}
+                onClick={() => { if (i <= step) setStep(i) }}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors w-full
                   ${isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : isDone ? 'bg-gray-100 text-emerald-600' : 'bg-white text-gray-400 border border-gray-200'}`}
               >
@@ -167,7 +234,7 @@ export default function SolicitarCreditoPage() {
         </div>
       )}
 
-      {/* Step 1: Property Info */}
+      {/* Step 0: Property Info */}
       {step === 0 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -181,7 +248,7 @@ export default function SolicitarCreditoPage() {
                 type="text"
                 value={direccion}
                 onChange={e => setDireccion(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className={INPUT_CLASS}
                 placeholder="Cra 10 #20-30, Barrio Centro"
               />
             </div>
@@ -192,7 +259,7 @@ export default function SolicitarCreditoPage() {
                 type="text"
                 value={ciudad}
                 onChange={e => setCiudad(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className={INPUT_CLASS}
                 placeholder="Bogota"
               />
             </div>
@@ -202,7 +269,7 @@ export default function SolicitarCreditoPage() {
               <select
                 value={tieneHipoteca ? 'si' : 'no'}
                 onChange={e => setTieneHipoteca(e.target.value === 'si')}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className={SELECT_CLASS}
               >
                 <option value="no">No</option>
                 <option value="si">Si</option>
@@ -214,7 +281,7 @@ export default function SolicitarCreditoPage() {
               <select
                 value={aNombreSolicitante ? 'si' : 'no'}
                 onChange={e => setANombreSolicitante(e.target.value === 'si')}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className={SELECT_CLASS}
               >
                 <option value="si">Si</option>
                 <option value="no">No</option>
@@ -227,7 +294,7 @@ export default function SolicitarCreditoPage() {
                 type="number"
                 value={valorInmueble || ''}
                 onChange={e => setValorInmueble(Number(e.target.value))}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className={INPUT_CLASS}
                 placeholder="300000000"
                 min={0}
               />
@@ -240,11 +307,28 @@ export default function SolicitarCreditoPage() {
                 type="number"
                 value={montoRequerido || ''}
                 onChange={e => setMontoRequerido(Number(e.target.value))}
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                className={INPUT_CLASS}
                 placeholder="150000000"
                 min={0}
               />
               {montoRequerido > 0 && <p className="text-xs text-gray-500 mt-1">{formatCOP(montoRequerido)}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Plazo del prestamo *</label>
+              <select
+                value={plazoMeses}
+                onChange={e => setPlazoMeses(Number(e.target.value))}
+                className={SELECT_CLASS}
+              >
+                <option value={6}>6 meses</option>
+                <option value={12}>12 meses (1 ano)</option>
+                <option value={18}>18 meses</option>
+                <option value={24}>24 meses (2 anos)</option>
+                <option value={36}>36 meses (3 anos)</option>
+                <option value={48}>48 meses (4 anos)</option>
+                <option value={60}>60 meses (5 anos)</option>
+              </select>
             </div>
           </div>
 
@@ -262,15 +346,229 @@ export default function SolicitarCreditoPage() {
             <textarea
               value={usoDinero}
               onChange={e => setUsoDinero(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 min-h-[80px]"
+              className={`${INPUT_CLASS} min-h-[80px]`}
               placeholder="Describe para que necesitas el prestamo..."
             />
           </div>
         </div>
       )}
 
-      {/* Step 2: Documents */}
+      {/* Step 1: Solicitante Info */}
       {step === 1 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <User size={20} className="text-emerald-500" /> Informacion del Solicitante
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Common questions */}
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">De quien va a diligenciar la informacion? *</label>
+              <select value={rolDiligencia} onChange={e => setRolDiligencia(e.target.value as 'deudor' | 'codeudor')} className={SELECT_CLASS}>
+                <option value="deudor">Deudor</option>
+                <option value="codeudor">Codeudor</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Tipo de persona *</label>
+              <select value={tipoPersona} onChange={e => setTipoPersona(e.target.value as 'natural' | 'juridica')} className={SELECT_CLASS}>
+                <option value="natural">Natural</option>
+                <option value="juridica">Juridica</option>
+              </select>
+            </div>
+          </div>
+
+          <hr className="border-gray-200" />
+
+          {/* Persona Natural fields */}
+          {tipoPersona === 'natural' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Persona Natural</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-gray-600 mb-1">Nombre del {rolDiligencia} *</label>
+                  <input
+                    type="text"
+                    value={nombreDeudor}
+                    onChange={e => setNombreDeudor(e.target.value)}
+                    className={INPUT_CLASS}
+                    placeholder="Nombre completo"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Ingreso mensual promedio (IMP) demostrable *</label>
+                  <input
+                    type="number"
+                    value={ingresoMensual || ''}
+                    onChange={e => setIngresoMensual(Number(e.target.value))}
+                    className={INPUT_CLASS}
+                    placeholder="5000000"
+                    min={0}
+                  />
+                  {ingresoMensual > 0 && <p className="text-xs text-gray-500 mt-1">{formatCOP(ingresoMensual)}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Tipo de ingresos o vinculacion laboral *</label>
+                  <select value={tipoIngreso} onChange={e => setTipoIngreso(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="pensionado">Pensionado</option>
+                    <option value="independiente">Independiente</option>
+                    <option value="asalariado">Asalariado</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Situacion habitacional *</label>
+                  <select value={situacionHabitacional} onChange={e => setSituacionHabitacional(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="propia">Vive en vivienda propia</option>
+                    <option value="familiar">Vive en vivienda familiar</option>
+                    <option value="arriendo">Vive en arriendo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Estado civil *</label>
+                  <select value={estadoCivil} onChange={e => setEstadoCivil(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="soltero">Soltero</option>
+                    <option value="casado_union_libre">Casado / Union libre</option>
+                    <option value="divorciado_viudo">Divorciado / Viudo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Personas a cargo *</label>
+                  <select value={personasACargo} onChange={e => setPersonasACargo(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3_o_mas">3 o mas</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Nivel educativo *</label>
+                  <select value={nivelEducativo} onChange={e => setNivelEducativo(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="posgrado">Posgrado</option>
+                    <option value="pregrado">Pregrado</option>
+                    <option value="tecnologo">Tecnologo</option>
+                    <option value="tecnico">Tecnico</option>
+                    <option value="bachiller">Bachiller</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Edad *</label>
+                  <select value={rangoEdad} onChange={e => setRangoEdad(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="18_25">Entre 18 y 25</option>
+                    <option value="26_35">Entre 26 y 35</option>
+                    <option value="36_45">Entre 36 y 45</option>
+                    <option value="46_55">Entre 46 y 55</option>
+                    <option value="mayor_55">Mayor a 55</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Persona Juridica fields */}
+          {tipoPersona === 'juridica' && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Persona Juridica</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm text-gray-600 mb-1">Nombre de la empresa *</label>
+                  <input
+                    type="text"
+                    value={nombreEmpresa}
+                    onChange={e => setNombreEmpresa(e.target.value)}
+                    className={INPUT_CLASS}
+                    placeholder="Razon social"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Tipo de sociedad *</label>
+                  <select value={tipoSociedad} onChange={e => setTipoSociedad(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="sas">SAS</option>
+                    <option value="limitada">Limitada</option>
+                    <option value="anonima">Anonima</option>
+                    <option value="comandita_simple">Comandita Simple</option>
+                    <option value="comandita_acciones">Comandita por Acciones</option>
+                    <option value="unipersonal">Unipersonal</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Fecha de constitucion *</label>
+                  <input
+                    type="date"
+                    value={fechaConstitucion}
+                    onChange={e => setFechaConstitucion(e.target.value)}
+                    className={INPUT_CLASS}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Tamano de la empresa segun activos *</label>
+                  <select value={tamanoEmpresa} onChange={e => setTamanoEmpresa(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="micro">Micro (Hasta 500 SMMLV)</option>
+                    <option value="pequena">Pequena (Mas de 500 y hasta 5.000 SMMLV)</option>
+                    <option value="mediana">Mediana (Mas de 5.000 y hasta 30.000 SMMLV)</option>
+                    <option value="grande">Grande (Mas de 30.000 SMMLV)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Resultado operativo ultimo ano *</label>
+                  <select value={resultadoOperativo} onChange={e => setResultadoOperativo(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="negativo">Negativo</option>
+                    <option value="0_50m">Entre 0 y 50 millones</option>
+                    <option value="50_200m">Entre 50 y 200 millones</option>
+                    <option value="200_1000m">Entre 200 y 1.000 millones</option>
+                    <option value="mas_1000m">Mas de 1.000 millones</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Endeudamiento total (Pasivo / Activo) *</label>
+                  <select value={endeudamientoTotal} onChange={e => setEndeudamientoTotal(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="menos_40">Menos de 40%</option>
+                    <option value="40_60">Entre 40% y 60%</option>
+                    <option value="60_75">Entre 60% y 75%</option>
+                    <option value="mas_75">Mas del 75%</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Cobertura del Servicio de la Deuda (DSCR) *</label>
+                  <select value={coberturaDSCR} onChange={e => setCoberturaDSCR(e.target.value)} className={SELECT_CLASS}>
+                    <option value="">Seleccionar...</option>
+                    <option value="gte_1_5">{'\u2265'} 1.5x</option>
+                    <option value="1_2_1_49">1.2x - 1.49x</option>
+                    <option value="1_0_1_19">1.0x - 1.19x</option>
+                    <option value="lt_1_0">{'<'} 1.0x</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 2: Documents */}
+      {step === 2 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <FileText size={20} className="text-emerald-500" /> Documentos
@@ -323,7 +621,7 @@ export default function SolicitarCreditoPage() {
       )}
 
       {/* Step 3: Photos */}
-      {step === 2 && (
+      {step === 3 && (
         <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <Camera size={20} className="text-emerald-500" /> Fotos del Inmueble
@@ -392,12 +690,12 @@ export default function SolicitarCreditoPage() {
           <ChevronLeft size={16} /> Anterior
         </button>
 
-        {step < 2 ? (
+        {step < lastStep ? (
           <button
             onClick={() => setStep(s => s + 1)}
-            disabled={step === 0 && !step1Valid}
+            disabled={!canAdvance(step)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors
-              ${step === 0 && !step1Valid
+              ${!canAdvance(step)
                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
           >

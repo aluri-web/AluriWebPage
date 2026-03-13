@@ -13,6 +13,33 @@ interface FotoItem {
   url: string
 }
 
+interface SolicitanteNatural {
+  rol: 'deudor' | 'codeudor'
+  tipo_persona: 'natural'
+  nombre: string
+  ingreso_mensual: number
+  tipo_ingreso: string
+  situacion_habitacional: string
+  estado_civil: string
+  personas_a_cargo: string
+  nivel_educativo: string
+  rango_edad: string
+}
+
+interface SolicitanteJuridica {
+  rol: 'deudor' | 'codeudor'
+  tipo_persona: 'juridica'
+  nombre_empresa: string
+  tipo_sociedad: string
+  fecha_constitucion: string
+  tamano_empresa: string
+  resultado_operativo: string
+  endeudamiento_total: string
+  cobertura_dscr: string
+}
+
+type SolicitanteData = SolicitanteNatural | SolicitanteJuridica
+
 interface SolicitudData {
   direccion_inmueble: string
   ciudad: string
@@ -20,7 +47,9 @@ interface SolicitudData {
   a_nombre_solicitante: boolean
   monto_requerido: number
   valor_inmueble: number
+  plazo_meses: number
   uso_dinero: string
+  solicitante: SolicitanteData
   documentos: DocumentItem[]
   fotos: FotoItem[]
 }
@@ -63,7 +92,9 @@ export async function submitCreditRequest(
         a_nombre_solicitante: data.a_nombre_solicitante,
         monto_requerido: data.monto_requerido,
         valor_inmueble: data.valor_inmueble,
+        plazo_meses: data.plazo_meses,
         uso_dinero: data.uso_dinero,
+        solicitante: data.solicitante,
         documentos: data.documentos,
         fotos: data.fotos,
       })

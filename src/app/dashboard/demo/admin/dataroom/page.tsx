@@ -9,6 +9,7 @@ interface DataroomDocument {
   url: string
   createdAt: string
   size: number
+  folder: string
 }
 
 export default function DemoDataroomPage() {
@@ -42,7 +43,8 @@ export default function DemoDataroomPage() {
     setSelectedName(doc.displayName)
     setLoadingDoc(true)
     try {
-      const res = await fetch(doc.url)
+      const filePath = `${doc.folder}/${doc.name}`
+      const res = await fetch(`/api/dataroom?file=${encodeURIComponent(filePath)}`)
       const text = await res.text()
       setHtmlContent(text)
     } catch (error) {

@@ -65,6 +65,23 @@ export async function GET(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
+    // Proxy mode: download a specific file's content server-side
+    const filePath = request.nextUrl.searchParams.get('file')
+    if (filePath) {
+      const { data, error: downloadError } = await adminSupabase.storage
+        .from(BUCKET)
+        .download(filePath)
+
+      if (downloadError || !data) {
+        return NextResponse.json({ error: 'Error al descargar archivo' }, { status: 500 })
+      }
+
+      const text = await data.text()
+      return new NextResponse(text, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      })
+    }
+
     const visibilityParam = request.nextUrl.searchParams.get('visibility') as Visibility | null
 
     const allDocuments: ReturnType<typeof buildDocuments> = []
