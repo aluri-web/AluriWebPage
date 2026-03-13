@@ -1,9 +1,47 @@
-const UNSPLASH_PHOTOS = [
-  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop&q=80',
+// Each credit gets a unique set of photos so cards look distinct
+const PHOTOS_CRED_001 = [
+  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop&q=80', // casa blanca moderna
   'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=600&fit=crop&q=80',
+]
+const PHOTOS_CRED_002 = [
+  'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800&h=600&fit=crop&q=80', // casa con piscina
   'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&h=600&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&h=600&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=600&fit=crop&q=80',
+]
+const PHOTOS_CRED_003 = [
+  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=600&fit=crop&q=80', // edificio apartamentos
+  'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&q=80',
+]
+const PHOTOS_CRED_004 = [
+  'https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&h=600&fit=crop&q=80', // casa lujo
+  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=600&fit=crop&q=80',
+]
+const PHOTOS_CRED_005 = [
+  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&h=600&fit=crop&q=80', // edificio comercial exterior
+  'https://images.unsplash.com/photo-1604014237800-1c9102c219da?w=800&h=600&fit=crop&q=80', // interior local vacio
+  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&h=600&fit=crop&q=80',
+]
+const PHOTOS_CRED_006 = [
+  'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&h=600&fit=crop&q=80', // villa tropical
+  'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800&h=600&fit=crop&q=80',
+]
+const PHOTOS_CRED_007 = [
+  'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800&h=600&fit=crop&q=80', // casa contemporanea
+  'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&h=600&fit=crop&q=80',
+]
+const PHOTOS_CRED_008 = [
+  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop&q=80', // sala apartamento moderno
+  'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&h=600&fit=crop&q=80',
 ]
 
 export interface DemoCredito {
@@ -69,7 +107,7 @@ export const DEMO_CREDITOS: DemoCredito[] = [
     saldo_mora: 0,
     en_mora: false,
     created_at: '2025-01-10T09:00:00Z',
-    fotos_inmueble: UNSPLASH_PHOTOS.slice(0, 4),
+    fotos_inmueble: PHOTOS_CRED_001,
     cliente_id: 'demo-prop-001',
     cliente_name: 'Juan Pablo Moreno Castaño',
     cliente_cedula: '1040567890',
@@ -109,7 +147,7 @@ export const DEMO_CREDITOS: DemoCredito[] = [
     saldo_mora: 1200000,
     en_mora: true,
     created_at: '2024-11-05T14:30:00Z',
-    fotos_inmueble: UNSPLASH_PHOTOS.slice(1, 5),
+    fotos_inmueble: PHOTOS_CRED_002,
     cliente_id: 'demo-prop-002',
     cliente_name: 'Ana Maria Gutierrez Pardo',
     cliente_cedula: '52678901',
@@ -149,7 +187,7 @@ export const DEMO_CREDITOS: DemoCredito[] = [
     saldo_mora: 0,
     en_mora: false,
     created_at: '2025-02-20T10:00:00Z',
-    fotos_inmueble: UNSPLASH_PHOTOS.slice(0, 3),
+    fotos_inmueble: PHOTOS_CRED_003,
     cliente_id: 'demo-prop-003',
     cliente_name: 'Roberto Sanchez Villa',
     cliente_cedula: '80789012',
@@ -189,7 +227,7 @@ export const DEMO_CREDITOS: DemoCredito[] = [
     saldo_mora: 0,
     en_mora: false,
     created_at: '2025-03-01T08:00:00Z',
-    fotos_inmueble: UNSPLASH_PHOTOS,
+    fotos_inmueble: PHOTOS_CRED_004,
     cliente_id: 'demo-prop-004',
     cliente_name: 'Patricia Duarte Romero',
     cliente_cedula: '43890123',
@@ -229,7 +267,7 @@ export const DEMO_CREDITOS: DemoCredito[] = [
     saldo_mora: 0,
     en_mora: false,
     created_at: '2024-06-01T10:00:00Z',
-    fotos_inmueble: UNSPLASH_PHOTOS.slice(2, 5),
+    fotos_inmueble: PHOTOS_CRED_005,
     cliente_id: 'demo-prop-005',
     cliente_name: 'Fernando Reyes Agudelo',
     cliente_cedula: '71901234',
@@ -269,7 +307,7 @@ export const DEMO_CREDITOS: DemoCredito[] = [
     saldo_mora: 0,
     en_mora: false,
     created_at: '2025-02-15T12:00:00Z',
-    fotos_inmueble: UNSPLASH_PHOTOS.slice(0, 4),
+    fotos_inmueble: PHOTOS_CRED_006,
     cliente_id: 'demo-prop-001',
     cliente_name: 'Juan Pablo Moreno Castaño',
     cliente_cedula: '1040567890',
@@ -309,7 +347,7 @@ export const DEMO_CREDITOS: DemoCredito[] = [
     saldo_mora: 0,
     en_mora: false,
     created_at: '2025-03-05T09:00:00Z',
-    fotos_inmueble: UNSPLASH_PHOTOS.slice(1, 4),
+    fotos_inmueble: PHOTOS_CRED_007,
     cliente_id: 'demo-prop-004',
     cliente_name: 'Patricia Duarte Romero',
     cliente_cedula: '43890123',
@@ -349,7 +387,7 @@ export const DEMO_CREDITOS: DemoCredito[] = [
     saldo_mora: 0,
     en_mora: false,
     created_at: '2024-12-01T10:00:00Z',
-    fotos_inmueble: UNSPLASH_PHOTOS.slice(0, 2),
+    fotos_inmueble: PHOTOS_CRED_008,
     cliente_id: 'demo-prop-006',
     cliente_name: 'Claudia Vargas Pineda',
     cliente_cedula: '39123456',
