@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  FileText,
   Upload,
   CheckCircle,
   XCircle,
@@ -19,8 +18,6 @@ import {
 } from 'lucide-react'
 import { uploadFile } from '@/utils/uploadFile'
 import { type SolicitudSummary } from './actions'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 
 // ── Types ──────────────────────────────────────────────
 
@@ -119,6 +116,7 @@ export default function AgentesPanel({ solicitudes }: { solicitudes: SolicitudSu
   const [agents, setAgents] = useState<Record<string, AgentState>>({ ...INITIAL_AGENTS })
   const [isProcessing, setIsProcessing] = useState(false)
   const [fichaPdfUrl, setFichaPdfUrl] = useState<string | null>(null)
+  const [interestRate, setInterestRate] = useState(1.5)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const selectedSolicitud = solicitudes.find((s) => s.id === selectedSolicitudId) || null
@@ -186,280 +184,150 @@ export default function AgentesPanel({ solicitudes }: { solicitudes: SolicitudSu
     }))
   }
 
-  // ── Agent execution ──
-
-  const runAgent = async (agentKey: string) => {
-    const config = AGENT_CONFIGS.find((a) => a.key === agentKey)
-    if (!config) return null
-
-    const documentos = config.docs
-      .map((docKey) => ({ tipo: docKey, url: slots[docKey]?.url }))
-      .filter((d) => d.url)
-
-    setAgents((prev) => ({
-      ...prev,
-      [agentKey]: { status: 'procesando', result: null, error: null, startedAt: Date.now(), completedAt: null },
-    }))
-
-    try {
-      const res = await fetch('/api/agentes-ia', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agente: agentKey, documentos }),
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        setAgents((prev) => ({
-          ...prev,
-          [agentKey]: {
-            status: 'completado',
-            result: data.resultado,
-            error: null,
-            startedAt: prev[agentKey].startedAt,
-            completedAt: Date.now(),
-          },
-        }))
-        return data.resultado
-      } else {
-        throw new Error(data.error || 'Error desconocido')
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error de conexion'
-      setAgents((prev) => ({
-        ...prev,
-        [agentKey]: {
-          status: 'error',
-          result: null,
-          error: message,
-          startedAt: prev[agentKey].startedAt,
-          completedAt: Date.now(),
-        },
-      }))
-      return null
-    }
-  }
+  // ── Orchestrator execution ──
 
   const handleProcesar = async () => {
     setIsProcessing(true)
     setFichaPdfUrl(null)
-    setAgents({ ...INITIAL_AGENTS })
 
-    // Run ready agents in parallel
-    const readyAgents = AGENT_CONFIGS.filter((a) => agentReady(a.key))
-    const results = await Promise.allSettled(readyAgents.map((a) => runAgent(a.key)))
+    const now = Date.now()
+    // Set all agents + ficha as processing
+    setAgents({
+      titulos: { status: 'procesando', result: null, error: null, startedAt: now, completedAt: null },
+      kyc: { status: 'procesando', result: null, error: null, startedAt: now, completedAt: null },
+      credito: { status: 'procesando', result: null, error: null, startedAt: now, completedAt: null },
+      ficha: { status: 'procesando', result: null, error: null, startedAt: now, completedAt: null },
+    })
 
-    // Check if all 3 main agents succeeded
-    const allSucceeded =
-      readyAgents.length === 3 && results.every((r) => r.status === 'fulfilled' && r.value !== null)
+    try {
+      // Build document map: field name → Supabase Storage URL
+      const documents: Record<string, string> = {}
+      if (slots.libertad_tradicion?.url) documents.libertad_tradicion = slots.libertad_tradicion.url
+      if (slots.escritura?.url) documents.escritura = slots.escritura.url
+      if (slots.cedula?.url) documents.cedula = slots.cedula.url
+      if (slots.extractos?.url) documents.extractos = slots.extractos.url
+      if (slots.declaracion_renta?.url) documents.declaracion_renta = slots.declaracion_renta.url
 
-    if (allSucceeded) {
-      // Run ficha agent
-      setAgents((prev) => ({
-        ...prev,
-        ficha: { status: 'procesando', result: null, error: null, startedAt: Date.now(), completedAt: null },
-      }))
-
-      try {
-        const res = await fetch('/api/agentes-ia', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            agente: 'ficha',
-            documentos: results.map((r) => (r.status === 'fulfilled' ? r.value : null)),
-          }),
-        })
-        const data = await res.json()
-
-        if (data.success) {
-          setAgents((prev) => ({
-            ...prev,
-            ficha: {
-              status: 'completado',
-              result: data.resultado,
-              error: null,
-              startedAt: prev.ficha.startedAt,
-              completedAt: Date.now(),
-            },
-          }))
-
-          // Generate PDF
-          const pdfUrl = generateFichaPDF(data.resultado)
-          setFichaPdfUrl(pdfUrl)
-        }
-      } catch {
-        setAgents((prev) => ({
-          ...prev,
-          ficha: {
-            status: 'error',
-            result: null,
-            error: 'Error al generar ficha tecnica',
-            startedAt: prev.ficha.startedAt,
-            completedAt: Date.now(),
-          },
-        }))
+      // Build operation data from solicitud
+      // Monthly payment formula (French amortization): M = P * r / (1 - (1+r)^-n)
+      const calcMonthlyPayment = (principal: number, rateMonthly: number, months: number) => {
+        const r = rateMonthly / 100
+        if (r === 0) return Math.round(principal / months)
+        return Math.round(principal * r / (1 - Math.pow(1 + r, -months)))
       }
+
+      const operation = selectedSolicitud
+        ? {
+            operation_id: selectedSolicitud.id,
+            loan_amount: selectedSolicitud.monto_requerido,
+            loan_term_months: selectedSolicitud.plazo_meses || 12,
+            interest_rate_monthly: interestRate,
+            monthly_payment: calcMonthlyPayment(
+              selectedSolicitud.monto_requerido,
+              interestRate,
+              selectedSolicitud.plazo_meses || 12
+            ),
+            guarantee_type: 'hipoteca' as const,
+            property_appraisal_value: selectedSolicitud.valor_inmueble,
+            ltv_percent: Math.round((selectedSolicitud.monto_requerido / selectedSolicitud.valor_inmueble) * 100),
+            loan_purpose: 'Crédito hipotecario',
+          }
+        : {
+            operation_id: `MANUAL-${Date.now()}`,
+            loan_amount: 250000000,
+            loan_term_months: 12,
+            interest_rate_monthly: interestRate,
+            monthly_payment: calcMonthlyPayment(250000000, interestRate, 12),
+            guarantee_type: 'hipoteca' as const,
+            property_appraisal_value: 450000000,
+            ltv_percent: 56,
+            loan_purpose: 'Crédito hipotecario',
+          }
+
+      const applicant = selectedSolicitud?.solicitante
+        ? { name: selectedSolicitud.solicitante.full_name || 'Sin nombre', cedula: '0000000000' }
+        : { name: 'Solicitante Manual', cedula: '0000000000' }
+
+      const res = await fetch('/api/orchestrator/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicant, operation, documents }),
+      })
+
+      const data = await res.json()
+      const completedAt = Date.now()
+
+      if (res.ok && data.evaluationId) {
+        // Map orchestrator sections to agent cards
+        const sections = data.report?.sections || {}
+
+        setAgents({
+          titulos: {
+            status: 'completado',
+            result: {
+              resumen: sections['1_descripcion_inmueble']?.substring(0, 300) || 'Análisis completado',
+              riesgo: data.riskLevel,
+            },
+            error: null,
+            startedAt: now,
+            completedAt,
+          },
+          kyc: {
+            status: 'completado',
+            result: {
+              resumen: sections['4_perfil_solicitante']?.substring(0, 300) || 'Verificación completada',
+            },
+            error: null,
+            startedAt: now,
+            completedAt,
+          },
+          credito: {
+            status: 'completado',
+            result: {
+              resumen: sections['5_analisis_financiero']?.substring(0, 300) || 'Análisis financiero completado',
+            },
+            error: null,
+            startedAt: now,
+            completedAt,
+          },
+          ficha: {
+            status: 'completado',
+            result: {
+              resumen_general: sections['6_evaluacion_riesgo']?.substring(0, 300) || 'Evaluación completada',
+              recomendacion: data.verdict,
+              nivel_riesgo_global: `${data.riskLevel?.toUpperCase()} (${data.riskScore}/10)`,
+            },
+            error: null,
+            startedAt: now,
+            completedAt,
+          },
+        })
+
+        // Use the PDF URL from the orchestrator (Supabase Storage signed URL)
+        if (data.pdfUrl) {
+          setFichaPdfUrl(data.pdfUrl)
+        }
+      } else {
+        const errorMsg = data.error || 'Error del orquestador'
+        setAgents({
+          titulos: { status: 'error', result: null, error: errorMsg, startedAt: now, completedAt },
+          kyc: { status: 'error', result: null, error: errorMsg, startedAt: now, completedAt },
+          credito: { status: 'error', result: null, error: errorMsg, startedAt: now, completedAt },
+          ficha: { status: 'error', result: null, error: errorMsg, startedAt: now, completedAt },
+        })
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error de conexión'
+      const completedAt = Date.now()
+      setAgents({
+        titulos: { status: 'error', result: null, error: message, startedAt: now, completedAt },
+        kyc: { status: 'error', result: null, error: message, startedAt: now, completedAt },
+        credito: { status: 'error', result: null, error: message, startedAt: now, completedAt },
+        ficha: { status: 'error', result: null, error: message, startedAt: now, completedAt },
+      })
     }
 
     setIsProcessing(false)
-  }
-
-  // ── PDF Generation ──
-
-  const generateFichaPDF = (fichaResult: Record<string, string>) => {
-    const doc = new jsPDF()
-
-    // Header
-    doc.setFontSize(20)
-    doc.setTextColor(30, 30, 30)
-    doc.text('Ficha Tecnica - Analisis IA', 20, 20)
-    doc.setFontSize(9)
-    doc.setTextColor(120, 120, 120)
-    doc.text(`Generada: ${new Date().toLocaleDateString('es-CO')} | Aluri Platform`, 20, 27)
-    doc.setDrawColor(200, 200, 200)
-    doc.line(20, 30, 190, 30)
-
-    let y = 38
-
-    // Solicitud info
-    if (selectedSolicitud) {
-      doc.setFontSize(13)
-      doc.setTextColor(30, 30, 30)
-      doc.text('Datos de la Solicitud', 20, y)
-      y += 3
-      autoTable(doc, {
-        startY: y,
-        theme: 'grid',
-        headStyles: { fillColor: [245, 158, 11], textColor: [0, 0, 0], fontStyle: 'bold' },
-        head: [['Campo', 'Valor']],
-        body: [
-          ['Solicitante', selectedSolicitud.solicitante?.full_name || 'N/A'],
-          ['Ciudad', selectedSolicitud.ciudad],
-          ['Direccion', selectedSolicitud.direccion_inmueble],
-          ['Monto Requerido', formatCOP(selectedSolicitud.monto_requerido)],
-        ],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      y = (doc as any).lastAutoTable.finalY + 10
-    }
-
-    // Estudio de Titulos
-    const titulosResult = agents.titulos.result
-    if (titulosResult) {
-      doc.setFontSize(13)
-      doc.text('Estudio de Titulos', 20, y)
-      y += 3
-      autoTable(doc, {
-        startY: y,
-        theme: 'grid',
-        headStyles: { fillColor: [217, 119, 6] },
-        head: [['Indicador', 'Resultado']],
-        body: [
-          ['Riesgo', titulosResult.riesgo],
-          ['Propietario verificado', titulosResult.propietario_verificado ? 'Si' : 'No'],
-          ['Gravamenes', titulosResult.gravamenes ? 'Si' : 'No'],
-          ['Embargos', titulosResult.embargos ? 'Si' : 'No'],
-          ['Anotaciones', String(titulosResult.anotaciones)],
-          ['Matricula', titulosResult.matricula_inmobiliaria || 'N/A'],
-        ],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      y = (doc as any).lastAutoTable.finalY + 4
-      doc.setFontSize(9)
-      doc.setTextColor(80, 80, 80)
-      const lines = doc.splitTextToSize(titulosResult.resumen || '', 170)
-      doc.text(lines, 20, y)
-      y += lines.length * 4 + 8
-      doc.setTextColor(30, 30, 30)
-    }
-
-    // KYC
-    const kycResult = agents.kyc.result
-    if (kycResult) {
-      doc.setFontSize(13)
-      doc.text('KYC - Verificacion de Identidad', 20, y)
-      y += 3
-      autoTable(doc, {
-        startY: y,
-        theme: 'grid',
-        headStyles: { fillColor: [59, 130, 246] },
-        head: [['Indicador', 'Resultado']],
-        body: [
-          ['Identidad verificada', kycResult.identidad_verificada ? 'Si' : 'No'],
-          ['Nombre coincide', kycResult.nombre_coincide ? 'Si' : 'No'],
-          ['Documento vigente', kycResult.documento_vigente ? 'Si' : 'No'],
-          ['Listas restrictivas', kycResult.listas_restrictivas ? 'ALERTA' : 'Limpio'],
-          ['PEP', kycResult.peps ? 'Si' : 'No'],
-          ['Lugar expedicion', kycResult.lugar_expedicion || 'N/A'],
-        ],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      y = (doc as any).lastAutoTable.finalY + 4
-      doc.setFontSize(9)
-      doc.setTextColor(80, 80, 80)
-      const lines = doc.splitTextToSize(kycResult.resumen || '', 170)
-      doc.text(lines, 20, y)
-      y += lines.length * 4 + 8
-      doc.setTextColor(30, 30, 30)
-    }
-
-    // Estudio de Credito
-    const creditoResult = agents.credito.result
-    if (creditoResult) {
-      if (y > 240) {
-        doc.addPage()
-        y = 20
-      }
-      doc.setFontSize(13)
-      doc.text('Estudio de Credito', 20, y)
-      y += 3
-      autoTable(doc, {
-        startY: y,
-        theme: 'grid',
-        headStyles: { fillColor: [16, 185, 129] },
-        head: [['Indicador', 'Resultado']],
-        body: [
-          ['Capacidad de pago', creditoResult.capacidad_pago],
-          ['Ingresos mensuales', formatCOP(creditoResult.ingresos_mensuales)],
-          ['Gastos fijos', formatCOP(creditoResult.gastos_fijos)],
-          ['Endeudamiento', `${creditoResult.endeudamiento_porcentaje}%`],
-          ['Score crediticio', `${creditoResult.score_crediticio}/999`],
-          ['Creditos activos', String(creditoResult.historial_creditos)],
-          ['Creditos en mora', String(creditoResult.creditos_en_mora)],
-          ['Patrimonio estimado', formatCOP(creditoResult.patrimonio_estimado)],
-        ],
-      })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      y = (doc as any).lastAutoTable.finalY + 4
-      doc.setFontSize(9)
-      doc.setTextColor(80, 80, 80)
-      const lines = doc.splitTextToSize(creditoResult.resumen || '', 170)
-      doc.text(lines, 20, y)
-      y += lines.length * 4 + 8
-      doc.setTextColor(30, 30, 30)
-    }
-
-    // Conclusion
-    if (fichaResult) {
-      if (y > 250) {
-        doc.addPage()
-        y = 20
-      }
-      doc.setFontSize(13)
-      doc.text('Conclusion General', 20, y)
-      y += 6
-      doc.setFontSize(10)
-      doc.text(`Recomendacion: ${fichaResult.recomendacion || 'N/A'}`, 20, y)
-      y += 5
-      doc.text(`Nivel de riesgo global: ${fichaResult.nivel_riesgo_global || 'N/A'}`, 20, y)
-      y += 5
-      doc.setFontSize(9)
-      doc.setTextColor(80, 80, 80)
-      const lines = doc.splitTextToSize(fichaResult.resumen_general || '', 170)
-      doc.text(lines, 20, y)
-    }
-
-    return doc.output('bloburl') as unknown as string
   }
 
   // ── Render ───────────────────────────────────────────
@@ -638,8 +506,22 @@ export default function AgentesPanel({ solicitudes }: { solicitudes: SolicitudSu
         </div>
       </div>
 
-      {/* Section 3: Process Button */}
+      {/* Section 3: Interest Rate + Process Button */}
       <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-slate-400 whitespace-nowrap">Tasa mensual (%)</label>
+          <input
+            type="number"
+            value={interestRate}
+            onChange={e => setInterestRate(Number(e.target.value))}
+            step={0.1}
+            min={0.1}
+            max={5}
+            disabled={isProcessing}
+            className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm text-center focus:outline-none focus:border-amber-500 disabled:opacity-50"
+          />
+        </div>
+
         <button
           onClick={handleProcesar}
           disabled={isProcessing || !anyAgentReady}

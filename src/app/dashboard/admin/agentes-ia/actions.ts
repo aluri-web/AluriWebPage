@@ -7,6 +7,8 @@ export interface SolicitudSummary {
   direccion_inmueble: string
   ciudad: string
   monto_requerido: number
+  valor_inmueble: number
+  plazo_meses: number | null
   created_at: string
   documentos: { tipo: string; url: string }[]
   solicitante: {
@@ -28,6 +30,8 @@ export async function getSolicitudesForAgents(): Promise<{
       direccion_inmueble,
       ciudad,
       monto_requerido,
+      valor_inmueble,
+      plazo_meses,
       documentos,
       created_at,
       solicitante:profiles!solicitante_id (
