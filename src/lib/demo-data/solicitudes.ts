@@ -53,7 +53,7 @@ export const DEMO_SOLICITUDES: DemoSolicitud[] = [
     notas_admin: 'Documentos completos. Verificando con notaria.',
     created_at: '2025-03-01T10:00:00Z',
     updated_at: '2025-03-05T14:00:00Z',
-    solicitante: { full_name: 'Juan Pablo Moreno Castaño', email: 'juanpablo.moreno@gmail.com', document_id: '1040567890' },
+    solicitante: { full_name: 'Juan Pablo Moreno Castaño', email: 'juanpablo.moreno@aluri.com', document_id: '1040567890' },
   },
   {
     id: 'demo-sol-002',
@@ -78,7 +78,7 @@ export const DEMO_SOLICITUDES: DemoSolicitud[] = [
     notas_admin: null,
     created_at: '2025-03-07T09:30:00Z',
     updated_at: '2025-03-07T09:30:00Z',
-    solicitante: { full_name: 'Ana Maria Gutierrez Pardo', email: 'ana.gutierrez@outlook.com', document_id: '52678901' },
+    solicitante: { full_name: 'Ana Maria Gutierrez Pardo', email: 'ana.gutierrez@aluri.com', document_id: '52678901' },
   },
   {
     id: 'demo-sol-003',
@@ -99,7 +99,7 @@ export const DEMO_SOLICITUDES: DemoSolicitud[] = [
     notas_admin: null,
     created_at: '2025-03-08T16:00:00Z',
     updated_at: '2025-03-08T16:00:00Z',
-    solicitante: { full_name: 'Roberto Sanchez Villa', email: 'roberto.sanchez@gmail.com', document_id: '80789012' },
+    solicitante: { full_name: 'Roberto Sanchez Villa', email: 'roberto.sanchez@aluri.com', document_id: '80789012' },
   },
   {
     id: 'demo-sol-004',
@@ -129,7 +129,7 @@ export const DEMO_SOLICITUDES: DemoSolicitud[] = [
     notas_admin: 'Aprobada. Inmueble en buenas condiciones, LTV dentro de parametros.',
     created_at: '2025-02-15T10:00:00Z',
     updated_at: '2025-02-25T16:30:00Z',
-    solicitante: { full_name: 'Fernando Reyes Agudelo', email: 'fernando.reyes@hotmail.com', document_id: '71901234' },
+    solicitante: { full_name: 'Fernando Reyes Agudelo', email: 'fernando.reyes@aluri.com', document_id: '71901234' },
   },
   {
     id: 'demo-sol-005',
@@ -159,6 +159,6 @@ export const DEMO_SOLICITUDES: DemoSolicitud[] = [
     notas_admin: 'LTV excede el limite permitido del 60%. El monto requerido es demasiado alto para el valor del inmueble.',
     created_at: '2025-02-01T11:00:00Z',
     updated_at: '2025-02-10T09:00:00Z',
-    solicitante: { full_name: 'Patricia Duarte Romero', email: 'patricia.duarte@yahoo.com', document_id: '43890123' },
+    solicitante: { full_name: 'Patricia Duarte Romero', email: 'patricia.duarte@aluri.com', document_id: '43890123' },
   },
 ]

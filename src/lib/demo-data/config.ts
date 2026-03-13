@@ -72,14 +72,14 @@ export const DEMO_TASAS: DemoTasa[] = [
 
 export const DEMO_PROPIETARIO_PROFILE = {
   full_name: 'Juan Pablo Moreno Castaño',
-  email: 'juanpablo.moreno@gmail.com',
+  email: 'juanpablo.moreno@aluri.com',
   avatar_url: null,
   role: 'propietario',
 }
 
 export const DEMO_INVERSIONISTA_PROFILE = {
   full_name: 'Maria Fernanda Lopez Gutierrez',
-  email: 'maria.lopez@gmail.com',
+  email: 'maria.lopez@aluri.com',
   avatar_url: null,
   role: 'inversionista',
 }

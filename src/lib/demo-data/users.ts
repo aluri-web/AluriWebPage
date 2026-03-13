@@ -47,7 +47,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-inv-001',
     full_name: 'Maria Fernanda Lopez Gutierrez',
-    email: 'maria.lopez@gmail.com',
+    email: 'maria.lopez@aluri.com',
     role: 'inversionista',
     verification_status: 'verified',
     created_at: '2024-06-20T14:00:00Z',
@@ -59,7 +59,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-inv-002',
     full_name: 'Andres Felipe Herrera',
-    email: 'andres.herrera@outlook.com',
+    email: 'andres.herrera@aluri.com',
     role: 'inversionista',
     verification_status: 'verified',
     created_at: '2024-07-10T09:30:00Z',
@@ -71,7 +71,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-inv-003',
     full_name: 'Sofia Ramirez Vasquez',
-    email: 'sofia.ramirez@yahoo.com',
+    email: 'sofia.ramirez@aluri.com',
     role: 'inversionista',
     verification_status: 'verified',
     created_at: '2024-08-05T16:45:00Z',
@@ -83,7 +83,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-inv-004',
     full_name: 'Diego Alejandro Torres',
-    email: 'diego.torres@gmail.com',
+    email: 'diego.torres@aluri.com',
     role: 'inversionista',
     verification_status: 'verified',
     created_at: '2024-09-12T11:00:00Z',
@@ -95,7 +95,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-inv-005',
     full_name: 'Carolina Ortiz Mendoza',
-    email: 'carolina.ortiz@hotmail.com',
+    email: 'carolina.ortiz@aluri.com',
     role: 'inversionista',
     verification_status: 'verified',
     created_at: '2024-10-01T13:20:00Z',
@@ -108,7 +108,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-prop-001',
     full_name: 'Juan Pablo Moreno Castaño',
-    email: 'juanpablo.moreno@gmail.com',
+    email: 'juanpablo.moreno@aluri.com',
     role: 'propietario',
     verification_status: 'verified',
     created_at: '2024-04-18T10:00:00Z',
@@ -120,7 +120,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-prop-002',
     full_name: 'Ana Maria Gutierrez Pardo',
-    email: 'ana.gutierrez@outlook.com',
+    email: 'ana.gutierrez@aluri.com',
     role: 'propietario',
     verification_status: 'verified',
     created_at: '2024-05-22T15:30:00Z',
@@ -132,7 +132,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-prop-003',
     full_name: 'Roberto Sanchez Villa',
-    email: 'roberto.sanchez@gmail.com',
+    email: 'roberto.sanchez@aluri.com',
     role: 'propietario',
     verification_status: 'verified',
     created_at: '2024-06-30T12:15:00Z',
@@ -144,7 +144,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-prop-004',
     full_name: 'Patricia Duarte Romero',
-    email: 'patricia.duarte@yahoo.com',
+    email: 'patricia.duarte@aluri.com',
     role: 'propietario',
     verification_status: 'verified',
     created_at: '2024-08-14T09:45:00Z',
@@ -156,7 +156,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-prop-005',
     full_name: 'Fernando Reyes Agudelo',
-    email: 'fernando.reyes@hotmail.com',
+    email: 'fernando.reyes@aluri.com',
     role: 'propietario',
     verification_status: 'verified',
     created_at: '2024-09-25T14:00:00Z',
@@ -168,7 +168,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-prop-006',
     full_name: 'Claudia Vargas Pineda',
-    email: 'claudia.vargas@gmail.com',
+    email: 'claudia.vargas@aluri.com',
     role: 'propietario',
     verification_status: 'unverified',
     created_at: '2025-01-05T10:30:00Z',
@@ -181,7 +181,7 @@ export const DEMO_USERS: DemoUserProfile[] = [
   {
     id: 'demo-inv-006',
     full_name: 'Miguel Angel Castillo',
-    email: 'miguel.castillo@gmail.com',
+    email: 'miguel.castillo@aluri.com',
     role: 'inversionista',
     verification_status: 'unverified',
     created_at: '2025-02-10T08:15:00Z',

@@ -131,64 +131,63 @@ export default function DemoSolicitudesPage() {
         ) : (
           <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-700">
-                    <th className="text-left text-slate-400 font-medium py-3 px-4">Fecha</th>
-                    <th className="text-left text-slate-400 font-medium py-3 px-4">Solicitante</th>
-                    <th className="text-left text-slate-400 font-medium py-3 px-4">Ciudad</th>
-                    <th className="text-right text-slate-400 font-medium py-3 px-4">Monto</th>
-                    <th className="text-right text-slate-400 font-medium py-3 px-4">LTV</th>
-                    <th className="text-center text-slate-400 font-medium py-3 px-4">Docs</th>
-                    <th className="text-center text-slate-400 font-medium py-3 px-4">Fotos</th>
-                    <th className="text-center text-slate-400 font-medium py-3 px-4">Estado</th>
-                    <th className="text-center text-slate-400 font-medium py-3 px-4"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(sol => {
-                    const status = getStatusConfig(sol.estado)
-                    const StatusIcon = status.icon
-                    const docCount = getDocCount(sol.documentos)
-                    const photoCount = getPhotoCount(sol.fotos)
-                    const ltv = sol.valor_inmueble > 0 ? ((sol.monto_requerido / sol.valor_inmueble) * 100).toFixed(1) : '-'
-                    const isExpanded = expandedId === sol.id
+              {/* Header */}
+              <div className="flex items-center border-b border-slate-700 text-sm">
+                <span className="py-3 px-4 text-left text-slate-400 font-medium w-[110px] shrink-0">Fecha</span>
+                <span className="py-3 px-4 text-left text-slate-400 font-medium flex-1 min-w-0">Solicitante</span>
+                <span className="py-3 px-4 text-left text-slate-400 font-medium w-[120px] shrink-0">Ciudad</span>
+                <span className="py-3 px-4 text-right text-slate-400 font-medium w-[140px] shrink-0">Monto</span>
+                <span className="py-3 px-4 text-right text-slate-400 font-medium w-[70px] shrink-0">LTV</span>
+                <span className="py-3 px-4 text-center text-slate-400 font-medium w-[70px] shrink-0">Docs</span>
+                <span className="py-3 px-4 text-center text-slate-400 font-medium w-[70px] shrink-0">Fotos</span>
+                <span className="py-3 px-4 text-center text-slate-400 font-medium w-[120px] shrink-0">Estado</span>
+                <span className="py-3 px-4 w-[40px] shrink-0"></span>
+              </div>
 
-                    return (
-                      <tr key={sol.id} className="border-b border-slate-700/50 last:border-0">
-                        <td colSpan={9} className="p-0">
-                          {/* Row */}
-                          <button
-                            onClick={() => toggleExpand(sol.id)}
-                            className="w-full flex items-center hover:bg-slate-700/30 transition-colors"
-                          >
-                            <span className="py-3 px-4 text-left text-slate-300 w-[110px] shrink-0">{formatDate(sol.created_at)}</span>
-                            <span className="py-3 px-4 text-left text-white font-medium flex-1 min-w-0 truncate">
-                              {sol.solicitante?.full_name || 'Sin nombre'}
-                            </span>
-                            <span className="py-3 px-4 text-left text-slate-300 w-[120px] shrink-0 truncate">{sol.ciudad}</span>
-                            <span className="py-3 px-4 text-right text-slate-300 w-[140px] shrink-0">{formatCOP(sol.monto_requerido)}</span>
-                            <span className="py-3 px-4 text-right text-slate-300 w-[70px] shrink-0">{ltv}%</span>
-                            <span className="py-3 px-4 text-center w-[70px] shrink-0">
-                              <span className={`text-xs font-medium ${docCount === 5 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                {docCount}/5
-                              </span>
-                            </span>
-                            <span className="py-3 px-4 text-center w-[70px] shrink-0">
-                              <span className={`text-xs font-medium ${photoCount === 5 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                                {photoCount}/5
-                              </span>
-                            </span>
-                            <span className="py-3 px-4 text-center w-[120px] shrink-0">
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${status.class}`}>
-                                <StatusIcon size={12} />
-                                {status.label}
-                              </span>
-                            </span>
-                            <span className="py-3 px-4 text-center w-[40px] shrink-0">
-                              {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                            </span>
-                          </button>
+              {/* Rows */}
+              <div className="text-sm">
+                {filtered.map(sol => {
+                  const status = getStatusConfig(sol.estado)
+                  const StatusIcon = status.icon
+                  const docCount = getDocCount(sol.documentos)
+                  const photoCount = getPhotoCount(sol.fotos)
+                  const ltv = sol.valor_inmueble > 0 ? ((sol.monto_requerido / sol.valor_inmueble) * 100).toFixed(1) : '-'
+                  const isExpanded = expandedId === sol.id
+
+                  return (
+                    <div key={sol.id} className="border-b border-slate-700/50 last:border-0">
+                      {/* Row */}
+                      <button
+                        onClick={() => toggleExpand(sol.id)}
+                        className="w-full flex items-center hover:bg-slate-700/30 transition-colors"
+                      >
+                        <span className="py-3 px-4 text-left text-slate-300 w-[110px] shrink-0">{formatDate(sol.created_at)}</span>
+                        <span className="py-3 px-4 text-left text-white font-medium flex-1 min-w-0 truncate">
+                          {sol.solicitante?.full_name || 'Sin nombre'}
+                        </span>
+                        <span className="py-3 px-4 text-left text-slate-300 w-[120px] shrink-0 truncate">{sol.ciudad}</span>
+                        <span className="py-3 px-4 text-right text-slate-300 w-[140px] shrink-0">{formatCOP(sol.monto_requerido)}</span>
+                        <span className="py-3 px-4 text-right text-slate-300 w-[70px] shrink-0">{ltv}%</span>
+                        <span className="py-3 px-4 text-center w-[70px] shrink-0">
+                          <span className={`text-xs font-medium ${docCount === 5 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {docCount}/5
+                          </span>
+                        </span>
+                        <span className="py-3 px-4 text-center w-[70px] shrink-0">
+                          <span className={`text-xs font-medium ${photoCount === 5 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {photoCount}/5
+                          </span>
+                        </span>
+                        <span className="py-3 px-4 text-center w-[120px] shrink-0">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${status.class}`}>
+                            <StatusIcon size={12} />
+                            {status.label}
+                          </span>
+                        </span>
+                        <span className="py-3 px-4 text-center w-[40px] shrink-0">
+                          {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                        </span>
+                      </button>
 
                           {/* Expanded detail */}
                           {isExpanded && (
@@ -302,12 +301,10 @@ export default function DemoSolicitudesPage() {
                               </div>
                             </div>
                           )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}
