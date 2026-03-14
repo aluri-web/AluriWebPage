@@ -15,9 +15,13 @@ import {
   ShieldCheck,
   CreditCard,
   FileDown,
+  History,
+  Clock,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { uploadFile } from '@/utils/uploadFile'
-import { type SolicitudSummary } from './actions'
+import { type SolicitudSummary, type EvaluacionIA, saveEvaluation } from './actions'
 
 // ── Types ──────────────────────────────────────────────
 
@@ -109,7 +113,13 @@ function ElapsedTimer({ startedAt }: { startedAt: number }) {
 
 // ── Main Component ─────────────────────────────────────
 
-export default function AgentesPanel({ solicitudes }: { solicitudes: SolicitudSummary[] }) {
+export default function AgentesPanel({
+  solicitudes,
+  previousEvaluations = [],
+}: {
+  solicitudes: SolicitudSummary[]
+  previousEvaluations?: EvaluacionIA[]
+}) {
   const [mode, setMode] = useState<'solicitud' | 'manual'>('solicitud')
   const [selectedSolicitudId, setSelectedSolicitudId] = useState<string | null>(null)
   const [slots, setSlots] = useState<Record<string, DocumentSlot>>({ ...INITIAL_SLOTS })
@@ -117,9 +127,23 @@ export default function AgentesPanel({ solicitudes }: { solicitudes: SolicitudSu
   const [isProcessing, setIsProcessing] = useState(false)
   const [fichaPdfUrl, setFichaPdfUrl] = useState<string | null>(null)
   const [interestRate, setInterestRate] = useState(1.5)
+  const [evaluations, setEvaluations] = useState<EvaluacionIA[]>(previousEvaluations)
+  const [showHistory, setShowHistory] = useState(false)
+  const [viewingEvaluation, setViewingEvaluation] = useState<EvaluacionIA | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const selectedSolicitud = solicitudes.find((s) => s.id === selectedSolicitudId) || null
+
+  // Keep session alive while AI is processing (prevents timeout logout)
+  useEffect(() => {
+    if (!isProcessing) return
+    const interval = setInterval(() => {
+      window.dispatchEvent(new CustomEvent('session-activity-ping'))
+    }, 60_000) // ping every 60s
+    // Ping immediately on start
+    window.dispatchEvent(new CustomEvent('session-activity-ping'))
+    return () => clearInterval(interval)
+  }, [isProcessing])
 
   // Check which agents have all required docs
   const agentReady = (agentKey: string) => {
@@ -184,9 +208,73 @@ export default function AgentesPanel({ solicitudes }: { solicitudes: SolicitudSu
     }))
   }
 
+  // ── Load a previous evaluation into the agent cards ──
+
+  const loadEvaluation = useCallback((ev: EvaluacionIA) => {
+    const sections = ev.sections || {}
+    const now = Date.now()
+
+    setAgents({
+      titulos: {
+        status: 'completado',
+        result: {
+          resumen: sections['1_descripcion_inmueble']?.substring(0, 300) || 'Análisis completado',
+          riesgo: ev.risk_level,
+        },
+        error: null,
+        startedAt: now,
+        completedAt: now + (ev.processing_ms || 0),
+      },
+      kyc: {
+        status: 'completado',
+        result: {
+          resumen: sections['4_perfil_solicitante']?.substring(0, 300) || 'Verificación completada',
+        },
+        error: null,
+        startedAt: now,
+        completedAt: now + (ev.processing_ms || 0),
+      },
+      credito: {
+        status: 'completado',
+        result: {
+          resumen: sections['5_analisis_financiero']?.substring(0, 300) || 'Análisis financiero completado',
+        },
+        error: null,
+        startedAt: now,
+        completedAt: now + (ev.processing_ms || 0),
+      },
+      ficha: {
+        status: 'completado',
+        result: {
+          resumen_general: sections['6_evaluacion_riesgo']?.substring(0, 300) || 'Evaluación completada',
+          recomendacion: ev.verdict,
+          nivel_riesgo_global: `${ev.risk_level?.toUpperCase()} (${ev.risk_score}/10)`,
+        },
+        error: null,
+        startedAt: now,
+        completedAt: now + (ev.processing_ms || 0),
+      },
+    })
+
+    setFichaPdfUrl(ev.pdf_url || null)
+    setViewingEvaluation(ev)
+
+    // Set solicitud if it matches one we have
+    if (ev.solicitud_id) {
+      setSelectedSolicitudId(ev.solicitud_id)
+    }
+  }, [])
+
+  const clearViewingEvaluation = () => {
+    setAgents({ ...INITIAL_AGENTS })
+    setFichaPdfUrl(null)
+    setViewingEvaluation(null)
+  }
+
   // ── Orchestrator execution ──
 
   const handleProcesar = async () => {
+    setViewingEvaluation(null)
     setIsProcessing(true)
     setFichaPdfUrl(null)
 
@@ -307,6 +395,50 @@ export default function AgentesPanel({ solicitudes }: { solicitudes: SolicitudSu
         if (data.pdfUrl) {
           setFichaPdfUrl(data.pdfUrl)
         }
+
+        // Persist evaluation to DB
+        const savedDocuments: Record<string, string> = {}
+        for (const [k, v] of Object.entries(documents)) {
+          savedDocuments[k] = v
+        }
+
+        saveEvaluation({
+          solicitud_id: selectedSolicitudId,
+          applicant,
+          operation,
+          documents: savedDocuments,
+          verdict: data.verdict || null,
+          risk_level: data.riskLevel || null,
+          risk_score: data.riskScore ?? null,
+          sections: sections || null,
+          pdf_url: data.pdfUrl || null,
+          evaluation_id: data.evaluationId || null,
+          interest_rate: interestRate,
+          processing_ms: completedAt - now,
+        }).then(({ data: saved }) => {
+          if (saved) {
+            // Add to local history list
+            setEvaluations(prev => [{
+              id: saved.id,
+              solicitud_id: selectedSolicitudId,
+              admin_id: '',
+              applicant,
+              operation,
+              documents: savedDocuments,
+              verdict: data.verdict || null,
+              risk_level: data.riskLevel || null,
+              risk_score: data.riskScore ?? null,
+              sections: sections || null,
+              pdf_url: data.pdfUrl || null,
+              evaluation_id: data.evaluationId || null,
+              interest_rate: interestRate,
+              processing_ms: completedAt - now,
+              created_at: new Date().toISOString(),
+            }, ...prev])
+          }
+        }).catch(() => {
+          console.error('[AgentesPanel] Error saving evaluation')
+        })
       } else {
         const errorMsg = data.error || 'Error del orquestador'
         setAgents({
@@ -548,6 +680,28 @@ export default function AgentesPanel({ solicitudes }: { solicitudes: SolicitudSu
       </div>
 
       {/* Section 4: Agent Progress & Results */}
+      {viewingEvaluation && (
+        <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-xl px-5 py-3">
+          <div className="flex items-center gap-3">
+            <History size={16} className="text-amber-400" />
+            <span className="text-sm text-amber-300">
+              Viendo evaluación de <span className="font-semibold text-white">{viewingEvaluation.applicant?.name}</span>
+              {' — '}
+              {new Date(viewingEvaluation.created_at).toLocaleDateString('es-CO', {
+                day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+              })}
+            </span>
+          </div>
+          <button
+            onClick={clearViewingEvaluation}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition-colors"
+          >
+            <X size={12} />
+            Cerrar
+          </button>
+        </div>
+      )}
+
       {(isProcessing || Object.values(agents).some((a) => a.status !== 'idle')) && (
         <div>
           {/* Overall progress */}
@@ -633,11 +787,137 @@ export default function AgentesPanel({ solicitudes }: { solicitudes: SolicitudSu
           </div>
         </div>
       )}
+
+      {/* Section 5: Evaluation History */}
+      {evaluations.length > 0 && (
+        <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center justify-between w-full"
+          >
+            <div className="flex items-center gap-2">
+              <History size={16} className="text-amber-400" />
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                Evaluaciones Anteriores ({evaluations.length})
+              </h3>
+            </div>
+            {showHistory ? (
+              <ChevronUp size={16} className="text-slate-400" />
+            ) : (
+              <ChevronDown size={16} className="text-slate-400" />
+            )}
+          </button>
+
+          {showHistory && (
+            <div className="mt-4 space-y-3">
+              {evaluations.map((ev) => (
+                <EvaluationHistoryCard
+                  key={ev.id}
+                  evaluation={ev}
+                  isActive={viewingEvaluation?.id === ev.id}
+                  onLoad={() => loadEvaluation(ev)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Sub-components ─────────────────────────────────────
+
+function EvaluationHistoryCard({
+  evaluation,
+  isActive,
+  onLoad,
+}: {
+  evaluation: EvaluacionIA
+  isActive: boolean
+  onLoad: () => void
+}) {
+  const date = new Date(evaluation.created_at)
+  const formattedDate = date.toLocaleDateString('es-CO', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  const verdictColor =
+    evaluation.verdict === 'APROBAR'
+      ? 'text-emerald-400'
+      : evaluation.verdict === 'RECHAZAR'
+        ? 'text-red-400'
+        : 'text-amber-400'
+
+  const riskColor =
+    evaluation.risk_level === 'bajo'
+      ? 'text-emerald-400'
+      : evaluation.risk_level === 'medio'
+        ? 'text-amber-400'
+        : evaluation.risk_level === 'alto'
+          ? 'text-orange-400'
+          : 'text-red-400'
+
+  return (
+    <div className={`flex items-center justify-between rounded-lg px-4 py-3 border transition-colors ${
+      isActive
+        ? 'bg-amber-500/10 border-amber-500/30'
+        : 'bg-slate-700/30 border-slate-600/30 hover:border-slate-500/40'
+    }`}>
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="flex items-center gap-1.5 text-xs text-slate-400 shrink-0">
+          <Clock size={12} />
+          {formattedDate}
+        </div>
+        <span className="text-sm text-white truncate">
+          {evaluation.applicant?.name || 'Sin nombre'}
+        </span>
+        {evaluation.verdict && (
+          <span className={`text-xs font-semibold ${verdictColor}`}>
+            {evaluation.verdict}
+          </span>
+        )}
+        {evaluation.risk_level && (
+          <span className={`text-xs ${riskColor}`}>
+            Riesgo: {evaluation.risk_level} ({evaluation.risk_score}/10)
+          </span>
+        )}
+        {evaluation.processing_ms && (
+          <span className="text-xs text-slate-500">
+            {(evaluation.processing_ms / 1000).toFixed(0)}s
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={onLoad}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            isActive
+              ? 'bg-amber-500/20 text-amber-400'
+              : 'bg-slate-600 hover:bg-slate-500 text-slate-300'
+          }`}
+        >
+          <ExternalLink size={12} />
+          {isActive ? 'Viendo' : 'Ver'}
+        </button>
+        {evaluation.pdf_url && (
+          <a
+            href={evaluation.pdf_url}
+            download
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-medium transition-colors"
+          >
+            <Download size={12} />
+            PDF
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function AgentStatusBadge({ status }: { status: AgentStatus }) {
   const config = {

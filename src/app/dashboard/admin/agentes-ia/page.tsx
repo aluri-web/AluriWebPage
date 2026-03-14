@@ -1,9 +1,12 @@
 import { Bot } from 'lucide-react'
-import { getSolicitudesForAgents } from './actions'
+import { getSolicitudesForAgents, getEvaluations } from './actions'
 import AgentesPanel from './AgentesPanel'
 
 export default async function AgentesIAPage() {
-  const { data: solicitudes } = await getSolicitudesForAgents()
+  const [{ data: solicitudes }, { data: evaluaciones }] = await Promise.all([
+    getSolicitudesForAgents(),
+    getEvaluations(),
+  ])
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -19,7 +22,7 @@ export default async function AgentesIAPage() {
         </div>
       </header>
 
-      <AgentesPanel solicitudes={solicitudes} />
+      <AgentesPanel solicitudes={solicitudes} previousEvaluations={evaluaciones} />
     </div>
   )
 }

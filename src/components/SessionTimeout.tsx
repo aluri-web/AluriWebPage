@@ -52,12 +52,17 @@ export default function SessionTimeout() {
       window.addEventListener(event, handler, { passive: true })
     }
 
+    // Allow long-running processes (AI agents) to keep the session alive
+    const pingHandler = () => resetTimer()
+    window.addEventListener('session-activity-ping', pingHandler)
+
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       if (warningRef.current) clearTimeout(warningRef.current)
       for (const event of ACTIVITY_EVENTS) {
         window.removeEventListener(event, handler)
       }
+      window.removeEventListener('session-activity-ping', pingHandler)
     }
   }, [resetTimer])
 
