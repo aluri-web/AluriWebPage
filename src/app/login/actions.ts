@@ -36,6 +36,14 @@ export async function login(formData: FormData) {
 
   // Redirect según rol
   if (profile?.role === 'admin') {
+    // Check if admin has MFA enrolled → redirect to verify
+    const { data: factors } = await supabase.auth.mfa.listFactors()
+    const hasVerifiedTotp = factors?.totp?.some(f => f.status === 'verified')
+
+    if (hasVerifiedTotp) {
+      redirect('/login/mfa-verify')
+    }
+
     redirect('/dashboard/admin/colocaciones')
   } else if (profile?.role === 'propietario') {
     redirect('/dashboard/propietario')

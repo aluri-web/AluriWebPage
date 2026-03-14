@@ -13,7 +13,8 @@ import {
   Receipt,
   FolderOpen,
   ClipboardList,
-  Bot
+  Bot,
+  ShieldCheck,
 } from 'lucide-react'
 
 const mainNavItems = [
@@ -28,6 +29,7 @@ const mainNavItems = [
 ]
 
 const configNavItems = [
+  { href: '/dashboard/admin/seguridad', label: 'Seguridad', icon: ShieldCheck },
   { href: '/dashboard/admin/configuracion', label: 'Configuracion', icon: Settings },
   { href: '/dashboard/admin/api', label: 'API', icon: Code2 },
 ]

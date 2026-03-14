@@ -28,6 +28,12 @@ export default async function AdminLayout({
     return redirect('/dashboard/inversionista')
   }
 
+  // Enforce MFA: if admin has TOTP enrolled but session is AAL1, redirect to verify
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1') {
+    return redirect('/login/mfa-verify')
+  }
+
   const userName = profile?.full_name || user.user_metadata?.full_name || 'Administrador'
   const userEmail = user.email || ''
 

@@ -1,8 +1,39 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from './utils/supabase/middleware'
 
+function buildCspHeader(nonce: string): string {
+  const isDev = process.env.NODE_ENV === 'development'
+
+  const directives = [
+    "default-src 'self'",
+    // Nonce is primary; 'unsafe-inline' is fallback for older browsers (ignored when nonce present in CSP2+)
+    `script-src 'self' 'nonce-${nonce}' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com${isDev ? " 'unsafe-eval'" : ''}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://*.s3.amazonaws.com https://*.s3.us-east-1.amazonaws.com https://lh3.googleusercontent.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://www.google-analytics.com",
+    "frame-src 'self' https://js.stripe.com",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ]
+
+  return directives.join('; ')
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+
+  // ===============================================
+  // GENERATE CSP NONCE
+  // ===============================================
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const cspHeader = buildCspHeader(nonce)
+
+  // Set nonce AND CSP on request headers so Next.js can extract the nonce
+  // and inject it into its inline <script> tags during rendering
+  request.headers.set('x-nonce', nonce)
+  request.headers.set('Content-Security-Policy', cspHeader)
 
   // ===============================================
   // RUTAS EXCLUIDAS DEL MIDDLEWARE
@@ -12,6 +43,7 @@ export async function middleware(request: NextRequest) {
   if (isAuthRoute) {
     // Permitir que las rutas de auth funcionen sin interferencia
     const { supabaseResponse } = await updateSession(request)
+    supabaseResponse.headers.set('Content-Security-Policy', cspHeader)
     return supabaseResponse
   }
 
@@ -19,6 +51,11 @@ export async function middleware(request: NextRequest) {
   // ACTUALIZAR SESIÓN DE SUPABASE
   // ===============================================
   const { supabase, user, supabaseResponse } = await updateSession(request)
+
+  // ===============================================
+  // SET CSP ON RESPONSE
+  // ===============================================
+  supabaseResponse.headers.set('Content-Security-Policy', cspHeader)
 
   // ===============================================
   // DEFINIR RUTAS PROTEGIDAS (WHITELIST)
