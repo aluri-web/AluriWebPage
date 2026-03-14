@@ -56,13 +56,7 @@ export default function SolicitarCreditoPage() {
 
   // Step 1: Persona Natural
   const [nombreDeudor, setNombreDeudor] = useState('')
-  const [ingresoMensual, setIngresoMensual] = useState(0)
   const [tipoIngreso, setTipoIngreso] = useState('')
-  const [situacionHabitacional, setSituacionHabitacional] = useState('')
-  const [estadoCivil, setEstadoCivil] = useState('')
-  const [personasACargo, setPersonasACargo] = useState('')
-  const [nivelEducativo, setNivelEducativo] = useState('')
-  const [rangoEdad, setRangoEdad] = useState('')
 
   // Step 1: Persona Juridica
   const [nombreEmpresa, setNombreEmpresa] = useState('')
@@ -82,7 +76,7 @@ export default function SolicitarCreditoPage() {
   const ltvValid = ltv <= 60
   const step0Valid = direccion.trim() !== '' && ciudad.trim() !== '' && montoRequerido > 0 && valorInmueble > 0 && ltvValid
 
-  const step1NaturalValid = nombreDeudor.trim() !== '' && ingresoMensual > 0 && tipoIngreso !== '' && situacionHabitacional !== '' && estadoCivil !== '' && personasACargo !== '' && nivelEducativo !== '' && rangoEdad !== ''
+  const step1NaturalValid = nombreDeudor.trim() !== '' && tipoIngreso !== ''
   const step1JuridicaValid = nombreEmpresa.trim() !== '' && tipoSociedad !== '' && fechaConstitucion !== '' && tamanoEmpresa !== '' && resultadoOperativo !== '' && endeudamientoTotal !== '' && coberturaDSCR !== ''
   const step1Valid = tipoPersona === 'natural' ? step1NaturalValid : step1JuridicaValid
 
@@ -144,13 +138,7 @@ export default function SolicitarCreditoPage() {
             rol: rolDiligencia,
             tipo_persona: 'natural' as const,
             nombre: nombreDeudor,
-            ingreso_mensual: ingresoMensual,
             tipo_ingreso: tipoIngreso,
-            situacion_habitacional: situacionHabitacional,
-            estado_civil: estadoCivil,
-            personas_a_cargo: personasACargo,
-            nivel_educativo: nivelEducativo,
-            rango_edad: rangoEdad,
           }
         : {
             rol: rolDiligencia,
@@ -398,19 +386,6 @@ export default function SolicitarCreditoPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Ingreso mensual promedio (IMP) demostrable *</label>
-                  <input
-                    type="number"
-                    value={ingresoMensual || ''}
-                    onChange={e => setIngresoMensual(Number(e.target.value))}
-                    className={INPUT_CLASS}
-                    placeholder="5000000"
-                    min={0}
-                  />
-                  {ingresoMensual > 0 && <p className="text-xs text-gray-500 mt-1">{formatCOP(ingresoMensual)}</p>}
-                </div>
-
-                <div>
                   <label className="block text-sm text-gray-600 mb-1">Tipo de ingresos o vinculacion laboral *</label>
                   <select value={tipoIngreso} onChange={e => setTipoIngreso(e.target.value)} className={SELECT_CLASS}>
                     <option value="">Seleccionar...</option>
@@ -420,60 +395,6 @@ export default function SolicitarCreditoPage() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Situacion habitacional *</label>
-                  <select value={situacionHabitacional} onChange={e => setSituacionHabitacional(e.target.value)} className={SELECT_CLASS}>
-                    <option value="">Seleccionar...</option>
-                    <option value="propia">Vive en vivienda propia</option>
-                    <option value="familiar">Vive en vivienda familiar</option>
-                    <option value="arriendo">Vive en arriendo</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Estado civil *</label>
-                  <select value={estadoCivil} onChange={e => setEstadoCivil(e.target.value)} className={SELECT_CLASS}>
-                    <option value="">Seleccionar...</option>
-                    <option value="soltero">Soltero</option>
-                    <option value="casado_union_libre">Casado / Union libre</option>
-                    <option value="divorciado_viudo">Divorciado / Viudo</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Personas a cargo *</label>
-                  <select value={personasACargo} onChange={e => setPersonasACargo(e.target.value)} className={SELECT_CLASS}>
-                    <option value="">Seleccionar...</option>
-                    <option value="0">0</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3_o_mas">3 o mas</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Nivel educativo *</label>
-                  <select value={nivelEducativo} onChange={e => setNivelEducativo(e.target.value)} className={SELECT_CLASS}>
-                    <option value="">Seleccionar...</option>
-                    <option value="posgrado">Posgrado</option>
-                    <option value="pregrado">Pregrado</option>
-                    <option value="tecnologo">Tecnologo</option>
-                    <option value="tecnico">Tecnico</option>
-                    <option value="bachiller">Bachiller</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Edad *</label>
-                  <select value={rangoEdad} onChange={e => setRangoEdad(e.target.value)} className={SELECT_CLASS}>
-                    <option value="">Seleccionar...</option>
-                    <option value="18_25">Entre 18 y 25</option>
-                    <option value="26_35">Entre 26 y 35</option>
-                    <option value="36_45">Entre 36 y 45</option>
-                    <option value="46_55">Entre 46 y 55</option>
-                    <option value="mayor_55">Mayor a 55</option>
-                  </select>
-                </div>
               </div>
             </div>
           )}

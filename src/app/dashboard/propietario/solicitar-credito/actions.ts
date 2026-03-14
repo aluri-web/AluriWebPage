@@ -17,13 +17,7 @@ interface SolicitanteNatural {
   rol: 'deudor' | 'codeudor'
   tipo_persona: 'natural'
   nombre: string
-  ingreso_mensual: number
   tipo_ingreso: string
-  situacion_habitacional: string
-  estado_civil: string
-  personas_a_cargo: string
-  nivel_educativo: string
-  rango_edad: string
 }
 
 interface SolicitanteJuridica {
