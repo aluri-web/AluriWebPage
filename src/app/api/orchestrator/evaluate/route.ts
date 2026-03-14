@@ -84,6 +84,6 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     console.error('[orchestrator-proxy]', msg)
-    return NextResponse.json({ error: msg }, { status: 502 })
+    return NextResponse.json({ error: 'Error al comunicarse con el servicio' }, { status: 502 })
   }
 }

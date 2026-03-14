@@ -3,6 +3,7 @@
 import { createClient } from '../../../../utils/supabase/server'
 import { createAdminClient } from '../../../../utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { auditLog } from '@/lib/audit-log'
 
 export interface PendingInvestment {
   id: string
@@ -123,6 +124,13 @@ export async function approveInvestment(investmentId: string): Promise<{ success
         amount
       }
     })
+
+    await auditLog({
+      action: 'investment.approve',
+      resource_type: 'inversion',
+      resource_id: investmentId,
+      details: { credit_code: creditCode, amount }
+    })
   }
 
   revalidatePath('/dashboard/admin/inversiones')
@@ -207,6 +215,13 @@ export async function rejectInvestment(investmentId: string, reason: string): Pr
         amount,
         reason
       }
+    })
+
+    await auditLog({
+      action: 'investment.reject',
+      resource_type: 'inversion',
+      resource_id: investmentId,
+      details: { credit_code: creditCode, amount, reason }
     })
   }
 

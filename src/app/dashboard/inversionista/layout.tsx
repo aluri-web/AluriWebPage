@@ -2,6 +2,7 @@ import { createClient } from '../../../utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar from '../../../components/dashboard/Sidebar'
 import MobileSidebar from '../../../components/dashboard/MobileSidebar'
+import SessionTimeout from '../../../components/SessionTimeout'
 
 export default async function InversionistaLayout({
   children,
@@ -35,6 +36,7 @@ export default async function InversionistaLayout({
 
   return (
     <div className="min-h-screen bg-black">
+      <SessionTimeout />
       {/* Desktop sidebar */}
       <Sidebar user={{ name: userName, email: userEmail }} />
 

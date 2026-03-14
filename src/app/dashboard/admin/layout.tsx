@@ -2,6 +2,7 @@ import { createClient } from '../../../utils/supabase/server'
 import { redirect } from 'next/navigation'
 import AdminSidebar from '../../../components/dashboard/AdminSidebar'
 import AdminMobileSidebar from '../../../components/dashboard/AdminMobileSidebar'
+import SessionTimeout from '../../../components/SessionTimeout'
 
 export default async function AdminLayout({
   children,
@@ -32,6 +33,7 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-slate-900">
+      <SessionTimeout />
       {/* Desktop sidebar */}
       <AdminSidebar user={{ name: userName, email: userEmail }} />
 

@@ -4,6 +4,7 @@ import { createClient } from '../../../../utils/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { createLoan } from '@/app/actions/create-loan'
+import { auditLog } from '@/lib/audit-log'
 
 // ========== ADMIN AUTH HELPER ==========
 
@@ -492,6 +493,13 @@ export async function createFullLoanRecord(
       }
     }
 
+    await auditLog({
+      action: 'loan.create',
+      resource_type: 'credito',
+      resource_id: loanResult.loanId,
+      details: { code: data.code, amount: data.amount_requested, investors_count: data.investors.length }
+    })
+
     revalidatePath('/dashboard/admin/colocaciones')
     revalidatePath('/dashboard/admin/creditos')
 
@@ -837,6 +845,13 @@ export async function addInvestmentToLoan(
       return { success: false, error: 'Error al crear inversion: ' + investError.message }
     }
 
+    await auditLog({
+      action: 'investment.create',
+      resource_type: 'inversion',
+      resource_id: data.loan_id,
+      details: { investor_id: investorId, amount: data.amount, percentage: (data.amount / (credito.monto_solicitado || 1)) * 100 }
+    })
+
     revalidatePath('/dashboard/admin/colocaciones')
 
     return { success: true, investmentId: investment.id }
@@ -1066,6 +1081,13 @@ export async function registerLoanPayment(
       console.error('Error actualizando saldos:', updateError)
       return { success: false, error: 'Error al actualizar saldos: ' + updateError.message }
     }
+
+    await auditLog({
+      action: 'payment.register',
+      resource_type: 'pago',
+      resource_id: data.loan_id,
+      details: { amount: data.monto, date: data.payment_date }
+    })
 
     revalidatePath('/dashboard/admin/colocaciones')
     revalidatePath(`/dashboard/admin/colocaciones/${data.loan_id}`)
@@ -1329,6 +1351,13 @@ export async function updateCredit(
     return { success: false, error: 'Error al actualizar credito: ' + error.message }
   }
 
+  await auditLog({
+    action: 'loan.update',
+    resource_type: 'credito',
+    resource_id: id,
+    details: { fields_updated: Object.keys(updateObj) }
+  })
+
   revalidatePath('/dashboard/admin/colocaciones')
   revalidatePath(`/dashboard/admin/colocaciones/${id}`)
 
@@ -1440,6 +1469,13 @@ export async function deleteCredit(
       await supabaseAdmin.from('notificaciones').insert(notifications)
     }
 
+    await auditLog({
+      action: 'loan.delete',
+      resource_type: 'credito',
+      resource_id: creditId,
+      details: { codigo: credit.codigo_credito }
+    })
+
     revalidatePath('/dashboard/admin/colocaciones')
     revalidatePath('/dashboard/inversionista/notificaciones')
     revalidatePath('/dashboard/propietario/notificaciones')
@@ -1525,6 +1561,15 @@ export async function removeInvestment(investmentId: string): Promise<{ success:
     return { success: false, error: 'ID de inversion es requerido.' }
   }
 
+  // Fetch investment details before deleting (for audit log)
+  const { data: invData } = await supabaseAdmin
+    .from('inversiones')
+    .select('credito_id')
+    .eq('id', investmentId)
+    .single()
+
+  const creditoId = invData?.credito_id
+
   const { error } = await supabaseAdmin
     .from('inversiones')
     .delete()
@@ -1534,6 +1579,13 @@ export async function removeInvestment(investmentId: string): Promise<{ success:
     console.error('Error removing investment:', error.message)
     return { success: false, error: 'Error al eliminar inversion: ' + error.message }
   }
+
+  await auditLog({
+    action: 'investment.remove',
+    resource_type: 'inversion',
+    resource_id: investmentId,
+    details: { credito_id: creditoId }
+  })
 
   revalidatePath('/dashboard/admin/colocaciones')
 

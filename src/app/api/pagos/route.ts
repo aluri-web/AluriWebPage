@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { verificarAuth } from '@/lib/api-keys'
+import { apiLimiter, getClientIp } from '@/lib/rate-limit'
+import { auditLogApi } from '@/lib/audit-log'
 
 // Tipos para la API
 interface SolicitudPago {
@@ -91,40 +94,42 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       )
     }
 
+    const ip = getClientIp(request)
+    const rateCheck = await apiLimiter.check(ip)
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, monto_total: 0, distribucion: [], error: 'Demasiadas solicitudes. Intente más tarde.' },
+        { status: 429, headers: apiLimiter.headers(rateCheck) }
+      )
+    }
+
     const supabase = authResult.supabase
     const body: SolicitudPago = await request.json()
 
-    // Validaciones
-    if (!body.credito_id) {
+    // Validaciones con Zod
+    const bodySchema = z.object({
+      credito_id: z.string().min(1, 'credito_id es requerido'),
+      fecha_pago: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'fecha_pago debe ser YYYY-MM-DD'),
+      monto: z.number().positive('El monto debe ser mayor a cero'),
+    })
+
+    const parsed = bodySchema.safeParse(body)
+    if (!parsed.success) {
       return NextResponse.json(
-        { success: false, monto_total: 0, distribucion: [], error: 'credito_id es requerido' },
+        { success: false, monto_total: 0, distribucion: [], error: parsed.error.issues[0].message },
         { status: 400 }
       )
     }
 
-    if (!body.fecha_pago) {
-      return NextResponse.json(
-        { success: false, monto_total: 0, distribucion: [], error: 'fecha_pago es requerido' },
-        { status: 400 }
-      )
-    }
-
-    const montoTotal = body.monto || 0
-
-    if (montoTotal <= 0) {
-      return NextResponse.json(
-        { success: false, monto_total: 0, distribucion: [], error: 'El monto debe ser mayor a cero' },
-        { status: 400 }
-      )
-    }
+    const { credito_id, fecha_pago, monto: montoTotal } = parsed.data
 
     // Verificar que el crédito existe (buscar por ID o por codigo_credito)
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.credito_id)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credito_id)
 
     const { data: credito, error: creditoError } = await supabase
       .from('creditos')
       .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, tasa_nominal, tipo_liquidacion, tipo_amortizacion, valor_colocado, fecha_desembolso, fecha_ultimo_pago, plazo')
-      .eq(isUUID ? 'id' : 'codigo_credito', body.credito_id)
+      .eq(isUUID ? 'id' : 'codigo_credito', credito_id)
       .single()
 
     if (creditoError || !credito) {
@@ -145,7 +150,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
     const esAnticipada = (credito.tipo_liquidacion || 'vencida') === 'anticipada'
     const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
     const principal = credito.valor_colocado || credito.monto_solicitado || 0
-    const fechaPago = new Date(body.fecha_pago + 'T12:00:00') // Usar fecha del pago como referencia
+    const fechaPago = new Date(fecha_pago + 'T12:00:00') // Usar fecha del pago como referencia
 
     let saldoInteresesCalculado = 0
 
@@ -214,7 +219,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
           .from('tasas_oficiales')
           .select('tasa_ea, vigencia_desde, vigencia_hasta')
           .eq('tipo', 'usura_consumo')
-          .lte('vigencia_desde', body.fecha_pago)
+          .lte('vigencia_desde', fecha_pago)
           .gte('vigencia_hasta', fechaInicioMora)
           .order('vigencia_desde', { ascending: true })
 
@@ -345,8 +350,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         credito_id: creditoId,
         tipo_transaccion: 'pago_mora',
         monto: montoMora,
-        fecha_aplicacion: body.fecha_pago,
-        fecha_transaccion: body.fecha_pago,
+        fecha_aplicacion: fecha_pago,
+        fecha_transaccion: fecha_pago,
         referencia_pago: referenciaPago
       })
     }
@@ -356,8 +361,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         credito_id: creditoId,
         tipo_transaccion: 'pago_interes',
         monto: montoInteres,
-        fecha_aplicacion: body.fecha_pago,
-        fecha_transaccion: body.fecha_pago,
+        fecha_aplicacion: fecha_pago,
+        fecha_transaccion: fecha_pago,
         referencia_pago: referenciaPago
       })
     }
@@ -367,8 +372,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
         credito_id: creditoId,
         tipo_transaccion: 'pago_capital',
         monto: montoCapital,
-        fecha_aplicacion: body.fecha_pago,
-        fecha_transaccion: body.fecha_pago,
+        fecha_aplicacion: fecha_pago,
+        fecha_transaccion: fecha_pago,
         referencia_pago: referenciaPago
       })
     }
@@ -381,7 +386,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       if (txError) {
         console.error('Error registering payment:', txError)
         return NextResponse.json(
-          { success: false, monto_total: 0, distribucion: [], error: 'Error al registrar el pago: ' + txError.message },
+          { success: false, monto_total: 0, distribucion: [], error: 'Error al registrar el pago' },
           { status: 500 }
         )
       }
@@ -392,7 +397,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
       saldo_capital: nuevoSaldoCapital,
       saldo_intereses: nuevoSaldoIntereses,
       saldo_mora: nuevoSaldoMora,
-      fecha_ultimo_pago: body.fecha_pago,
+      fecha_ultimo_pago: fecha_pago,
     }
 
     // Si el capital quedó en 0, marcar como pagado
@@ -410,6 +415,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
     if (updateError) {
       console.error('Error actualizando saldos del crédito:', updateError)
     }
+
+    // Audit log
+    auditLogApi(supabase, {
+      action: 'payment.register',
+      resource_type: 'pago',
+      resource_id: creditoId,
+      details: { monto_total: montoTotal, fecha: fecha_pago, referencia: referenciaPago, codigo_credito: credito.codigo_credito }
+    })
 
     return NextResponse.json({
       success: true,
@@ -447,6 +460,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status || 500 }
+      )
+    }
+
+    const ip = getClientIp(request)
+    const rateCheckGet = await apiLimiter.check(ip)
+    if (!rateCheckGet.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Demasiadas solicitudes. Intente más tarde.' },
+        { status: 429, headers: apiLimiter.headers(rateCheckGet) }
       )
     }
 

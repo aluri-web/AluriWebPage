@@ -2,6 +2,7 @@ import { createClient } from '../../../utils/supabase/server'
 import { redirect } from 'next/navigation'
 import PropietarioSidebar from '../../../components/dashboard/PropietarioSidebar'
 import PropietarioMobileSidebar from '../../../components/dashboard/PropietarioMobileSidebar'
+import SessionTimeout from '../../../components/SessionTimeout'
 
 export default async function PropietarioLayout({
   children,
@@ -35,6 +36,7 @@ export default async function PropietarioLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SessionTimeout />
       {/* Desktop sidebar */}
       <PropietarioSidebar user={{ name: userName, email: userEmail }} />
 

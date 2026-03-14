@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { verificarAuth } from '@/lib/api-keys'
+import { apiLimiter, getClientIp } from '@/lib/rate-limit'
+import { auditLogApi } from '@/lib/audit-log'
 
 /**
  * GET /api/creditos/[id]
@@ -18,11 +21,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse> {
   try {
-    const authResult = await verificarAuth(request, 'read')
+    const authResult = await verificarAuth(request, 'admin')
     if (!authResult.success || !authResult.supabase) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status || 500 }
+      )
+    }
+
+    const ip = getClientIp(request)
+    const rateCheck = await apiLimiter.check(ip)
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Demasiadas solicitudes. Intente más tarde.' },
+        { status: 429, headers: apiLimiter.headers(rateCheck) }
       )
     }
 
@@ -63,7 +75,7 @@ export async function GET(
 
     if (error || !credito) {
       return NextResponse.json(
-        { success: false, error: `Crédito no encontrado: ${creditoIdParam}` },
+        { success: false, error: 'Crédito no encontrado' },
         { status: 404 }
       )
     }

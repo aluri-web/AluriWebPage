@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { verificarAuth } from '@/lib/api-keys'
+import { apiLimiter, getClientIp } from '@/lib/rate-limit'
 
 /**
  * GET /api/causaciones
@@ -17,7 +19,7 @@ import { verificarAuth } from '@/lib/api-keys'
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    const authResult = await verificarAuth(request, 'read')
+    const authResult = await verificarAuth(request, 'admin')
     if (!authResult.success || !authResult.supabase) {
       return NextResponse.json(
         { success: false, error: authResult.error },
@@ -25,10 +27,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       )
     }
 
+    const ip = getClientIp(request)
+    const rateCheck = await apiLimiter.check(ip)
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Demasiadas solicitudes. Intente más tarde.' },
+        { status: 429, headers: apiLimiter.headers(rateCheck) }
+      )
+    }
+
     const supabase = authResult.supabase
     const { searchParams } = new URL(request.url)
     const creditoIdParam = searchParams.get('credito_id')
-    const limite = parseInt(searchParams.get('limite') || '100')
+    const limiteSchema = z.coerce.number().int().min(1).max(1000).default(100)
+    const limiteResult = limiteSchema.safeParse(searchParams.get('limite') || '100')
+    const limite = limiteResult.success ? limiteResult.data : 100
 
     if (!creditoIdParam) {
       return NextResponse.json(
@@ -51,7 +64,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
       if (errorCredito || !credito) {
         return NextResponse.json(
-          { success: false, error: `Crédito no encontrado: ${creditoIdParam}` },
+          { success: false, error: 'Crédito no encontrado' },
           { status: 404 }
         )
       }

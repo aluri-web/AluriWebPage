@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { verificarAuth } from '@/lib/api-keys'
+import { apiLimiter, getClientIp } from '@/lib/rate-limit'
 
 /**
  * GET /api/usuarios
@@ -25,21 +27,34 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         { status: authResult.status || 500 }
       )
     }
+
+    const ip = getClientIp(request)
+    const rateCheck = await apiLimiter.check(ip)
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'Demasiadas solicitudes. Intente más tarde.' },
+        { status: 429, headers: apiLimiter.headers(rateCheck) }
+      )
+    }
+
     const supabase = authResult.supabase
 
     // Procesar la solicitud (usuario autenticado como admin)
     const { searchParams } = new URL(request.url)
-    const rol = searchParams.get('rol')
-    const limite = parseInt(searchParams.get('limite') || '50')
+    const rolSchema = z.enum(['admin', 'propietario', 'inversionista', 'demo']).optional()
+    const limiteSchema = z.coerce.number().int().min(1).max(200).default(50)
+
+    const rol = rolSchema.safeParse(searchParams.get('rol') || undefined)
+    const limite = limiteSchema.safeParse(searchParams.get('limite') || '50')
 
     let query = supabase
       .from('profiles')
       .select('id, full_name, email, document_id, phone, address, city, role, verification_status, created_at')
       .order('created_at', { ascending: false })
-      .limit(limite)
+      .limit(limite.success ? limite.data : 50)
 
-    if (rol) {
-      query = query.eq('role', rol)
+    if (rol.success && rol.data) {
+      query = query.eq('role', rol.data)
     }
 
     const { data: usuarios, error } = await query

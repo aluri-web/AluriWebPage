@@ -3,6 +3,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { ejecutarCausacionDiaria } from '@/lib/interest/calculator'
 import type { ResumenEjecucion } from '@/lib/interest/types'
 import crypto from 'crypto'
+import { cronLimiter, getClientIp } from '@/lib/rate-limit'
 
 /**
  * POST /api/cron/calcular-intereses
@@ -35,6 +36,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<ResumenEj
   const inicio = Date.now()
 
   try {
+    // 0. Rate limiting
+    const ip = getClientIp(request)
+    const rateCheck = await cronLimiter.check(ip)
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Demasiadas ejecuciones. Máximo 2 por hora.' },
+        { status: 429, headers: cronLimiter.headers(rateCheck) }
+      )
+    }
+
     // 1. Verificar autenticación del cron
     const authHeader = request.headers.get('Authorization')
     const cronSecret = process.env.CRON_SECRET

@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error uploading to Supabase:', error)
-      return NextResponse.json({ error: 'Error al subir archivo: ' + error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al subir archivo' }, { status: 500 })
     }
 
     // Obtener URL pública
@@ -122,7 +122,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error('Error deleting from Supabase:', error)
-      return NextResponse.json({ error: 'Error al eliminar archivo: ' + error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al eliminar archivo' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

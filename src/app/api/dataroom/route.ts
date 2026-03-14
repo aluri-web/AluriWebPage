@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Error uploading dataroom file:', uploadError)
-      return NextResponse.json({ error: 'Error al subir: ' + uploadError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al subir archivo' }, { status: 500 })
     }
 
     const {
@@ -261,7 +261,7 @@ export async function DELETE(request: NextRequest) {
 
     if (deleteError) {
       console.error('Error deleting dataroom file:', deleteError)
-      return NextResponse.json({ error: 'Error al eliminar: ' + deleteError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al eliminar archivo' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

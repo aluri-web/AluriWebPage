@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { uploadLimiter, getClientIp } from '@/lib/rate-limit'
 
 const BUCKET = 'properties'
+
+// Magic bytes para validación real de tipo de archivo
+const IMAGE_SIGNATURES: number[][] = [
+  [0xFF, 0xD8, 0xFF],           // JPEG
+  [0x89, 0x50, 0x4E, 0x47],     // PNG
+  [0x47, 0x49, 0x46, 0x38],     // GIF
+  [0x52, 0x49, 0x46, 0x46],     // WEBP (RIFF)
+  [0x42, 0x4D],                  // BMP
+]
+const PDF_SIGNATURE = [0x25, 0x50, 0x44, 0x46] // %PDF
+
+function validateMagicBytes(buffer: Buffer, declaredType: string): boolean {
+  if (buffer.length < 4) return false
+  if (declaredType.startsWith('image/')) {
+    return IMAGE_SIGNATURES.some(sig => sig.every((byte, i) => buffer[i] === byte))
+  }
+  if (declaredType === 'application/pdf') {
+    return PDF_SIGNATURE.every((byte, i) => buffer[i] === byte)
+  }
+  return false
+}
 
 /**
  * POST /api/upload
@@ -11,6 +33,16 @@ const BUCKET = 'properties'
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const ip = getClientIp(request)
+    const rateCheck = await uploadLimiter.check(ip)
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: 'Demasiadas subidas. Intente más tarde.' },
+        { status: 429, headers: uploadLimiter.headers(rateCheck) }
+      )
+    }
+
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -37,6 +69,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `El archivo excede ${isPdf ? '25' : '5'}MB` }, { status: 400 })
     }
 
+    // Convert File to Buffer for reliable upload of large files
+    const buffer = Buffer.from(await file.arrayBuffer())
+
+    // Validar magic bytes (contenido real del archivo)
+    if (!validateMagicBytes(buffer, file.type)) {
+      return NextResponse.json({ error: 'El contenido del archivo no coincide con el tipo declarado' }, { status: 400 })
+    }
+
     // Use service role for storage upload (bypasses RLS)
     const adminSupabase = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,9 +86,6 @@ export async function POST(request: NextRequest) {
     const timestamp = Date.now()
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_')
     const path = `${loanCode}/${timestamp}_${sanitizedName}`
-
-    // Convert File to Buffer for reliable upload of large files
-    const buffer = Buffer.from(await file.arrayBuffer())
 
     const { error: uploadError } = await adminSupabase
       .storage
@@ -61,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Error uploading:', uploadError)
-      return NextResponse.json({ error: 'Error al subir: ' + uploadError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al subir archivo' }, { status: 500 })
     }
 
     const { data: { publicUrl } } = adminSupabase
@@ -115,7 +152,7 @@ export async function DELETE(request: NextRequest) {
 
     if (deleteError) {
       console.error('Error deleting:', deleteError)
-      return NextResponse.json({ error: 'Error al eliminar: ' + deleteError.message }, { status: 500 })
+      return NextResponse.json({ error: 'Error al eliminar archivo' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
