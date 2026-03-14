@@ -68,6 +68,11 @@ export async function GET(request: NextRequest) {
     // Proxy mode: download a specific file's content server-side
     const filePath = request.nextUrl.searchParams.get('file')
     if (filePath) {
+      // Path traversal prevention
+      if (filePath.includes('..') || !filePath.startsWith(FOLDER + '/')) {
+        return NextResponse.json({ error: 'Ruta no permitida' }, { status: 400 })
+      }
+
       const { data, error: downloadError } = await adminSupabase.storage
         .from(BUCKET)
         .download(filePath)

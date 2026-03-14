@@ -5,6 +5,23 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { createLoan } from '@/app/actions/create-loan'
 
+// ========== ADMIN AUTH HELPER ==========
+
+async function verifyAdmin(): Promise<{ authorized: boolean; error?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { authorized: false, error: 'No autenticado' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') return { authorized: false, error: 'No autorizado' }
+  return { authorized: true }
+}
+
 // ========== SEARCH & LOOKUP FUNCTIONS ==========
 
 export interface DebtorSearchResult {
@@ -124,7 +141,7 @@ async function createUserWithProfile(
   // Try to create auth user
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email: email,
-    password: `Temp${cedula}!`,
+    password: `Tmp${crypto.randomUUID().slice(0, 12)}!`,
     email_confirm: true,
     user_metadata: {
       full_name,
@@ -307,6 +324,9 @@ export interface FullLoanData {
 export async function createFullLoanRecord(
   data: FullLoanData
 ): Promise<{ success: boolean; error?: string; loanId?: string }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { success: false, error: adminCheck.error }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -711,6 +731,9 @@ export interface AddInvestmentData {
 export async function addInvestmentToLoan(
   data: AddInvestmentData
 ): Promise<{ success: boolean; error?: string; investmentId?: string }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { success: false, error: adminCheck.error }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -889,6 +912,9 @@ export interface RegisterPaymentData {
 export async function registerLoanPayment(
   data: RegisterPaymentData
 ): Promise<{ success: boolean; error?: string; aplicacion?: Record<string, unknown> }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { success: false, error: adminCheck.error }
+
   // Validation
   if (!data.loan_id) {
     return { success: false, error: 'ID del credito es requerido.' }
@@ -1231,6 +1257,9 @@ export interface UpdateCreditData {
 export async function updateCredit(
   data: UpdateCreditData
 ): Promise<{ success: boolean; error?: string }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { success: false, error: adminCheck.error }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -1311,6 +1340,9 @@ export async function updateCredit(
 export async function deleteCredit(
   creditId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { success: false, error: adminCheck.error }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -1477,6 +1509,9 @@ export async function getCreditInvestments(creditId: string): Promise<{ data: Cr
 // ========== REMOVE INVESTMENT ==========
 
 export async function removeInvestment(investmentId: string): Promise<{ success: boolean; error?: string }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { success: false, error: adminCheck.error }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 

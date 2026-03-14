@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { ejecutarCausacionDiaria } from '@/lib/interest/calculator'
 import type { ResumenEjecucion } from '@/lib/interest/types'
+import crypto from 'crypto'
 
 /**
  * POST /api/cron/calcular-intereses
@@ -50,8 +51,34 @@ export async function POST(request: NextRequest): Promise<NextResponse<ResumenEj
     }
 
     // Verificar token Bearer o firma de Vercel
-    const bearerToken = authHeader?.replace('Bearer ', '')
-    const isAuthorized = bearerToken === cronSecret || vercelCronSignature
+    const bearerToken = authHeader?.replace('Bearer ', '') || ''
+    let isAuthorized = false
+
+    // Timing-safe comparison for Bearer token
+    if (bearerToken.length === cronSecret.length) {
+      isAuthorized = crypto.timingSafeEqual(
+        Buffer.from(bearerToken),
+        Buffer.from(cronSecret)
+      )
+    }
+
+    // Vercel cron signature verification
+    if (!isAuthorized && vercelCronSignature && cronSecret) {
+      try {
+        const expectedSignature = crypto
+          .createHmac('sha256', cronSecret)
+          .update(request.url)
+          .digest('hex')
+        if (expectedSignature.length === vercelCronSignature.length) {
+          isAuthorized = crypto.timingSafeEqual(
+            Buffer.from(expectedSignature),
+            Buffer.from(vercelCronSignature)
+          )
+        }
+      } catch {
+        // Invalid signature format
+      }
+    }
 
     if (!isAuthorized) {
       console.warn('Intento no autorizado de ejecutar cron de intereses')

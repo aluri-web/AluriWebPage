@@ -234,26 +234,6 @@ export default function SolicitudCard({ solicitud }: { solicitud: MiSolicitud })
             </div>
           </div>
 
-          {/* Admin notes */}
-          {solicitud.notas_admin && (
-            <div className={`p-4 rounded-xl border mb-6 ${
-              solicitud.estado === 'rechazada'
-                ? 'bg-red-50 border-red-200'
-                : 'bg-blue-50 border-blue-200'
-            }`}>
-              <p className={`text-sm font-medium mb-1 ${
-                solicitud.estado === 'rechazada' ? 'text-red-700' : 'text-blue-700'
-              }`}>
-                Notas del equipo Aluri:
-              </p>
-              <p className={`text-sm ${
-                solicitud.estado === 'rechazada' ? 'text-red-600' : 'text-blue-600'
-              }`}>
-                {solicitud.notas_admin}
-              </p>
-            </div>
-          )}
-
           {/* Documents section */}
           <div className="mb-6">
             <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">

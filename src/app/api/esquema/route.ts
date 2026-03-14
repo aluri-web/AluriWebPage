@@ -26,8 +26,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const supabase = authResult.supabase
 
     // Procesar la solicitud (usuario autenticado como admin)
+    const ALLOWED_TABLES = [
+      'creditos', 'inversiones', 'solicitudes_credito', 'profiles',
+      'notificaciones', 'causaciones', 'log_ejecucion_cron', 'pagos'
+    ]
     const { searchParams } = new URL(request.url)
     const tabla = searchParams.get('tabla') || 'creditos'
+
+    if (!ALLOWED_TABLES.includes(tabla)) {
+      return NextResponse.json(
+        { success: false, error: `Tabla '${tabla}' no permitida` },
+        { status: 400 }
+      )
+    }
 
     // Consultar information_schema para obtener las columnas de la tabla
     const { data: columnas, error } = await supabase

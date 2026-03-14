@@ -15,12 +15,20 @@ export default async function InversionistaLayout({
     return redirect('/login')
   }
 
-  // Fetch user profile for name
+  // Fetch user profile for name and role verification
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name')
+    .select('full_name, role')
     .eq('id', user.id)
     .single()
+
+  // Verify role
+  if (profile?.role !== 'inversionista') {
+    if (profile?.role === 'admin') {
+      return redirect('/dashboard/admin')
+    }
+    return redirect('/dashboard/propietario')
+  }
 
   const userName = profile?.full_name || user.user_metadata?.full_name || ''
   const userEmail = user.email || ''

@@ -15,7 +15,6 @@ export interface MiSolicitud {
   documentos: { tipo: string; url: string }[]
   fotos: { tipo: string; url: string }[]
   estado: string
-  notas_admin: string | null
   created_at: string
   updated_at: string
 }
@@ -40,7 +39,6 @@ export async function getMisSolicitudes(): Promise<{ data: MiSolicitud[]; error:
       documentos,
       fotos,
       estado,
-      notas_admin,
       created_at,
       updated_at
     `)

@@ -57,10 +57,14 @@ export async function getUnreadCount(): Promise<number> {
 export async function markAsRead(notificationId: string): Promise<{ success: boolean }> {
   const supabase = await createClient()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false }
+
   const { error } = await supabase
     .from('notificaciones')
     .update({ leida: true })
     .eq('id', notificationId)
+    .eq('user_id', user.id)
 
   if (error) {
     console.error('Error marking notification as read:', error.message)

@@ -50,6 +50,21 @@ export async function getPendingInvestments(): Promise<{ data: PendingInvestment
 }
 
 export async function approveInvestment(investmentId: string): Promise<{ success: boolean; error?: string }> {
+  // Verify caller is admin
+  const authSupabase = await createClient()
+  const { data: { user } } = await authSupabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autenticado' }
+
+  const { data: profile } = await authSupabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    return { success: false, error: 'No autorizado' }
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -117,6 +132,21 @@ export async function approveInvestment(investmentId: string): Promise<{ success
 }
 
 export async function rejectInvestment(investmentId: string, reason: string): Promise<{ success: boolean; error?: string }> {
+  // Verify caller is admin
+  const authSupabase = await createClient()
+  const { data: { user } } = await authSupabase.auth.getUser()
+  if (!user) return { success: false, error: 'No autenticado' }
+
+  const { data: profile } = await authSupabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') {
+    return { success: false, error: 'No autorizado' }
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
