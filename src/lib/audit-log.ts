@@ -1,5 +1,3 @@
-'use server'
-
 import { createClient } from '../utils/supabase/server'
 import { headers } from 'next/headers'
 
@@ -42,6 +40,7 @@ interface AuditLogEntry {
  * Se ejecuta de forma async sin bloquear la operación principal.
  */
 export async function auditLog(entry: AuditLogEntry): Promise<void> {
+  'use server'
   try {
     const supabase = await createClient()
 
