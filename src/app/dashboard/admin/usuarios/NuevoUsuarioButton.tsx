@@ -148,6 +148,7 @@ export default function NuevoUsuarioButton() {
                     <option value="inversionista">Inversionista</option>
                     <option value="propietario">Propietario</option>
                     <option value="admin">Administrador</option>
+                    <option value="demo">Demo</option>
                   </select>
                 </div>
 

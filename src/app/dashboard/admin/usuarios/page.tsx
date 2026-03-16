@@ -23,6 +23,7 @@ export default async function AdminUsuariosPage() {
   const adminCount = usersList.filter(u => u.role === 'admin').length
   const inversorCount = usersList.filter(u => u.role === 'inversionista' || u.role === 'inversor').length
   const propietarioCount = usersList.filter(u => u.role === 'propietario').length
+  const demoCount = usersList.filter(u => u.role === 'demo').length
 
   return (
     <div className="text-white p-8">
@@ -37,7 +38,7 @@ export default async function AdminUsuariosPage() {
       </header>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
           <div className="flex items-center gap-4 mb-2">
             <div className="p-3 bg-emerald-500/10 rounded-full text-emerald-400">
@@ -66,6 +67,16 @@ export default async function AdminUsuariosPage() {
             <span className="text-slate-400 text-sm">Propietarios</span>
           </div>
           <p className="text-3xl font-bold text-white">{propietarioCount}</p>
+        </div>
+
+        <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+          <div className="flex items-center gap-4 mb-2">
+            <div className="p-3 bg-purple-500/10 rounded-full text-purple-400">
+              <Users size={24} />
+            </div>
+            <span className="text-slate-400 text-sm">Demo</span>
+          </div>
+          <p className="text-3xl font-bold text-white">{demoCount}</p>
         </div>
       </div>
 

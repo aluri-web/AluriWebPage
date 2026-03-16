@@ -23,7 +23,7 @@ export async function crearUsuario(formData: FormData) {
     return { error: 'Todos los campos son requeridos' }
   }
 
-  const validRoles = ['inversionista', 'propietario', 'admin']
+  const validRoles = ['inversionista', 'propietario', 'admin', 'demo']
   if (!validRoles.includes(role)) {
     return { error: 'Rol invalido' }
   }
@@ -132,7 +132,7 @@ export async function updateUserProfile(data: UpdateUserData) {
   }
 
   if (data.role !== undefined) {
-    const validRoles = ['inversionista', 'propietario', 'admin']
+    const validRoles = ['inversionista', 'propietario', 'admin', 'demo']
     if (!validRoles.includes(data.role)) {
       return { error: 'Rol invalido' }
     }

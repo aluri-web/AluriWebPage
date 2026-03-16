@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '../../../../utils/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
 export async function updateProfile(formData: FormData) {
@@ -69,8 +70,13 @@ export async function changePassword(formData: FormData) {
     return { error: 'Las contraseñas no coinciden' }
   }
 
-  // Verify current password by attempting to sign in
-  const { error: signInError } = await supabase.auth.signInWithPassword({
+  // Verify current password using a standalone client (no cookies)
+  // This prevents overwriting the current AAL2 session with a new AAL1 session
+  const verifyClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+  const { error: signInError } = await verifyClient.auth.signInWithPassword({
     email: user.email!,
     password: currentPassword
   })
