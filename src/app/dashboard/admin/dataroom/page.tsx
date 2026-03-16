@@ -139,16 +139,22 @@ export default function DataroomPage() {
     setTextContent(null)
 
     try {
-      const res = await fetch(`/api/dataroom?file=${encodeURIComponent(file.path)}`)
+      const apiUrl = `/api/dataroom?file=${encodeURIComponent(file.path)}`
 
-      if (file.category === 'html') {
+      if (file.category === 'pdf') {
+        // Use API URL directly — browser's native PDF viewer handles it
+        setPreviewUrl(apiUrl)
+      } else if (file.category === 'html') {
+        const res = await fetch(apiUrl)
         const text = await res.text()
         setHtmlContent(text)
-      } else if (file.category === 'pdf' || file.category === 'image') {
+      } else if (file.category === 'image') {
+        const res = await fetch(apiUrl)
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
         setPreviewUrl(url)
       } else if (file.category === 'text') {
+        const res = await fetch(apiUrl)
         const text = await res.text()
         setTextContent(text)
       }
