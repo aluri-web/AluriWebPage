@@ -6,6 +6,9 @@ import {
   ChevronRight, ArrowLeft, File, FileSpreadsheet, FileImage,
   Presentation, FileCode,
 } from 'lucide-react'
+import dynamic from 'next/dynamic'
+
+const PdfViewer = dynamic(() => import('@/components/PdfViewer'), { ssr: false })
 
 interface DataroomFolder {
   type: 'folder'
@@ -187,7 +190,7 @@ export default function DemoDataroomPage() {
     }
 
     if (selectedFile.category === 'pdf' && previewUrl) {
-      return <iframe src={previewUrl} className="flex-1 w-full bg-white" title={selectedFile.displayName} />
+      return <PdfViewer url={previewUrl} className="flex-1" />
     }
 
     if (selectedFile.category === 'image' && previewUrl) {
@@ -237,7 +240,7 @@ export default function DemoDataroomPage() {
       return <iframe srcDoc={htmlContent} className="flex-1 w-full bg-white" title={selectedFile.displayName} sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
     }
     if (selectedFile.category === 'pdf' && previewUrl) {
-      return <iframe src={previewUrl} className="flex-1 w-full bg-white" title={selectedFile.displayName} />
+      return <PdfViewer url={previewUrl} className="flex-1" />
     }
     if (selectedFile.category === 'image' && previewUrl) {
       return (
