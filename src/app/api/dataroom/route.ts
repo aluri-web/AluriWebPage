@@ -100,6 +100,8 @@ export async function GET(request: NextRequest) {
         headers: {
           'Content-Type': contentType,
           'Content-Disposition': `inline; filename="${fileName}"`,
+          'Content-Length': String(arrayBuffer.byteLength),
+          'X-Frame-Options': 'SAMEORIGIN',
         },
       })
     }
