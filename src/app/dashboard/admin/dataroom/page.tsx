@@ -142,8 +142,10 @@ export default function DataroomPage() {
       const apiUrl = `/api/dataroom?file=${encodeURIComponent(file.path)}`
 
       if (file.category === 'pdf') {
-        // Use API URL directly — browser's native PDF viewer handles it
-        setPreviewUrl(apiUrl)
+        const res = await fetch(apiUrl)
+        const blob = await res.blob()
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' })
+        setPreviewUrl(URL.createObjectURL(pdfBlob))
       } else if (file.category === 'html') {
         const res = await fetch(apiUrl)
         const text = await res.text()

@@ -115,7 +115,7 @@ const nextConfig = {
               "img-src 'self' data: blob: https://images.unsplash.com https://*.supabase.co https://*.s3.amazonaws.com https://*.s3.us-east-1.amazonaws.com https://lh3.googleusercontent.com https://i.pravatar.cc",
               "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com",
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com https://www.google-analytics.com https://api.leadconnectorhq.com",
-              "frame-src 'self' https://js.stripe.com https://api.leadconnectorhq.com",
+              "frame-src 'self' blob: https://js.stripe.com https://api.leadconnectorhq.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
