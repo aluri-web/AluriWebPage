@@ -30,7 +30,7 @@ export default function NuevoUsuarioButton() {
       }
     } catch (err) {
       console.error('Error creating user:', err)
-      setError('Error al crear usuario. Intenta de nuevo.')
+      setError(err instanceof Error ? err.message : 'Error al crear usuario. Intenta de nuevo.')
     } finally {
       setIsLoading(false)
     }
