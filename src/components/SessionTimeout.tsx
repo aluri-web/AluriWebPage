@@ -16,7 +16,7 @@ export default function SessionTimeout() {
 
   const logout = useCallback(async () => {
     try {
-      await fetch('/auth/signout', { method: 'POST' })
+      await fetch('/auth/signout?reason=timeout', { method: 'POST' })
     } catch {
       // Best effort
     }

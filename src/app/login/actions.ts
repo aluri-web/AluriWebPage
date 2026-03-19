@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '../../utils/supabase/server'
+import { headers } from 'next/headers'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
@@ -30,6 +31,31 @@ export async function login(formData: FormData) {
     .select('role')
     .eq('id', data.user.id)
     .single()
+
+  // Registrar sesión de usuario
+  const headersList = await headers()
+  const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || headersList.get('x-real-ip') || 'unknown'
+  const userAgent = headersList.get('user-agent') || 'unknown'
+
+  const { data: sessionData } = await supabase.from('user_sessions').insert({
+    user_id: data.user.id,
+    ip_address: ip,
+    user_agent: userAgent,
+  }).select('id').single()
+
+  // Guardar session_id en cookie para poder cerrarla después
+  if (sessionData?.id) {
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    cookieStore.set('session_tracking_id', sessionData.id, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24, // 24h
+    })
+  }
 
   // Revalidate cache
   revalidatePath('/', 'layout')

@@ -18,6 +18,8 @@ export type AuditAction =
   | 'document.upload'
   | 'document.delete'
   | 'admin.action'
+  | 'session.login'
+  | 'session.logout'
 
 export type AuditResource =
   | 'credito'
@@ -26,6 +28,7 @@ export type AuditResource =
   | 'solicitud'
   | 'usuario'
   | 'documento'
+  | 'sesion'
 
 interface AuditLogEntry {
   action: AuditAction
