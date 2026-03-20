@@ -23,6 +23,13 @@ const evaluateSchema = z.object({
     property_appraisal_value: z.number().positive(),
     ltv_percent: z.number().min(0).max(200),
     loan_purpose: z.string().max(200),
+    // Flash card fields
+    property_type: z.string().max(50).optional(),
+    city: z.string().max(100).optional(),
+    payment_mode: z.enum(['solo_intereses', 'capital_intereses']).optional(),
+    rate_type: z.enum(['anticipado', 'vencido']).optional(),
+    net_rate_monthly: z.number().min(0).max(10).optional(),
+    property_address: z.string().max(300).optional(),
   }),
   documents: z.record(
     z.string().max(50),
@@ -30,6 +37,7 @@ const evaluateSchema = z.object({
   ).refine(obj => Object.keys(obj).length <= 10, {
     message: 'Máximo 10 documentos',
   }),
+  photo_urls: z.array(z.string().url().max(2000)).max(20).optional(),
 })
 
 /** POST to orchestrator using node:http with a 10-minute timeout */

@@ -88,7 +88,6 @@ export async function submitCreditRequest(
         valor_inmueble: data.valor_inmueble,
         plazo_meses: data.plazo_meses,
         uso_dinero: data.uso_dinero,
-        solicitante: data.solicitante,
         documentos: data.documentos,
         fotos: data.fotos,
       })

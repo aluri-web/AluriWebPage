@@ -9,8 +9,10 @@ export interface SolicitudSummary {
   monto_requerido: number
   valor_inmueble: number
   plazo_meses: number | null
+  uso_dinero: string | null
   created_at: string
   documentos: { tipo: string; url: string }[]
+  fotos: { tipo: string; url: string }[]
   solicitante: {
     full_name: string | null
     email: string | null
@@ -32,7 +34,9 @@ export async function getSolicitudesForAgents(): Promise<{
       monto_requerido,
       valor_inmueble,
       plazo_meses,
+      uso_dinero,
       documentos,
+      fotos,
       created_at,
       solicitante:profiles!solicitante_id (
         full_name,
@@ -49,6 +53,7 @@ export async function getSolicitudesForAgents(): Promise<{
   const rows: SolicitudSummary[] = (data || []).map(row => ({
     ...row,
     documentos: (row.documentos || []) as { tipo: string; url: string }[],
+    fotos: (row.fotos || []) as { tipo: string; url: string }[],
     solicitante: row.solicitante as unknown as SolicitudSummary['solicitante'],
   }))
 
@@ -72,6 +77,7 @@ export interface EvaluacionIA {
   evaluation_id: string | null
   interest_rate: number | null
   processing_ms: number | null
+  photo_urls?: string[] | null
   created_at: string
 }
 
@@ -88,6 +94,7 @@ export interface SaveEvaluationInput {
   evaluation_id?: string | null
   interest_rate?: number | null
   processing_ms?: number | null
+  photo_urls?: string[] | null
 }
 
 export async function saveEvaluation(input: SaveEvaluationInput): Promise<{
@@ -124,6 +131,7 @@ export async function saveEvaluation(input: SaveEvaluationInput): Promise<{
       evaluation_id: input.evaluation_id || null,
       interest_rate: input.interest_rate ?? null,
       processing_ms: input.processing_ms ?? null,
+      ...(input.photo_urls ? { photo_urls: input.photo_urls } : {}),
     })
     .select('id')
     .single()

@@ -19,9 +19,11 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { uploadFile } from '@/utils/uploadFile'
 import { type SolicitudSummary, type EvaluacionIA, saveEvaluation } from './actions'
+import FlashCardGenerator from './FlashCardGenerator'
 
 // ── Types ──────────────────────────────────────────────
 
@@ -127,8 +129,18 @@ export default function AgentesPanel({
   const [isProcessing, setIsProcessing] = useState(false)
   const [fichaPdfUrl, setFichaPdfUrl] = useState<string | null>(null)
   const [interestRate, setInterestRate] = useState(1.5)
+  const [netRate, setNetRate] = useState(1.2)
+  const [rateType, setRateType] = useState<'anticipado' | 'vencido'>('anticipado')
+  const [paymentMode, setPaymentMode] = useState<'solo_intereses' | 'capital_intereses'>('solo_intereses')
+  const [propertyType, setPropertyType] = useState('casa')
+  const [guaranteeType, setGuaranteeType] = useState<'hipoteca' | 'retroventa'>('hipoteca')
+  // Applicant name/cedula: sent as hint to orchestrator, but KYC extracts the real identity from documents
+  const [applicantName, setApplicantName] = useState('')
   const [evaluations, setEvaluations] = useState<EvaluacionIA[]>(previousEvaluations)
   const [showHistory, setShowHistory] = useState(false)
+  const [lastOperation, setLastOperation] = useState<Record<string, unknown> | null>(null)
+  const [lastPhotoUrls, setLastPhotoUrls] = useState<string[]>([])
+  const [lastApplicantName, setLastApplicantName] = useState('')
   const [viewingEvaluation, setViewingEvaluation] = useState<EvaluacionIA | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -174,6 +186,7 @@ export default function AgentesPanel({
       setSlots(newSlots)
       setAgents({ ...INITIAL_AGENTS })
       setFichaPdfUrl(null)
+      setApplicantName(sol.solicitante?.full_name || '')
     },
     [solicitudes]
   )
@@ -304,42 +317,47 @@ export default function AgentesPanel({
         return Math.round(principal * r / (1 - Math.pow(1 + r, -months)))
       }
 
-      const operation = selectedSolicitud
-        ? {
-            operation_id: selectedSolicitud.id,
-            loan_amount: selectedSolicitud.monto_requerido,
-            loan_term_months: selectedSolicitud.plazo_meses || 12,
-            interest_rate_monthly: interestRate,
-            monthly_payment: calcMonthlyPayment(
-              selectedSolicitud.monto_requerido,
-              interestRate,
-              selectedSolicitud.plazo_meses || 12
-            ),
-            guarantee_type: 'hipoteca' as const,
-            property_appraisal_value: selectedSolicitud.valor_inmueble,
-            ltv_percent: Math.round((selectedSolicitud.monto_requerido / selectedSolicitud.valor_inmueble) * 100),
-            loan_purpose: 'Crédito hipotecario',
-          }
-        : {
-            operation_id: `MANUAL-${Date.now()}`,
-            loan_amount: 250000000,
-            loan_term_months: 12,
-            interest_rate_monthly: interestRate,
-            monthly_payment: calcMonthlyPayment(250000000, interestRate, 12),
-            guarantee_type: 'hipoteca' as const,
-            property_appraisal_value: 450000000,
-            ltv_percent: 56,
-            loan_purpose: 'Crédito hipotecario',
-          }
+      const loanAmount = selectedSolicitud ? selectedSolicitud.monto_requerido : 250000000
+      const loanTerm = selectedSolicitud ? (selectedSolicitud.plazo_meses || 12) : 12
+      const propertyValue = selectedSolicitud ? selectedSolicitud.valor_inmueble : 450000000
 
-      const applicant = selectedSolicitud?.solicitante
-        ? { name: selectedSolicitud.solicitante.full_name || 'Sin nombre', cedula: '0000000000' }
-        : { name: 'Solicitante Manual', cedula: '0000000000' }
+      const monthlyPayment = paymentMode === 'solo_intereses'
+        ? Math.round(loanAmount * interestRate / 100)
+        : calcMonthlyPayment(loanAmount, interestRate, loanTerm)
+
+      const operation = {
+        operation_id: selectedSolicitud ? selectedSolicitud.id : `MANUAL-${Date.now()}`,
+        loan_amount: loanAmount,
+        loan_term_months: loanTerm,
+        interest_rate_monthly: interestRate,
+        monthly_payment: monthlyPayment,
+        guarantee_type: guaranteeType,
+        property_appraisal_value: propertyValue,
+        ltv_percent: Math.round((loanAmount / propertyValue) * 100),
+        loan_purpose: selectedSolicitud?.uso_dinero || 'Crédito hipotecario',
+        // New flash card fields
+        property_type: propertyType,
+        city: selectedSolicitud?.ciudad || 'Sin ciudad',
+        payment_mode: paymentMode,
+        rate_type: rateType,
+        net_rate_monthly: netRate,
+        property_address: selectedSolicitud?.direccion_inmueble || '',
+      }
+
+      const applicant = {
+        name: applicantName || selectedSolicitud?.solicitante?.full_name || 'Sin nombre',
+        cedula: 'pending-kyc',
+      }
+
+      // Collect photo URLs from solicitud
+      const photoUrls = (selectedSolicitud?.fotos || [])
+        .filter(f => f.url)
+        .map(f => f.url)
 
       const res = await fetch('/api/orchestrator/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicant, operation, documents }),
+        body: JSON.stringify({ applicant, operation, documents, photo_urls: photoUrls }),
       })
 
       const data = await res.json()
@@ -384,6 +402,7 @@ export default function AgentesPanel({
               resumen_general: sections['6_evaluacion_riesgo']?.substring(0, 300) || 'Evaluación completada',
               recomendacion: data.verdict,
               nivel_riesgo_global: `${data.riskLevel?.toUpperCase()} (${data.riskScore}/10)`,
+              evaluationId: data.evaluationId,
             },
             error: null,
             startedAt: now,
@@ -395,6 +414,11 @@ export default function AgentesPanel({
         if (data.pdfUrl) {
           setFichaPdfUrl(data.pdfUrl)
         }
+
+        // Store operation data for flash card generator
+        setLastOperation(operation)
+        setLastPhotoUrls(photoUrls)
+        setLastApplicantName(applicant.name)
 
         // Persist evaluation to DB
         const savedDocuments: Record<string, string> = {}
@@ -415,6 +439,7 @@ export default function AgentesPanel({
           evaluation_id: data.evaluationId || null,
           interest_rate: interestRate,
           processing_ms: completedAt - now,
+          photo_urls: photoUrls.length > 0 ? photoUrls : null,
         }).then(({ data: saved }) => {
           if (saved) {
             // Add to local history list
@@ -433,6 +458,7 @@ export default function AgentesPanel({
               evaluation_id: data.evaluationId || null,
               interest_rate: interestRate,
               processing_ms: completedAt - now,
+              photo_urls: photoUrls.length > 0 ? photoUrls : null,
               created_at: new Date().toISOString(),
             }, ...prev])
           }
@@ -638,45 +664,127 @@ export default function AgentesPanel({
         </div>
       </div>
 
-      {/* Section 3: Interest Rate + Process Button */}
-      <div className="flex items-center justify-center gap-4">
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-slate-400 whitespace-nowrap">Tasa mensual (%)</label>
-          <input
-            type="number"
-            value={interestRate}
-            onChange={e => setInterestRate(Number(e.target.value))}
-            step={0.1}
-            min={0.1}
-            max={5}
-            disabled={isProcessing}
-            className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm text-center focus:outline-none focus:border-amber-500 disabled:opacity-50"
-          />
+      {/* Section 3: Operation Parameters */}
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+          {/* Tipo de inmueble */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Tipo inmueble</label>
+            <select
+              value={propertyType}
+              onChange={e => setPropertyType(e.target.value)}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50"
+            >
+              <option value="casa">Casa</option>
+              <option value="apartamento">Apartamento</option>
+              <option value="local_comercial">Local comercial</option>
+              <option value="oficina">Oficina</option>
+              <option value="lote">Lote</option>
+              <option value="finca">Finca</option>
+              <option value="bodega">Bodega</option>
+            </select>
+          </div>
+
+          {/* Garantía */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Garantía</label>
+            <select
+              value={guaranteeType}
+              onChange={e => setGuaranteeType(e.target.value as 'hipoteca' | 'retroventa')}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50"
+            >
+              <option value="hipoteca">Hipoteca</option>
+              <option value="retroventa">Retroventa</option>
+            </select>
+          </div>
+
+          {/* Modalidad de pago */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Modalidad</label>
+            <select
+              value={paymentMode}
+              onChange={e => setPaymentMode(e.target.value as 'solo_intereses' | 'capital_intereses')}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50"
+            >
+              <option value="solo_intereses">Solo intereses</option>
+              <option value="capital_intereses">Capital e intereses</option>
+            </select>
+          </div>
+
+          {/* Tipo de tasa */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Tipo tasa</label>
+            <select
+              value={rateType}
+              onChange={e => setRateType(e.target.value as 'anticipado' | 'vencido')}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50"
+            >
+              <option value="anticipado">Mes anticipado</option>
+              <option value="vencido">Mes vencido</option>
+            </select>
+          </div>
+
+          {/* Tasa bruta */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Tasa bruta (%)</label>
+            <input
+              type="number"
+              value={interestRate}
+              onChange={e => setInterestRate(Number(e.target.value))}
+              step={0.01}
+              min={0.1}
+              max={5}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm text-center focus:outline-none focus:border-amber-500 disabled:opacity-50"
+            />
+          </div>
+
+          {/* Tasa neta */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Tasa neta (%)</label>
+            <input
+              type="number"
+              value={netRate}
+              onChange={e => setNetRate(Number(e.target.value))}
+              step={0.01}
+              min={0.1}
+              max={5}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm text-center focus:outline-none focus:border-amber-500 disabled:opacity-50"
+            />
+          </div>
         </div>
 
-        <button
-          onClick={handleProcesar}
-          disabled={isProcessing || !anyAgentReady}
-          className="flex items-center gap-2 px-8 py-3 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 disabled:text-slate-500 text-black font-semibold rounded-xl transition-colors text-sm disabled:cursor-not-allowed"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Procesando...
-            </>
-          ) : (
-            <>
-              <Zap size={18} />
-              Procesar con Agentes IA
-            </>
-          )}
-        </button>
+        {/* Process button */}
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={handleProcesar}
+            disabled={isProcessing || !anyAgentReady}
+            className="flex items-center gap-2 px-8 py-3 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-700 disabled:text-slate-500 text-black font-semibold rounded-xl transition-colors text-sm disabled:cursor-not-allowed"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Procesando...
+              </>
+            ) : (
+              <>
+                <Zap size={18} />
+                Procesar con Agentes IA
+              </>
+            )}
+          </button>
 
-        {!allAgentsReady && anyAgentReady && !isProcessing && (
-          <p className="text-xs text-amber-400">
-            Algunos agentes no tienen todos los documentos
-          </p>
-        )}
+          {!allAgentsReady && anyAgentReady && !isProcessing && (
+            <p className="text-xs text-amber-400">
+              Algunos agentes no tienen todos los documentos
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Section 4: Agent Progress & Results */}
@@ -774,8 +882,8 @@ export default function AgentesPanel({
                     {agents.ficha.result?.resumen_general}
                   </p>
                   <a
-                    href={fichaPdfUrl}
-                    download={`ficha-tecnica-${selectedSolicitudId || 'manual'}-${Date.now()}.pdf`}
+                    href={`/api/orchestrator/pdf?id=${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || ''}`}
+                    download={`ficha-tecnica-${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || 'report'}.pdf`}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-lg transition-colors text-sm"
                   >
                     <Download size={14} />
@@ -787,6 +895,34 @@ export default function AgentesPanel({
           </div>
         </div>
       )}
+
+      {/* Flash Card Generator — from current eval or from viewing a previous one */}
+      {(() => {
+        const flashOp = viewingEvaluation?.operation ?? lastOperation
+        // Fallback: if evaluation has no photo_urls saved, try to get them from the linked solicitud
+        const evalPhotos = viewingEvaluation?.photo_urls
+        const fallbackPhotos = viewingEvaluation?.solicitud_id
+          ? (solicitudes.find(s => s.id === viewingEvaluation.solicitud_id)?.fotos || [])
+              .filter(f => f.url).map(f => f.url)
+          : []
+        const flashPhotos = evalPhotos ?? (fallbackPhotos.length > 0 ? fallbackPhotos : lastPhotoUrls)
+        const flashName = viewingEvaluation?.applicant?.name ?? lastApplicantName
+        const showFlash = viewingEvaluation ? true : (lastOperation && agents.ficha.status === 'completado')
+        if (!flashOp || !showFlash) return null
+        return (
+          <div className="bg-slate-900/50 border border-slate-700 rounded-2xl p-5">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <ImageIcon size={16} className="text-teal-400" />
+              Flash para WhatsApp
+            </h3>
+            <FlashCardGenerator
+              operation={flashOp as any}
+              applicantName={flashName}
+              photoUrls={flashPhotos ?? []}
+            />
+          </div>
+        )
+      })()}
 
       {/* Section 5: Evaluation History */}
       {evaluations.length > 0 && (
@@ -904,10 +1040,10 @@ function EvaluationHistoryCard({
           <ExternalLink size={12} />
           {isActive ? 'Viendo' : 'Ver'}
         </button>
-        {evaluation.pdf_url && (
+        {evaluation.evaluation_id && (
           <a
-            href={evaluation.pdf_url}
-            download
+            href={`/api/orchestrator/pdf?id=${evaluation.evaluation_id}`}
+            download={`ficha-tecnica-${evaluation.evaluation_id}.pdf`}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-medium transition-colors"
           >
             <Download size={12} />
