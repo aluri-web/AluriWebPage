@@ -373,126 +373,148 @@ export default function AgentesPanel({
         .filter(f => f.url)
         .map(f => f.url)
 
+      // ── Step 1: Start evaluation (returns immediately with evaluationId) ──
       const res = await fetch('/api/orchestrator/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ applicant, operation, documents, photo_urls: photoUrls, ...(adminNotes ? { admin_notes: adminNotes } : {}) }),
       })
 
-      const data = await res.json()
-      const completedAt = Date.now()
+      const startData = await res.json()
 
-      if (res.ok && data.evaluationId) {
-        // Map orchestrator sections to agent cards
-        const sections = data.report?.sections || {}
-
-        setAgents({
-          titulos: {
-            status: 'completado',
-            result: {
-              resumen: sections['1_descripcion_inmueble']?.substring(0, 300) || 'Análisis completado',
-              riesgo: data.riskLevel,
-            },
-            error: null,
-            startedAt: now,
-            completedAt,
-          },
-          kyc: {
-            status: 'completado',
-            result: {
-              resumen: sections['4_perfil_solicitante']?.substring(0, 300) || 'Verificación completada',
-            },
-            error: null,
-            startedAt: now,
-            completedAt,
-          },
-          credito: {
-            status: 'completado',
-            result: {
-              resumen: sections['5_analisis_financiero']?.substring(0, 300) || 'Análisis financiero completado',
-            },
-            error: null,
-            startedAt: now,
-            completedAt,
-          },
-          ficha: {
-            status: 'completado',
-            result: {
-              resumen_general: sections['6_evaluacion_riesgo']?.substring(0, 300) || 'Evaluación completada',
-              recomendacion: data.verdict,
-              nivel_riesgo_global: `${data.riskLevel?.toUpperCase()} (${data.riskScore}/10)`,
-              evaluationId: data.evaluationId,
-            },
-            error: null,
-            startedAt: now,
-            completedAt,
-          },
-        })
-
-        // Use the PDF URL from the orchestrator (Supabase Storage signed URL)
-        if (data.pdfUrl) {
-          setFichaPdfUrl(data.pdfUrl)
-        }
-
-        // Store operation data for flash card generator
-        setLastOperation(operation)
-        setLastPhotoUrls(photoUrls)
-        setLastApplicantName(applicant.name)
-
-        // Persist evaluation to DB
-        const savedDocuments: Record<string, string> = {}
-        for (const [k, v] of Object.entries(documents)) {
-          savedDocuments[k] = v
-        }
-
-        saveEvaluation({
-          solicitud_id: selectedSolicitudId,
-          applicant,
-          operation,
-          documents: savedDocuments,
-          verdict: data.verdict || null,
-          risk_level: data.riskLevel || null,
-          risk_score: data.riskScore ?? null,
-          sections: sections || null,
-          pdf_url: data.pdfUrl || null,
-          evaluation_id: data.evaluationId || null,
-          interest_rate: interestRate,
-          processing_ms: completedAt - now,
-          photo_urls: photoUrls.length > 0 ? photoUrls : null,
-        }).then(({ data: saved }) => {
-          if (saved) {
-            // Add to local history list
-            setEvaluations(prev => [{
-              id: saved.id,
-              solicitud_id: selectedSolicitudId,
-              admin_id: '',
-              applicant,
-              operation,
-              documents: savedDocuments,
-              verdict: data.verdict || null,
-              risk_level: data.riskLevel || null,
-              risk_score: data.riskScore ?? null,
-              sections: sections || null,
-              pdf_url: data.pdfUrl || null,
-              evaluation_id: data.evaluationId || null,
-              interest_rate: interestRate,
-              processing_ms: completedAt - now,
-              photo_urls: photoUrls.length > 0 ? photoUrls : null,
-              created_at: new Date().toISOString(),
-            }, ...prev])
-          }
-        }).catch(() => {
-          console.error('[AgentesPanel] Error saving evaluation')
-        })
-      } else {
-        const errorMsg = data.error || 'Error del orquestador'
-        setAgents({
-          titulos: { status: 'error', result: null, error: errorMsg, startedAt: now, completedAt },
-          kyc: { status: 'error', result: null, error: errorMsg, startedAt: now, completedAt },
-          credito: { status: 'error', result: null, error: errorMsg, startedAt: now, completedAt },
-          ficha: { status: 'error', result: null, error: errorMsg, startedAt: now, completedAt },
-        })
+      if (!res.ok || !startData.evaluationId) {
+        throw new Error(startData.error || 'Error al iniciar evaluación')
       }
+
+      const evaluationId = startData.evaluationId
+
+      // ── Step 2: Poll for results every 5 seconds ──
+      const POLL_INTERVAL = 5000
+      const MAX_POLLS = 180 // 15 minutes max
+
+      for (let poll = 0; poll < MAX_POLLS; poll++) {
+        await new Promise(r => setTimeout(r, POLL_INTERVAL))
+
+        const statusRes = await fetch(`/api/orchestrator/status?id=${evaluationId}`)
+        if (!statusRes.ok) continue
+
+        const statusData = await statusRes.json()
+        const evaluation = statusData.evaluation
+
+        if (!evaluation) continue
+
+        if (evaluation.status === 'completed' || evaluation.status === 'failed') {
+          const completedAt = Date.now()
+          const sections = evaluation.unifier_output?.report?.sections || {}
+          const verdict = evaluation.verdict
+          const riskLevel = evaluation.global_risk_level
+          const riskScore = evaluation.global_risk_score
+
+          setAgents({
+            titulos: {
+              status: 'completado',
+              result: {
+                resumen: sections['1_descripcion_inmueble']?.substring(0, 300) || 'Análisis completado',
+                riesgo: riskLevel,
+              },
+              error: null,
+              startedAt: now,
+              completedAt,
+            },
+            kyc: {
+              status: 'completado',
+              result: {
+                resumen: sections['4_perfil_solicitante']?.substring(0, 300) || 'Verificación completada',
+              },
+              error: null,
+              startedAt: now,
+              completedAt,
+            },
+            credito: {
+              status: 'completado',
+              result: {
+                resumen: sections['5_analisis_financiero']?.substring(0, 300) || 'Análisis financiero completado',
+              },
+              error: null,
+              startedAt: now,
+              completedAt,
+            },
+            ficha: {
+              status: 'completado',
+              result: {
+                resumen_general: sections['6_evaluacion_riesgo']?.substring(0, 300) || 'Evaluación completada',
+                recomendacion: verdict,
+                nivel_riesgo_global: `${riskLevel?.toUpperCase()} (${riskScore}/10)`,
+                evaluationId,
+              },
+              error: null,
+              startedAt: now,
+              completedAt,
+            },
+          })
+
+          // Get fresh PDF URL
+          if (evaluation.pdf_storage_path) {
+            setFichaPdfUrl(`/api/orchestrator/pdf?id=${evaluationId}`)
+          }
+
+          // Store operation data for flash card
+          setLastOperation(operation)
+          setLastPhotoUrls(photoUrls)
+          setLastApplicantName(applicant.name)
+
+          // Persist to frontend DB
+          const savedDocuments: Record<string, string> = {}
+          for (const [k, v] of Object.entries(documents)) {
+            savedDocuments[k] = v
+          }
+
+          saveEvaluation({
+            solicitud_id: selectedSolicitudId,
+            applicant,
+            operation,
+            documents: savedDocuments,
+            verdict: verdict || null,
+            risk_level: riskLevel || null,
+            risk_score: riskScore ?? null,
+            sections: sections || null,
+            pdf_url: evaluation.pdf_storage_path ? `/api/orchestrator/pdf?id=${evaluationId}` : null,
+            evaluation_id: evaluationId,
+            interest_rate: interestRate,
+            processing_ms: completedAt - now,
+            photo_urls: photoUrls.length > 0 ? photoUrls : null,
+          }).then(({ data: saved }) => {
+            if (saved) {
+              setEvaluations(prev => [{
+                id: saved.id,
+                solicitud_id: selectedSolicitudId,
+                admin_id: '',
+                applicant,
+                operation,
+                documents: savedDocuments,
+                verdict: verdict || null,
+                risk_level: riskLevel || null,
+                risk_score: riskScore ?? null,
+                sections: sections || null,
+                pdf_url: evaluation.pdf_storage_path ? `/api/orchestrator/pdf?id=${evaluationId}` : null,
+                evaluation_id: evaluationId,
+                interest_rate: interestRate,
+                processing_ms: completedAt - now,
+                photo_urls: photoUrls.length > 0 ? photoUrls : null,
+                created_at: new Date().toISOString(),
+              }, ...prev])
+            }
+          }).catch(() => {
+            console.error('[AgentesPanel] Error saving evaluation')
+          })
+
+          setIsProcessing(false)
+          return
+        }
+      }
+
+      // If we get here, polling timed out
+      throw new Error('Timeout: la evaluación tardó más de 15 minutos')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error de conexión'
       const completedAt = Date.now()

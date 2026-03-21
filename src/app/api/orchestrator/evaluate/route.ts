@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import http from 'node:http'
-import https from 'node:https'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiLimiter, getClientIp } from '@/lib/rate-limit'
@@ -45,52 +43,6 @@ const evaluateSchema = z.object({
   photo_urls: z.array(z.string().url().max(2000)).max(20).optional(),
   admin_notes: z.string().max(2000).optional(),
 })
-
-/** POST to orchestrator using node:http with a 10-minute timeout */
-function postToOrchestrator(
-  url: string,
-  body: object
-): Promise<{ status: number; data: Record<string, unknown> }> {
-  return new Promise((resolve, reject) => {
-    const parsed = new URL(url)
-    const payload = JSON.stringify(body)
-
-    const transport = parsed.protocol === 'https:' ? https : http
-    const req = transport.request(
-      {
-        hostname: parsed.hostname,
-        port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
-        path: parsed.pathname,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload),
-        },
-        timeout: 600_000, // 10 minutes
-      },
-      (res) => {
-        let raw = ''
-        res.on('data', (chunk) => (raw += chunk))
-        res.on('end', () => {
-          try {
-            resolve({ status: res.statusCode ?? 500, data: JSON.parse(raw) })
-          } catch {
-            reject(new Error('Invalid response from orchestrator'))
-          }
-        })
-      }
-    )
-
-    req.on('error', reject)
-    req.on('timeout', () => {
-      req.destroy()
-      reject(new Error('Orchestrator request timed out'))
-    })
-
-    req.write(payload)
-    req.end()
-  })
-}
 
 export async function POST(request: NextRequest) {
   // ── Rate limiting ──
@@ -139,14 +91,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
-  // ── Forward to orchestrator ──
+  // ── Forward to orchestrator (async — returns immediately with evaluationId) ──
   try {
-    const { status, data } = await postToOrchestrator(
-      `${ORCHESTRATOR_URL}/api/evaluate-by-urls`,
-      body
-    )
+    const res = await fetch(`${ORCHESTRATOR_URL}/api/evaluate-async`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
 
-    // Audit log the evaluation
+    const data = await res.json()
+
+    // Audit log
     auditLogApi(supabase, {
       action: 'admin.action',
       resource_type: 'solicitud',
@@ -154,17 +109,15 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       ip_address: ip,
       details: {
-        type: 'ai_evaluation',
-        verdict: data.verdict,
-        risk_level: data.riskLevel,
+        type: 'ai_evaluation_started',
+        evaluationId: data.evaluationId,
       },
     })
 
-    return NextResponse.json(data, { status })
+    return NextResponse.json(data, { status: res.status })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     console.error('[orchestrator-proxy] ERROR:', msg)
-    // Don't expose internal error details to the client
     return NextResponse.json({ error: 'Error al comunicarse con el servicio de evaluación' }, { status: 502 })
   }
 }
