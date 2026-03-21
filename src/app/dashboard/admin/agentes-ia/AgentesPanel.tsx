@@ -155,6 +155,7 @@ export default function AgentesPanel({
   const [showHistory, setShowHistory] = useState(false)
   const [lastOperation, setLastOperation] = useState<Record<string, unknown> | null>(null)
   const [lastPhotoUrls, setLastPhotoUrls] = useState<string[]>([])
+  const [manualPhotos, setManualPhotos] = useState<string[]>([])
   const [lastApplicantName, setLastApplicantName] = useState('')
   const [viewingEvaluation, setViewingEvaluation] = useState<EvaluacionIA | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -228,6 +229,21 @@ export default function AgentesPanel({
         [docKey]: { ...prev[docKey], uploading: false },
       }))
     }
+  }
+
+  const handlePhotoUpload = async (file: File) => {
+    try {
+      const result = await uploadFile(file, 'agentes-ia-fotos')
+      if (result.url) {
+        setManualPhotos(prev => [...prev, result.url!])
+      }
+    } catch {
+      alert('Error al subir foto')
+    }
+  }
+
+  const removePhoto = (index: number) => {
+    setManualPhotos(prev => prev.filter((_, i) => i !== index))
   }
 
   const clearSlot = (docKey: string) => {
@@ -377,10 +393,11 @@ export default function AgentesPanel({
         cedula: 'pending-kyc',
       }
 
-      // Collect photo URLs from solicitud
-      const photoUrls = (selectedSolicitud?.fotos || [])
+      // Collect photo URLs from solicitud + manual uploads
+      const solicitudPhotos = (selectedSolicitud?.fotos || [])
         .filter(f => f.url)
         .map(f => f.url)
+      const photoUrls = [...solicitudPhotos, ...manualPhotos]
 
       // ── Step 1: Start evaluation (returns immediately with evaluationId) ──
       const res = await fetch('/api/orchestrator/evaluate', {
@@ -711,6 +728,41 @@ export default function AgentesPanel({
               </div>
             )
           })}
+        </div>
+      </div>
+
+      {/* Section 2.5: Photo uploads */}
+      <div className="space-y-2">
+        <p className="text-xs text-slate-400 font-medium">Fotos del inmueble (opcional)</p>
+        <div className="flex flex-wrap gap-2">
+          {manualPhotos.map((url, i) => (
+            <div key={i} className="relative group">
+              <img src={url} alt={`Foto ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-slate-600" />
+              <button
+                onClick={() => removePhoto(i)}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+          <label className="w-20 h-20 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center cursor-pointer hover:border-amber-500 transition-colors">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              disabled={isProcessing}
+              onChange={(e) => {
+                const files = e.target.files
+                if (files) {
+                  Array.from(files).forEach(f => handlePhotoUpload(f))
+                }
+                e.target.value = ''
+              }}
+            />
+            <Upload size={16} className="text-slate-500" />
+          </label>
         </div>
       </div>
 
