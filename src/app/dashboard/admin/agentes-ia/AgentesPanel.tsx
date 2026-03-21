@@ -58,7 +58,7 @@ const AGENT_CONFIGS = [
     key: 'kyc',
     label: 'KYC',
     icon: ShieldCheck,
-    docs: ['cedula'],
+    docs: ['cedula', 'reporte_auco'],
     color: 'blue',
   },
   {
@@ -71,6 +71,9 @@ const AGENT_CONFIGS = [
 ] as const
 
 // Docs to hide based on persona type
+// Docs that are optional (not required for agent readiness)
+const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta']
+
 const PERSONA_HIDDEN_DOCS: Record<string, string[]> = {
   persona_natural: ['estados_financieros'],
   persona_juridica: ['certificado_ingresos'],
@@ -84,6 +87,7 @@ const DOC_LABELS: Record<string, string> = {
   declaracion_renta: 'Declaracion de renta',
   certificado_ingresos: 'Certificado laboral / de ingresos',
   estados_financieros: 'Estados financieros',
+  reporte_auco: 'Reporte AUCO (PDF)',
 }
 
 const INITIAL_SLOTS: Record<string, DocumentSlot> = Object.fromEntries(
@@ -178,7 +182,7 @@ export default function AgentesPanel({
     const config = AGENT_CONFIGS.find((a) => a.key === agentKey)
     if (!config) return false
     const hidden = PERSONA_HIDDEN_DOCS[personaType] || []
-    return config.docs.filter(d => !hidden.includes(d)).every((docKey) => slots[docKey]?.url)
+    return config.docs.filter(d => !hidden.includes(d) && !OPTIONAL_DOCS.includes(d)).every((docKey) => slots[docKey]?.url)
   }
 
   const anyAgentReady = AGENT_CONFIGS.some((a) => agentReady(a.key))
@@ -342,6 +346,7 @@ export default function AgentesPanel({
       if (slots.declaracion_renta?.url) documents.declaracion_renta = slots.declaracion_renta.url
       if (slots.certificado_ingresos?.url) documents.certificado_ingresos = slots.certificado_ingresos.url
       if (slots.estados_financieros?.url) documents.estados_financieros = slots.estados_financieros.url
+      if (slots.reporte_auco?.url) documents.reporte_auco = slots.reporte_auco.url
 
       // Build operation data from solicitud
       // Monthly payment formula (French amortization): M = P * r / (1 - (1+r)^-n)
