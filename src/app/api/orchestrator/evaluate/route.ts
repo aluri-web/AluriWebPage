@@ -31,6 +31,10 @@ const evaluateSchema = z.object({
     rate_type: z.enum(['anticipado', 'vencido']).optional(),
     net_rate_monthly: z.number().min(0).max(10).optional(),
     property_address: z.string().max(300).optional(),
+    // Admin-declared values for contrast
+    declared_income_cop: z.number().positive().optional(),
+    declared_appraisal_cop: z.number().positive().optional(),
+    persona_type: z.enum(['persona_natural', 'persona_juridica']).optional(),
   }),
   documents: z.record(
     z.string().max(50),
@@ -39,6 +43,7 @@ const evaluateSchema = z.object({
     message: 'Máximo 10 documentos',
   }),
   photo_urls: z.array(z.string().url().max(2000)).max(20).optional(),
+  admin_notes: z.string().max(2000).optional(),
 })
 
 /** POST to orchestrator using node:http with a 10-minute timeout */

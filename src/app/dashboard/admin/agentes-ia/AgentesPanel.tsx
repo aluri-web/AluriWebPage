@@ -65,17 +65,25 @@ const AGENT_CONFIGS = [
     key: 'credito',
     label: 'Estudio de Credito',
     icon: CreditCard,
-    docs: ['extractos', 'declaracion_renta'],
+    docs: ['extractos', 'declaracion_renta', 'certificado_ingresos', 'estados_financieros'],
     color: 'emerald',
   },
 ] as const
+
+// Docs to hide based on persona type
+const PERSONA_HIDDEN_DOCS: Record<string, string[]> = {
+  persona_natural: ['estados_financieros'],
+  persona_juridica: ['certificado_ingresos'],
+}
 
 const DOC_LABELS: Record<string, string> = {
   libertad_tradicion: 'Certificado Libertad y Tradicion',
   escritura: 'Escritura',
   cedula: 'Cedula de ciudadania',
   extractos: 'Extractos bancarios',
-  declaracion_renta: 'Declaracion de renta / Certificado de ingresos',
+  declaracion_renta: 'Declaracion de renta',
+  certificado_ingresos: 'Certificado laboral / de ingresos',
+  estados_financieros: 'Estados financieros',
 }
 
 const INITIAL_SLOTS: Record<string, DocumentSlot> = Object.fromEntries(
@@ -136,6 +144,10 @@ export default function AgentesPanel({
   const [guaranteeType, setGuaranteeType] = useState<'hipoteca' | 'retroventa'>('hipoteca')
   // Applicant name/cedula: sent as hint to orchestrator, but KYC extracts the real identity from documents
   const [applicantName, setApplicantName] = useState('')
+  const [personaType, setPersonaType] = useState<'persona_natural' | 'persona_juridica'>('persona_natural')
+  const [declaredIncome, setDeclaredIncome] = useState<number | ''>('')
+  const [declaredAppraisal, setDeclaredAppraisal] = useState<number | ''>('')
+  const [adminNotes, setAdminNotes] = useState('')
   const [evaluations, setEvaluations] = useState<EvaluacionIA[]>(previousEvaluations)
   const [showHistory, setShowHistory] = useState(false)
   const [lastOperation, setLastOperation] = useState<Record<string, unknown> | null>(null)
@@ -161,7 +173,8 @@ export default function AgentesPanel({
   const agentReady = (agentKey: string) => {
     const config = AGENT_CONFIGS.find((a) => a.key === agentKey)
     if (!config) return false
-    return config.docs.every((docKey) => slots[docKey]?.url)
+    const hidden = PERSONA_HIDDEN_DOCS[personaType] || []
+    return config.docs.filter(d => !hidden.includes(d)).every((docKey) => slots[docKey]?.url)
   }
 
   const anyAgentReady = AGENT_CONFIGS.some((a) => agentReady(a.key))
@@ -308,6 +321,8 @@ export default function AgentesPanel({
       if (slots.cedula?.url) documents.cedula = slots.cedula.url
       if (slots.extractos?.url) documents.extractos = slots.extractos.url
       if (slots.declaracion_renta?.url) documents.declaracion_renta = slots.declaracion_renta.url
+      if (slots.certificado_ingresos?.url) documents.certificado_ingresos = slots.certificado_ingresos.url
+      if (slots.estados_financieros?.url) documents.estados_financieros = slots.estados_financieros.url
 
       // Build operation data from solicitud
       // Monthly payment formula (French amortization): M = P * r / (1 - (1+r)^-n)
@@ -342,6 +357,10 @@ export default function AgentesPanel({
         rate_type: rateType,
         net_rate_monthly: netRate,
         property_address: selectedSolicitud?.direccion_inmueble || '',
+        // Admin-declared values for contrast
+        ...(declaredIncome ? { declared_income_cop: declaredIncome } : {}),
+        ...(declaredAppraisal ? { declared_appraisal_cop: declaredAppraisal } : {}),
+        persona_type: personaType,
       }
 
       const applicant = {
@@ -357,7 +376,7 @@ export default function AgentesPanel({
       const res = await fetch('/api/orchestrator/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicant, operation, documents, photo_urls: photoUrls }),
+        body: JSON.stringify({ applicant, operation, documents, photo_urls: photoUrls, ...(adminNotes ? { admin_notes: adminNotes } : {}) }),
       })
 
       const data = await res.json()
@@ -589,7 +608,7 @@ export default function AgentesPanel({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {agent.docs.map((docKey) => {
+                  {agent.docs.filter((docKey) => !(PERSONA_HIDDEN_DOCS[personaType] || []).includes(docKey)).map((docKey) => {
                     const slot = slots[docKey]
                     return (
                       <div
@@ -759,8 +778,65 @@ export default function AgentesPanel({
           </div>
         </div>
 
+        {/* Additional context fields */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3">
+          {/* Tipo de persona */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Tipo persona</label>
+            <select
+              value={personaType}
+              onChange={e => setPersonaType(e.target.value as 'persona_natural' | 'persona_juridica')}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50"
+            >
+              <option value="persona_natural">Persona natural</option>
+              <option value="persona_juridica">Persona jurídica</option>
+            </select>
+          </div>
+
+          {/* Ingresos declarados */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Ingresos declarados (COP)</label>
+            <input
+              type="number"
+              value={declaredIncome}
+              onChange={e => setDeclaredIncome(e.target.value ? Number(e.target.value) : '')}
+              placeholder="Ej: 13000000"
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
+            />
+          </div>
+
+          {/* Avalúo indicado */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Avalúo indicado (COP)</label>
+            <input
+              type="number"
+              value={declaredAppraisal}
+              onChange={e => setDeclaredAppraisal(e.target.value ? Number(e.target.value) : '')}
+              placeholder="Ej: 450000000"
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
+            />
+          </div>
+        </div>
+
+        {/* Observaciones del administrador */}
+        <div className="mt-3">
+          <label className="text-xs text-slate-400">Observaciones del administrador</label>
+          <textarea
+            value={adminNotes}
+            onChange={e => setAdminNotes(e.target.value)}
+            placeholder="Ej: La persona tiene un codeudor con ingresos de $X, el inmueble tiene parqueadero independiente..."
+            disabled={isProcessing}
+            rows={2}
+            maxLength={2000}
+            className="w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500 resize-none"
+          />
+        </div>
+
         {/* Process button */}
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center gap-4 mt-3">
           <button
             onClick={handleProcesar}
             disabled={isProcessing || !anyAgentReady}
