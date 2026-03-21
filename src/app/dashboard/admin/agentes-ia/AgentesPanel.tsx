@@ -144,6 +144,9 @@ export default function AgentesPanel({
   const [guaranteeType, setGuaranteeType] = useState<'hipoteca' | 'retroventa'>('hipoteca')
   // Applicant name/cedula: sent as hint to orchestrator, but KYC extracts the real identity from documents
   const [applicantName, setApplicantName] = useState('')
+  const [manualLoanAmount, setManualLoanAmount] = useState<number | ''>('')
+  const [manualLoanTerm, setManualLoanTerm] = useState<number | ''>(12)
+  const [manualPropertyValue, setManualPropertyValue] = useState<number | ''>('')
   const [personaType, setPersonaType] = useState<'persona_natural' | 'persona_juridica'>('persona_natural')
   const [declaredIncome, setDeclaredIncome] = useState<number | ''>('')
   const [declaredAppraisal, setDeclaredAppraisal] = useState<number | ''>('')
@@ -332,9 +335,15 @@ export default function AgentesPanel({
         return Math.round(principal * r / (1 - Math.pow(1 + r, -months)))
       }
 
-      const loanAmount = selectedSolicitud ? selectedSolicitud.monto_requerido : 250000000
-      const loanTerm = selectedSolicitud ? (selectedSolicitud.plazo_meses || 12) : 12
-      const propertyValue = selectedSolicitud ? selectedSolicitud.valor_inmueble : 450000000
+      const loanAmount = manualLoanAmount || (selectedSolicitud ? selectedSolicitud.monto_requerido : 0)
+      const loanTerm = manualLoanTerm || (selectedSolicitud ? (selectedSolicitud.plazo_meses || 12) : 12)
+      const propertyValue = manualPropertyValue || (selectedSolicitud ? selectedSolicitud.valor_inmueble : 0)
+
+      if (!loanAmount || !propertyValue) {
+        alert('Ingrese el monto requerido y el valor del inmueble')
+        setIsProcessing(false)
+        return
+      }
 
       const monthlyPayment = paymentMode === 'solo_intereses'
         ? Math.round(loanAmount * interestRate / 100)
@@ -707,6 +716,44 @@ export default function AgentesPanel({
 
       {/* Section 3: Operation Parameters */}
       <div className="space-y-3">
+        {/* Loan details */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Monto requerido (COP) *</label>
+            <input
+              type="number"
+              value={manualLoanAmount}
+              onChange={e => setManualLoanAmount(e.target.value ? Number(e.target.value) : '')}
+              placeholder={selectedSolicitud ? String(selectedSolicitud.monto_requerido) : 'Ej: 250000000'}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Valor inmueble (COP) *</label>
+            <input
+              type="number"
+              value={manualPropertyValue}
+              onChange={e => setManualPropertyValue(e.target.value ? Number(e.target.value) : '')}
+              placeholder={selectedSolicitud ? String(selectedSolicitud.valor_inmueble) : 'Ej: 450000000'}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Plazo (meses)</label>
+            <input
+              type="number"
+              value={manualLoanTerm}
+              onChange={e => setManualLoanTerm(e.target.value ? Number(e.target.value) : '')}
+              min={1}
+              max={360}
+              disabled={isProcessing}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm text-center focus:outline-none focus:border-amber-500 disabled:opacity-50"
+            />
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
           {/* Tipo de inmueble */}
           <div className="flex flex-col gap-1">
