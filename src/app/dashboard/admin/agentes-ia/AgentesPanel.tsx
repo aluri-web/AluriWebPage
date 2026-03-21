@@ -1229,19 +1229,30 @@ export default function AgentesPanel({
                 </div>
               )}
 
-              {agents.ficha.status === 'completado' && fichaPdfUrl && (
+              {agents.ficha.status === 'completado' && (
                 <div className="space-y-2">
                   <p className="text-xs text-emerald-400">
                     {agents.ficha.result?.resumen_general}
                   </p>
-                  <a
-                    href={`/api/orchestrator/pdf?id=${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || ''}`}
-                    download={`ficha-tecnica-${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || 'report'}.pdf`}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-lg transition-colors text-sm"
-                  >
-                    <Download size={14} />
-                    Descargar Ficha Tecnica PDF
-                  </a>
+                  {fichaPdfUrl && (
+                    <a
+                      href={`/api/orchestrator/pdf?id=${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || ''}`}
+                      download={`ficha-tecnica-${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || 'report'}.pdf`}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-lg transition-colors text-sm"
+                    >
+                      <Download size={14} />
+                      Descargar Ficha Tecnica PDF
+                    </a>
+                  )}
+                  {lastEvaluationId && !isProcessing && Object.values(agents).some(a => a.status === 'error') && (
+                    <button
+                      onClick={handleRetryFailed}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg transition-colors text-xs"
+                    >
+                      <Zap size={14} />
+                      Reintentar agentes fallidos
+                    </button>
+                  )}
                 </div>
               )}
             </div>
