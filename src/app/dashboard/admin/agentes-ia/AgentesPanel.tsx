@@ -158,6 +158,7 @@ export default function AgentesPanel({
   const [evaluations, setEvaluations] = useState<EvaluacionIA[]>(previousEvaluations)
   const [showHistory, setShowHistory] = useState(false)
   const [lastOperation, setLastOperation] = useState<Record<string, unknown> | null>(null)
+  const [lastEvaluationId, setLastEvaluationId] = useState<string | null>(null)
   const [lastPhotoUrls, setLastPhotoUrls] = useState<string[]>([])
   const [manualPhotos, setManualPhotos] = useState<string[]>([])
   const [lastApplicantName, setLastApplicantName] = useState('')
@@ -418,6 +419,7 @@ export default function AgentesPanel({
       }
 
       const evaluationId = startData.evaluationId
+      setLastEvaluationId(evaluationId)
 
       // ── Step 2: Poll for results every 5 seconds ──
       const POLL_INTERVAL = 5000
@@ -579,6 +581,124 @@ export default function AgentesPanel({
 
     setIsProcessing(false)
   }
+
+  const handleRetryFailed = async () => {
+    if (!lastEvaluationId) return
+    setIsProcessing(true)
+    const now = Date.now()
+
+    // Build documents map from current slots
+    const documents: Record<string, string> = {}
+    for (const [key, slot] of Object.entries(slots)) {
+      if (slot.url) documents[key] = slot.url
+    }
+
+    try {
+      const res = await fetch('/api/orchestrator/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evaluationId: lastEvaluationId,
+          applicant: { name: applicantName || 'Sin nombre', cedula: 'pending-kyc' },
+          operation: lastOperation,
+          documents,
+          photo_urls: lastPhotoUrls,
+          ...(adminNotes ? { admin_notes: adminNotes } : {}),
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Error al reintentar')
+
+      // Set retrying agents to procesando, keep successful ones
+      setAgents(prev => ({
+        titulos: data.retrying?.titulo ? { ...prev.titulos, status: 'procesando', error: null } : prev.titulos,
+        kyc: data.retrying?.kyc ? { ...prev.kyc, status: 'procesando', error: null } : prev.kyc,
+        credito: data.retrying?.credito ? { ...prev.credito, status: 'procesando', error: null } : prev.credito,
+        ficha: { status: 'procesando', result: null, error: null, startedAt: now, completedAt: null },
+      }))
+
+      // Poll for results (same as handleProcesar)
+      const POLL_INTERVAL = 5000
+      const MAX_POLLS = 180
+
+      for (let poll = 0; poll < MAX_POLLS; poll++) {
+        await new Promise(r => setTimeout(r, POLL_INTERVAL))
+        const statusRes = await fetch(`/api/orchestrator/status?id=${lastEvaluationId}`)
+        if (!statusRes.ok) continue
+        const statusData = await statusRes.json()
+        const evaluation = statusData.evaluation
+        if (!evaluation) continue
+
+        // Update progress
+        const progress = evaluation.agent_progress as Record<string, string> | undefined
+        if (progress && evaluation.status === 'processing') {
+          const agentStatusMap = (s: string) => s === 'processing' ? 'procesando' as const : s === 'completed' ? 'completado' as const : s === 'failed' ? 'error' as const : 'idle' as const
+          setAgents(prev => ({
+            titulos: { ...prev.titulos, status: agentStatusMap(progress.titulo_study || 'pending') },
+            kyc: { ...prev.kyc, status: agentStatusMap(progress.kyc || 'pending') },
+            credito: { ...prev.credito, status: agentStatusMap(progress.credito || 'pending') },
+            ficha: { ...prev.ficha, status: 'procesando' },
+          }))
+        }
+
+        if (evaluation.status === 'completed' || evaluation.status === 'failed') {
+          const completedAt = Date.now()
+          const sections = evaluation.unifier_output?.report?.sections || {}
+          const tituloStatus = evaluation.titulo_study_output?.status
+          const kycStatus = evaluation.kyc_output?.status
+          const creditoStatus = evaluation.credito_output?.status
+
+          setAgents({
+            titulos: {
+              status: tituloStatus === 'failed' ? 'error' : 'completado',
+              result: tituloStatus === 'failed' ? null : { resumen: sections['1_descripcion_inmueble']?.substring(0, 300) || 'Análisis completado' },
+              error: tituloStatus === 'failed' ? (evaluation.titulo_study_output?.summary || 'Error') : null,
+              startedAt: now, completedAt,
+            },
+            kyc: {
+              status: kycStatus === 'failed' ? 'error' : 'completado',
+              result: kycStatus === 'failed' ? null : { resumen: sections['4_perfil_solicitante']?.substring(0, 300) || 'Verificación completada' },
+              error: kycStatus === 'failed' ? (evaluation.kyc_output?.summary || 'Error') : null,
+              startedAt: now, completedAt,
+            },
+            credito: {
+              status: creditoStatus === 'failed' ? 'error' : 'completado',
+              result: creditoStatus === 'failed' ? null : { resumen: sections['5_analisis_financiero']?.substring(0, 300) || 'Análisis completado' },
+              error: creditoStatus === 'failed' ? (evaluation.credito_output?.summary || 'Error') : null,
+              startedAt: now, completedAt,
+            },
+            ficha: {
+              status: evaluation.status === 'failed' ? 'error' : 'completado',
+              result: evaluation.status === 'failed' ? null : {
+                resumen_general: sections['6_evaluacion_riesgo']?.substring(0, 300) || 'Evaluación completada',
+                recomendacion: evaluation.verdict,
+                nivel_riesgo_global: `${evaluation.global_risk_level?.toUpperCase()} (${evaluation.global_risk_score}/10)`,
+                evaluationId: lastEvaluationId,
+              },
+              error: evaluation.status === 'failed' ? 'La evaluación no pudo completarse.' : null,
+              startedAt: now, completedAt,
+            },
+          })
+
+          if (evaluation.pdf_storage_path) {
+            setFichaPdfUrl(`/api/orchestrator/pdf?id=${lastEvaluationId}`)
+          }
+          setIsProcessing(false)
+          return
+        }
+      }
+      throw new Error('Timeout')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error de conexión'
+      setAgents(prev => ({
+        ...prev,
+        ficha: { status: 'error', result: null, error: message, startedAt: now, completedAt: Date.now() },
+      }))
+    }
+    setIsProcessing(false)
+  }
+
 
   // ── Render ───────────────────────────────────────────
 
@@ -1095,7 +1215,18 @@ export default function AgentesPanel({
               )}
 
               {agents.ficha.status === 'error' && (
-                <p className="text-xs text-red-400">{agents.ficha.error}</p>
+                <div className="space-y-2">
+                  <p className="text-xs text-red-400">{agents.ficha.error}</p>
+                  {lastEvaluationId && !isProcessing && (
+                    <button
+                      onClick={handleRetryFailed}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg transition-colors text-xs"
+                    >
+                      <Zap size={14} />
+                      Reintentar agentes fallidos
+                    </button>
+                  )}
+                </div>
               )}
 
               {agents.ficha.status === 'completado' && fichaPdfUrl && (
