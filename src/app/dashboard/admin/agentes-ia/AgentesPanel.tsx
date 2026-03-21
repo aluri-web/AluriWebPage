@@ -441,44 +441,52 @@ export default function AgentesPanel({
           const riskLevel = evaluation.global_risk_level
           const riskScore = evaluation.global_risk_score
 
+          // Check individual agent statuses for error display
+          const tituloStatus = evaluation.titulo_study_output?.status
+          const kycStatus = evaluation.kyc_output?.status
+          const creditoStatus = evaluation.credito_output?.status
+          const tituloError = tituloStatus === 'failed' ? (evaluation.titulo_study_output?.summary || 'Error en agente títulos') : null
+          const kycError = kycStatus === 'failed' ? (evaluation.kyc_output?.summary || 'Error en agente KYC') : null
+          const creditoError = creditoStatus === 'failed' ? (evaluation.credito_output?.summary || 'Error en agente crédito') : null
+
           setAgents({
             titulos: {
-              status: 'completado',
-              result: {
+              status: tituloError ? 'error' : 'completado',
+              result: tituloError ? null : {
                 resumen: sections['1_descripcion_inmueble']?.substring(0, 300) || 'Análisis completado',
                 riesgo: riskLevel,
               },
-              error: null,
+              error: tituloError,
               startedAt: now,
               completedAt,
             },
             kyc: {
-              status: 'completado',
-              result: {
+              status: kycError ? 'error' : 'completado',
+              result: kycError ? null : {
                 resumen: sections['4_perfil_solicitante']?.substring(0, 300) || 'Verificación completada',
               },
-              error: null,
+              error: kycError,
               startedAt: now,
               completedAt,
             },
             credito: {
-              status: 'completado',
-              result: {
+              status: creditoError ? 'error' : 'completado',
+              result: creditoError ? null : {
                 resumen: sections['5_analisis_financiero']?.substring(0, 300) || 'Análisis financiero completado',
               },
-              error: null,
+              error: creditoError,
               startedAt: now,
               completedAt,
             },
             ficha: {
-              status: 'completado',
-              result: {
+              status: evaluation.status === 'failed' ? 'error' : 'completado',
+              result: evaluation.status === 'failed' ? null : {
                 resumen_general: sections['6_evaluacion_riesgo']?.substring(0, 300) || 'Evaluación completada',
                 recomendacion: verdict,
                 nivel_riesgo_global: `${riskLevel?.toUpperCase()} (${riskScore}/10)`,
                 evaluationId,
               },
-              error: null,
+              error: evaluation.status === 'failed' ? 'La evaluación no pudo completarse. Revise los agentes con error.' : null,
               startedAt: now,
               completedAt,
             },
