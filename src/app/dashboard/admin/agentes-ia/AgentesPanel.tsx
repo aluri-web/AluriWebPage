@@ -434,6 +434,18 @@ export default function AgentesPanel({
 
         if (!evaluation) continue
 
+        // Update agent cards with live progress
+        const progress = evaluation.agent_progress as Record<string, string> | undefined
+        if (progress && evaluation.status === 'processing') {
+          const agentStatusMap = (s: string) => s === 'processing' ? 'procesando' as const : s === 'completed' ? 'completado' as const : s === 'failed' ? 'error' as const : 'idle' as const
+          setAgents(prev => ({
+            titulos: { ...prev.titulos, status: agentStatusMap(progress.titulo_study || 'pending'), startedAt: progress.titulo_study === 'processing' ? now : prev.titulos.startedAt },
+            kyc: { ...prev.kyc, status: agentStatusMap(progress.kyc || 'pending'), startedAt: progress.kyc === 'processing' ? now : prev.kyc.startedAt },
+            credito: { ...prev.credito, status: agentStatusMap(progress.credito || 'pending'), startedAt: progress.credito === 'processing' ? now : prev.credito.startedAt },
+            ficha: { ...prev.ficha, status: 'procesando' },
+          }))
+        }
+
         if (evaluation.status === 'completed' || evaluation.status === 'failed') {
           const completedAt = Date.now()
           const sections = evaluation.unifier_output?.report?.sections || {}
