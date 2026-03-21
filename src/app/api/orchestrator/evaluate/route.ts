@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import http from 'node:http'
+import https from 'node:https'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { apiLimiter, getClientIp } from '@/lib/rate-limit'
@@ -49,10 +50,11 @@ function postToOrchestrator(
     const parsed = new URL(url)
     const payload = JSON.stringify(body)
 
-    const req = http.request(
+    const transport = parsed.protocol === 'https:' ? https : http
+    const req = transport.request(
       {
         hostname: parsed.hostname,
-        port: parsed.port,
+        port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
         path: parsed.pathname,
         method: 'POST',
         headers: {
