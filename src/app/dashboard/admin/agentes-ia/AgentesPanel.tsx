@@ -65,14 +65,14 @@ const AGENT_CONFIGS = [
     key: 'credito',
     label: 'Estudio de Credito',
     icon: CreditCard,
-    docs: ['extractos', 'declaracion_renta', 'certificado_ingresos', 'estados_financieros'],
+    docs: ['extractos', 'extractos_2', 'extractos_3', 'declaracion_renta', 'certificado_ingresos', 'estados_financieros'],
     color: 'emerald',
   },
 ] as const
 
 // Docs to hide based on persona type
 // Docs that are optional (not required for agent readiness)
-const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta']
+const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3']
 
 const PERSONA_HIDDEN_DOCS: Record<string, string[]> = {
   persona_natural: ['estados_financieros'],
@@ -83,7 +83,9 @@ const DOC_LABELS: Record<string, string> = {
   libertad_tradicion: 'Certificado Libertad y Tradicion',
   escritura: 'Escritura',
   cedula: 'Cedula de ciudadania',
-  extractos: 'Extractos bancarios',
+  extractos: 'Extractos bancarios (mes 1 o consolidado)',
+  extractos_2: 'Extractos bancarios (mes 2)',
+  extractos_3: 'Extractos bancarios (mes 3)',
   declaracion_renta: 'Declaracion de renta',
   certificado_ingresos: 'Certificado laboral / de ingresos',
   estados_financieros: 'Estados financieros',
@@ -350,6 +352,8 @@ export default function AgentesPanel({
       if (slots.escritura?.url) documents.escritura = slots.escritura.url
       if (slots.cedula?.url) documents.cedula = slots.cedula.url
       if (slots.extractos?.url) documents.extractos = slots.extractos.url
+      if (slots.extractos_2?.url) documents.extractos_2 = slots.extractos_2.url
+      if (slots.extractos_3?.url) documents.extractos_3 = slots.extractos_3.url
       if (slots.declaracion_renta?.url) documents.declaracion_renta = slots.declaracion_renta.url
       if (slots.certificado_ingresos?.url) documents.certificado_ingresos = slots.certificado_ingresos.url
       if (slots.estados_financieros?.url) documents.estados_financieros = slots.estados_financieros.url
