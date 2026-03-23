@@ -186,6 +186,12 @@ export default function AgentesPanel({
     return config.docs.filter(d => !hidden.includes(d) && !OPTIONAL_DOCS.includes(d)).every((docKey) => slots[docKey]?.url)
   }
 
+  const pdfFilename = (name?: string, dateStr?: string) => {
+    const clean = (name || applicantName || 'solicitante').replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ ]/g, '').trim().replace(/\s+/g, '_')
+    const d = dateStr ? dateStr.substring(0, 10) : new Date().toISOString().substring(0, 10)
+    return `FT_${clean}_${d}.pdf`
+  }
+
   const anyAgentReady = AGENT_CONFIGS.some((a) => agentReady(a.key))
   const allAgentsReady = AGENT_CONFIGS.every((a) => agentReady(a.key))
 
@@ -1237,7 +1243,7 @@ export default function AgentesPanel({
                   {fichaPdfUrl && (
                     <a
                       href={`/api/orchestrator/pdf?id=${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || ''}`}
-                      download={`ficha-tecnica-${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || 'report'}.pdf`}
+                      download={pdfFilename(viewingEvaluation?.applicant?.name || lastApplicantName, viewingEvaluation?.created_at)}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-lg transition-colors text-sm"
                     >
                       <Download size={14} />
@@ -1407,7 +1413,7 @@ function EvaluationHistoryCard({
         {evaluation.evaluation_id && (
           <a
             href={`/api/orchestrator/pdf?id=${evaluation.evaluation_id}`}
-            download={`ficha-tecnica-${evaluation.evaluation_id}.pdf`}
+            download={`FT_${(evaluation.applicant?.name || 'solicitante').replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ ]/g, '').trim().replace(/\s+/g, '_')}_${evaluation.created_at?.substring(0, 10) || 'report'}.pdf`}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-medium transition-colors"
           >
             <Download size={12} />
