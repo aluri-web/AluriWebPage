@@ -48,25 +48,31 @@ interface AgentState {
 
 const AGENT_CONFIGS = [
   {
-    key: 'titulos',
-    label: 'Estudio de Titulos',
-    icon: Search,
-    docs: ['libertad_tradicion', 'escritura'],
-    color: 'amber',
-  },
-  {
     key: 'kyc',
-    label: 'KYC',
+    label: 'Fase 1: Triage KYC/SARLAFT',
     icon: ShieldCheck,
     docs: ['cedula', 'reporte_auco'],
     color: 'blue',
+    phase: 1,
+    description: 'Verificación de identidad y listas restrictivas',
   },
   {
     key: 'credito',
-    label: 'Estudio de Credito',
+    label: 'Fase 2: Estudio de Crédito',
     icon: CreditCard,
     docs: ['extractos', 'extractos_2', 'extractos_3', 'declaracion_renta', 'certificado_ingresos', 'estados_financieros'],
     color: 'emerald',
+    phase: 2,
+    description: 'Análisis de capacidad de pago',
+  },
+  {
+    key: 'titulos',
+    label: 'Fase 3: Estudio de Títulos',
+    icon: Search,
+    docs: ['libertad_tradicion', 'escritura'],
+    color: 'amber',
+    phase: 3,
+    description: 'Análisis jurídico del inmueble',
   },
 ] as const
 
@@ -75,8 +81,8 @@ const AGENT_CONFIGS = [
 const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3']
 
 const PERSONA_HIDDEN_DOCS: Record<string, string[]> = {
-  persona_natural: ['estados_financieros'],
-  persona_juridica: ['certificado_ingresos'],
+  persona_natural: ['estados_financieros'],   // PN no necesita EEFF
+  persona_juridica: ['certificado_ingresos'], // PJ no usa certificado laboral
 }
 
 const DOC_LABELS: Record<string, string> = {
