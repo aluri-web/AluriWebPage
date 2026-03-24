@@ -1787,6 +1787,7 @@ export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]
 
   if (creditosError || !creditos) return { discrepancies: [], total_checked: 0, error: creditosError?.message || 'Error al cargar créditos' }
 
+  // Get all payment transactions
   const { data: txns, error: txnsError } = await supabase
     .from('transacciones')
     .select('credito_id, tipo_transaccion, monto')
@@ -1794,10 +1795,27 @@ export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]
 
   if (txnsError) return { discrepancies: [], total_checked: 0, error: txnsError.message }
 
+  // Get all causacion transactions
   const { data: causaciones } = await supabase
     .from('transacciones')
     .select('credito_id, tipo_transaccion, monto')
     .in('tipo_transaccion', ['causacion_interes', 'causacion_mora'])
+
+  // Get last causacion_diaria per credit (source of truth for capital in two-capital model)
+  const creditIds = creditos.map(c => c.id)
+  const { data: allCausaciones } = await supabase
+    .from('causaciones_diarias')
+    .select('credito_id, capital_real, capital_esperado, interes_causado, fecha_causacion')
+    .in('credito_id', creditIds)
+    .order('fecha_causacion', { ascending: false })
+
+  // Build map of last causacion per credit
+  const lastCausacionByCredit: Record<string, { capital_real: number; capital_esperado: number; interes_causado: number }> = {}
+  for (const c of (allCausaciones || [])) {
+    if (!lastCausacionByCredit[c.credito_id]) {
+      lastCausacionByCredit[c.credito_id] = c
+    }
+  }
 
   // Sum payments per credit
   const paymentsByCredit: Record<string, { capital: number; intereses: number; mora: number }> = {}
@@ -1821,11 +1839,24 @@ export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]
   for (const c of creditos) {
     const payments = paymentsByCredit[c.id] || { capital: 0, intereses: 0, mora: 0 }
     const causacion = causacionesByCredit[c.id] || { intereses: 0, mora: 0 }
-
-    // saldo_capital y saldo_capital_esperado deberían iniciar en monto_solicitado
+    const lastCausacion = lastCausacionByCredit[c.id]
     const montoBase = c.monto_solicitado || 0
-    const calcCapital = Math.max(0, montoBase - payments.capital)
-    const calcCapitalEsperado = Math.max(0, montoBase - payments.capital)
+
+    let calcCapital: number
+    let calcCapitalEsperado: number
+
+    if (lastCausacion) {
+      // Two-capital model: capital values come from last causacion_diaria
+      // After processing, saldo_capital = capital_real + interes_causado
+      calcCapital = lastCausacion.capital_real + lastCausacion.interes_causado
+      calcCapitalEsperado = lastCausacion.capital_esperado + lastCausacion.interes_causado
+    } else {
+      // No causaciones yet: simple formula
+      calcCapital = Math.max(0, montoBase - payments.capital)
+      calcCapitalEsperado = Math.max(0, montoBase - payments.capital)
+    }
+
+    // Intereses and mora: always transactional (causaciones - pagos)
     const calcIntereses = Math.max(0, causacion.intereses - payments.intereses)
     const calcMora = Math.max(0, causacion.mora - payments.mora)
 
