@@ -11,11 +11,12 @@ interface PaymentModalProps {
   saldoCapital: number
   saldoIntereses: number
   saldoMora: number
+  tipoAmortizacion?: string | null
   isOpen: boolean
   onClose: () => void
 }
 
-export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoIntereses, saldoMora, isOpen, onClose }: PaymentModalProps) {
+export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoIntereses, saldoMora, tipoAmortizacion, isOpen, onClose }: PaymentModalProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -46,19 +47,28 @@ export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoInte
     }).format(amount)
   }
 
+  const esSoloInteres = tipoAmortizacion === 'solo_interes'
+
+  // Saldos efectivos (nunca negativos para la cascada)
+  const moraEfectiva = Math.max(0, saldoMora)
+  const interesesEfectivos = Math.max(0, saldoIntereses)
+  const capitalEfectivo = Math.max(0, saldoCapital)
+
   // Simulate cascading distribution preview
   const calcDistribution = (total: number) => {
     let restante = total
-    const mora = Math.min(restante, saldoMora)
+    const mora = Math.min(restante, moraEfectiva)
     restante -= mora
-    const intereses = Math.min(restante, saldoIntereses)
+    // Solo interés anticipado: todo el restante va a intereses (no limitado por saldo)
+    const intereses = esSoloInteres ? restante : Math.min(restante, interesesEfectivos)
     restante -= intereses
-    const capital = Math.min(restante, saldoCapital)
+    // Solo interés: no aplicar a capital (se paga al vencimiento)
+    const capital = esSoloInteres ? 0 : Math.min(restante, capitalEfectivo)
     return { mora, intereses, capital }
   }
 
   const dist = calcDistribution(monto)
-  const deudaTotal = saldoMora + saldoIntereses + saldoCapital
+  const deudaTotal = moraEfectiva + interesesEfectivos + capitalEfectivo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -147,17 +157,23 @@ export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoInte
               {/* Current balances */}
               <div className="p-3 bg-slate-800/50 rounded-lg space-y-2">
                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Saldos Pendientes</p>
+                {(saldoMora < 0 || saldoIntereses < 0 || saldoCapital < 0) && (
+                  <div className="flex items-center gap-2 p-2 bg-amber-500/10 border border-amber-500/30 rounded mb-2">
+                    <AlertCircle size={14} className="text-amber-400 flex-shrink-0" />
+                    <p className="text-xs text-amber-400">Hay saldos negativos en BD. Ejecute la auditoría de saldos para corregir.</p>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-red-400">Mora</span>
-                  <span className="text-red-400 font-medium">{formatCurrency(saldoMora)}</span>
+                  <span className="text-red-400 font-medium">{formatCurrency(moraEfectiva)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-amber-400">Intereses</span>
-                  <span className="text-amber-400 font-medium">{formatCurrency(saldoIntereses)}</span>
+                  <span className="text-amber-400 font-medium">{formatCurrency(interesesEfectivos)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-blue-400">Capital</span>
-                  <span className="text-blue-400 font-medium">{formatCurrency(saldoCapital)}</span>
+                  <span className="text-blue-400 font-medium">{formatCurrency(capitalEfectivo)}</span>
                 </div>
                 <div className="flex justify-between text-sm pt-2 border-t border-slate-700">
                   <span className="text-white font-medium">Deuda Total</span>
@@ -187,7 +203,11 @@ export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoInte
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Monto del Pago ($)
                 </label>
-                <p className="text-xs text-slate-500 mb-1.5">Se distribuye automaticamente: mora → intereses → capital</p>
+                <p className="text-xs text-slate-500 mb-1.5">
+                  {esSoloInteres
+                    ? 'Solo interés: mora → intereses (sin abono a capital)'
+                    : 'Se distribuye automaticamente: mora → intereses → capital'}
+                </p>
                 <input
                   type="number"
                   value={monto || ''}

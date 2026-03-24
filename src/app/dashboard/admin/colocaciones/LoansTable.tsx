@@ -28,7 +28,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const [selectedLoan, setSelectedLoan] = useState<LoanTableRow | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [paymentLoan, setPaymentLoan] = useState<{ id: string; code: string; saldo_capital: number; saldo_intereses: number; saldo_mora: number } | null>(null)
+  const [paymentLoan, setPaymentLoan] = useState<{ id: string; code: string; saldo_capital: number; saldo_intereses: number; saldo_mora: number; tipo_amortizacion: string | null } | null>(null)
   const [sortField, setSortField] = useState<SortField>('code')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const tableScrollRef = useRef<HTMLDivElement>(null)
@@ -226,7 +226,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   }
 
   const openPaymentModal = (loan: LoanTableRow) => {
-    setPaymentLoan({ id: loan.id, code: loan.code, saldo_capital: loan.saldo_capital, saldo_intereses: loan.saldo_intereses, saldo_mora: loan.saldo_mora })
+    setPaymentLoan({ id: loan.id, code: loan.code, saldo_capital: loan.saldo_capital, saldo_intereses: loan.saldo_intereses, saldo_mora: loan.saldo_mora, tipo_amortizacion: loan.tipo_amortizacion })
     setIsPaymentModalOpen(true)
   }
 
@@ -607,6 +607,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           saldoCapital={paymentLoan.saldo_capital}
           saldoIntereses={paymentLoan.saldo_intereses}
           saldoMora={paymentLoan.saldo_mora}
+          tipoAmortizacion={paymentLoan.tipo_amortizacion}
           isOpen={isPaymentModalOpen}
           onClose={closePaymentModal}
         />

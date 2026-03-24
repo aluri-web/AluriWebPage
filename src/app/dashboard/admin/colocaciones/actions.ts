@@ -537,6 +537,7 @@ export interface LoanTableRow {
   saldo_intereses: number
   saldo_mora: number
   en_mora: boolean
+  tipo_amortizacion: string | null
 }
 
 export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; error: string | null }> {
@@ -565,6 +566,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       saldo_intereses,
       saldo_mora,
       en_mora,
+      tipo_amortizacion,
       created_at,
       fecha_desembolso,
       cliente:profiles!cliente_id (
@@ -684,6 +686,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       saldo_intereses: (credito as any).saldo_intereses || 0,
       saldo_mora: (credito as any).saldo_mora || 0,
       en_mora: (credito as any).en_mora || false,
+      tipo_amortizacion: (credito as any).tipo_amortizacion || null,
     }
   })
 
@@ -956,7 +959,7 @@ export async function registerLoanPayment(
     // Buscar el crédito
     const { data: credito, error: creditoError } = await supabase
       .from('creditos')
-      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora')
+      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, tipo_amortizacion, plazo, fecha_desembolso')
       .eq('id', data.loan_id)
       .single()
 
@@ -967,9 +970,11 @@ export async function registerLoanPayment(
     const montoTotal = data.monto
 
     // CASCADA: mora → intereses → capital
-    const saldoMoraAnterior = credito.saldo_mora || 0
-    const saldoInteresesAnterior = credito.saldo_intereses || 0
-    const saldoCapitalAnterior = credito.saldo_capital || 0
+    // Usar Math.max(0, ...) para proteger contra saldos negativos en BD
+    const saldoMoraAnterior = Math.max(0, credito.saldo_mora || 0)
+    const saldoInteresesAnterior = Math.max(0, credito.saldo_intereses || 0)
+    const saldoCapitalAnterior = Math.max(0, credito.saldo_capital || 0)
+    const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
 
     let restante = montoTotal
 
@@ -978,15 +983,19 @@ export async function registerLoanPayment(
     restante -= montoMora
 
     // 2. Luego pagar intereses
-    const montoInteres = Math.min(restante, saldoInteresesAnterior)
+    // Solo interés anticipado: el pago de intereses NO se limita por saldo_intereses
+    // (los intereses se cobran anticipados, no dependen de la causación diaria)
+    const montoInteres = esSoloInteres ? restante : Math.min(restante, saldoInteresesAnterior)
     restante -= montoInteres
 
     // 3. El sobrante va a capital
-    const montoCapital = Math.min(restante, saldoCapitalAnterior)
+    // Para créditos "solo_interes", NO aplicar a capital automáticamente
+    // (el capital se paga completo al vencimiento del plazo)
+    const montoCapital = esSoloInteres ? 0 : Math.min(restante, saldoCapitalAnterior)
 
     // Nuevos saldos
     const nuevoSaldoMora = saldoMoraAnterior - montoMora
-    const nuevoSaldoIntereses = saldoInteresesAnterior - montoInteres
+    const nuevoSaldoIntereses = esSoloInteres ? 0 : (saldoInteresesAnterior - montoInteres)
     const nuevoSaldoCapital = saldoCapitalAnterior - montoCapital
 
     const aplicacion = {
@@ -1046,6 +1055,15 @@ export async function registerLoanPayment(
       })
     }
 
+    // Validar que al menos algo se distribuyó
+    const totalAplicado = montoMora + montoInteres + montoCapital
+    if (totalAplicado === 0) {
+      const motivo = esSoloInteres
+        ? `No hay saldo de intereses ni mora pendiente (intereses: ${saldoInteresesAnterior.toLocaleString()}, mora: ${saldoMoraAnterior.toLocaleString()}). Verifique que la causación diaria haya corrido.`
+        : `No hay saldos pendientes para aplicar el pago.`
+      return { success: false, error: motivo }
+    }
+
     if (filasTransaccion.length > 0) {
       const { error: txError } = await supabase
         .from('transacciones')
@@ -1097,6 +1115,89 @@ export async function registerLoanPayment(
   } catch (error) {
     console.error('Unexpected error:', error)
     return { success: false, error: 'Error inesperado al registrar el pago.' }
+  }
+}
+
+// ========== DELETE PAYMENT & RECALCULATE SALDOS ==========
+
+export async function deletePaymentAndRecalculate(
+  referenciaPago: string,
+  creditoId: string
+): Promise<{ success: boolean; error?: string }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { success: false, error: adminCheck.error }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuracion del servidor incompleta.' }
+
+  try {
+    const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+    // Obtener las transacciones del pago a eliminar
+    const { data: txns, error: txError } = await supabase
+      .from('transacciones')
+      .select('id, tipo_transaccion, monto')
+      .eq('referencia_pago', referenciaPago)
+      .eq('credito_id', creditoId)
+
+    if (txError) return { success: false, error: 'Error buscando transacciones: ' + txError.message }
+    if (!txns || txns.length === 0) return { success: false, error: 'No se encontraron transacciones con esa referencia.' }
+
+    // Calcular montos a revertir
+    let capitalRevertir = 0
+    let interesRevertir = 0
+    let moraRevertir = 0
+    for (const txn of txns) {
+      if (txn.tipo_transaccion === 'pago_capital') capitalRevertir += txn.monto
+      if (txn.tipo_transaccion === 'pago_interes') interesRevertir += txn.monto
+      if (txn.tipo_transaccion === 'pago_mora') moraRevertir += txn.monto
+    }
+
+    // Obtener saldos actuales del crédito
+    const { data: credito, error: cError } = await supabase
+      .from('creditos')
+      .select('saldo_capital, saldo_intereses, saldo_mora')
+      .eq('id', creditoId)
+      .single()
+
+    if (cError || !credito) return { success: false, error: 'Crédito no encontrado.' }
+
+    // Eliminar transacciones
+    const { error: delError } = await supabase
+      .from('transacciones')
+      .delete()
+      .eq('referencia_pago', referenciaPago)
+      .eq('credito_id', creditoId)
+
+    if (delError) return { success: false, error: 'Error eliminando transacciones: ' + delError.message }
+
+    // Revertir saldos (sumar lo que se había restado)
+    const { error: updError } = await supabase
+      .from('creditos')
+      .update({
+        saldo_capital: (credito.saldo_capital || 0) + capitalRevertir,
+        saldo_intereses: (credito.saldo_intereses || 0) + interesRevertir,
+        saldo_mora: (credito.saldo_mora || 0) + moraRevertir,
+      })
+      .eq('id', creditoId)
+
+    if (updError) return { success: false, error: 'Error actualizando saldos: ' + updError.message }
+
+    await auditLog({
+      action: 'payment.delete',
+      resource_type: 'pago',
+      resource_id: creditoId,
+      details: { referencia: referenciaPago, capital: capitalRevertir, interes: interesRevertir, mora: moraRevertir }
+    })
+
+    revalidatePath('/dashboard/admin/colocaciones')
+    revalidatePath('/dashboard/admin/pagos')
+
+    return { success: true }
+  } catch (err) {
+    console.error('Error deleting payment:', err)
+    return { success: false, error: 'Error inesperado al eliminar el pago.' }
   }
 }
 
@@ -1646,4 +1747,221 @@ export async function getCreditDeleteInfo(creditId: string): Promise<{
     },
     error: null
   }
+}
+
+// ========== AUDIT & RECONCILE SALDOS ==========
+
+export interface SaldoDiscrepancy {
+  credito_id: string
+  codigo: string
+  propietario: string
+  monto_financiado: number
+  db_saldo_capital: number
+  db_saldo_capital_esperado: number
+  db_saldo_intereses: number
+  db_saldo_mora: number
+  calc_saldo_capital: number
+  calc_saldo_capital_esperado: number
+  calc_saldo_intereses: number
+  calc_saldo_mora: number
+  diff_capital: number
+  diff_capital_esperado: number
+  diff_intereses: number
+  diff_mora: number
+}
+
+export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]; total_checked: number; error: string | null }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { discrepancies: [], total_checked: 0, error: adminCheck.error || 'No autorizado' }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) return { discrepancies: [], total_checked: 0, error: 'Configuracion incompleta' }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const { data: creditos, error: creditosError } = await supabase
+    .from('creditos')
+    .select('id, codigo_credito, monto_solicitado, saldo_capital, saldo_capital_esperado, saldo_intereses, saldo_mora, cliente:profiles!cliente_id(full_name)')
+    .in('estado', ['activo', 'mora', 'publicado', 'firmado'])
+
+  if (creditosError || !creditos) return { discrepancies: [], total_checked: 0, error: creditosError?.message || 'Error al cargar créditos' }
+
+  const { data: txns, error: txnsError } = await supabase
+    .from('transacciones')
+    .select('credito_id, tipo_transaccion, monto')
+    .in('tipo_transaccion', ['pago_capital', 'pago_interes', 'pago_mora'])
+
+  if (txnsError) return { discrepancies: [], total_checked: 0, error: txnsError.message }
+
+  const { data: causaciones } = await supabase
+    .from('transacciones')
+    .select('credito_id, tipo_transaccion, monto')
+    .in('tipo_transaccion', ['causacion_interes', 'causacion_mora'])
+
+  // Sum payments per credit
+  const paymentsByCredit: Record<string, { capital: number; intereses: number; mora: number }> = {}
+  for (const tx of (txns || [])) {
+    if (!paymentsByCredit[tx.credito_id]) paymentsByCredit[tx.credito_id] = { capital: 0, intereses: 0, mora: 0 }
+    if (tx.tipo_transaccion === 'pago_capital') paymentsByCredit[tx.credito_id].capital += tx.monto
+    else if (tx.tipo_transaccion === 'pago_interes') paymentsByCredit[tx.credito_id].intereses += tx.monto
+    else if (tx.tipo_transaccion === 'pago_mora') paymentsByCredit[tx.credito_id].mora += tx.monto
+  }
+
+  // Sum causaciones per credit
+  const causacionesByCredit: Record<string, { intereses: number; mora: number }> = {}
+  for (const tx of (causaciones || [])) {
+    if (!causacionesByCredit[tx.credito_id]) causacionesByCredit[tx.credito_id] = { intereses: 0, mora: 0 }
+    if (tx.tipo_transaccion === 'causacion_interes') causacionesByCredit[tx.credito_id].intereses += tx.monto
+    else if (tx.tipo_transaccion === 'causacion_mora') causacionesByCredit[tx.credito_id].mora += tx.monto
+  }
+
+  const discrepancies: SaldoDiscrepancy[] = []
+
+  for (const c of creditos) {
+    const payments = paymentsByCredit[c.id] || { capital: 0, intereses: 0, mora: 0 }
+    const causacion = causacionesByCredit[c.id] || { intereses: 0, mora: 0 }
+
+    // saldo_capital y saldo_capital_esperado deberían iniciar en monto_solicitado
+    const montoBase = c.monto_solicitado || 0
+    const calcCapital = Math.max(0, montoBase - payments.capital)
+    const calcCapitalEsperado = Math.max(0, montoBase - payments.capital)
+    const calcIntereses = Math.max(0, causacion.intereses - payments.intereses)
+    const calcMora = Math.max(0, causacion.mora - payments.mora)
+
+    const dbCapital = c.saldo_capital || 0
+    const dbCapitalEsperado = (c as Record<string, unknown>).saldo_capital_esperado as number || 0
+    const dbIntereses = c.saldo_intereses || 0
+    const dbMora = c.saldo_mora || 0
+
+    const diffCapital = Math.round(dbCapital - calcCapital)
+    const diffCapitalEsperado = Math.round(dbCapitalEsperado - calcCapitalEsperado)
+    const diffIntereses = Math.round(dbIntereses - calcIntereses)
+    const diffMora = Math.round(dbMora - calcMora)
+
+    if (diffCapital !== 0 || diffCapitalEsperado !== 0 || diffIntereses !== 0 || diffMora !== 0) {
+      const clienteRaw = c.cliente as unknown
+      const clienteData = Array.isArray(clienteRaw) ? clienteRaw[0] : clienteRaw as { full_name?: string } | null
+
+      discrepancies.push({
+        credito_id: c.id,
+        codigo: c.codigo_credito,
+        propietario: clienteData?.full_name || 'Sin nombre',
+        monto_financiado: montoBase,
+        db_saldo_capital: dbCapital,
+        db_saldo_capital_esperado: dbCapitalEsperado,
+        db_saldo_intereses: dbIntereses,
+        db_saldo_mora: dbMora,
+        calc_saldo_capital: calcCapital,
+        calc_saldo_capital_esperado: calcCapitalEsperado,
+        calc_saldo_intereses: calcIntereses,
+        calc_saldo_mora: calcMora,
+        diff_capital: diffCapital,
+        diff_capital_esperado: diffCapitalEsperado,
+        diff_intereses: diffIntereses,
+        diff_mora: diffMora,
+      })
+    }
+  }
+
+  return { discrepancies, total_checked: creditos.length, error: null }
+}
+
+export async function fixSaldos(creditoIds?: string[]): Promise<{ fixed: number; details: string[]; error: string | null }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { fixed: 0, details: [], error: adminCheck.error || 'No autorizado' }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) return { fixed: 0, details: [], error: 'Configuracion incompleta' }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const audit = await auditSaldos()
+  if (audit.error) return { fixed: 0, details: [], error: audit.error }
+
+  const toFix = creditoIds
+    ? audit.discrepancies.filter(d => creditoIds.includes(d.credito_id))
+    : audit.discrepancies
+
+  let fixed = 0
+  const details: string[] = []
+
+  for (const d of toFix) {
+    // 1. Fix saldos on the credit
+    const { error } = await supabase
+      .from('creditos')
+      .update({
+        saldo_capital: d.calc_saldo_capital,
+        saldo_capital_esperado: d.calc_saldo_capital_esperado,
+        saldo_intereses: d.calc_saldo_intereses,
+        saldo_mora: d.calc_saldo_mora,
+      })
+      .eq('id', d.credito_id)
+
+    if (error) {
+      details.push(`${d.codigo}: Error - ${error.message}`)
+      continue
+    }
+
+    // 2. If saldo_capital_esperado was wrong, causaciones were calculated on wrong base.
+    //    Delete wrong causacion data and transactions so they get re-calculated.
+    if (d.diff_capital_esperado !== 0) {
+      // Delete causaciones_diarias
+      await supabase
+        .from('causaciones_diarias')
+        .delete()
+        .eq('credito_id', d.credito_id)
+
+      // Delete causaciones_inversionistas
+      await supabase
+        .from('causaciones_inversionistas')
+        .delete()
+        .eq('credito_id', d.credito_id)
+
+      // Delete causacion transactions (they have wrong amounts)
+      await supabase
+        .from('transacciones')
+        .delete()
+        .eq('credito_id', d.credito_id)
+        .in('tipo_transaccion', ['causacion_interes', 'causacion_mora'])
+
+      // Reset acumulados on inversiones
+      await supabase
+        .from('inversiones')
+        .update({ interes_acumulado: 0, mora_acumulada: 0, ultima_causacion: null })
+        .eq('credito_id', d.credito_id)
+        .eq('estado', 'activo')
+
+      // Reset causacion-related fields on credit (so cron re-processes)
+      await supabase
+        .from('creditos')
+        .update({
+          saldo_capital: d.calc_saldo_capital_esperado,
+          saldo_capital_esperado: d.calc_saldo_capital_esperado,
+          saldo_intereses: 0,
+          saldo_mora: 0,
+          ultima_causacion: null,
+          interes_acumulado_total: 0,
+        })
+        .eq('id', d.credito_id)
+
+      details.push(`${d.codigo}: Saldos + causaciones reseteadas (capital_esperado era ${d.db_saldo_capital_esperado.toLocaleString()} → ${d.calc_saldo_capital_esperado.toLocaleString()})`)
+    } else {
+      details.push(`${d.codigo}: Saldos corregidos`)
+    }
+
+    fixed++
+  }
+
+  await auditLog({
+    action: 'admin.action',
+    resource_type: 'credito',
+    details: { action: 'fix_saldos', fixed, total_discrepancies: toFix.length, details },
+  })
+
+  revalidatePath('/dashboard/admin/colocaciones')
+  revalidatePath('/dashboard/admin/pagos')
+
+  return { fixed, details, error: null }
 }

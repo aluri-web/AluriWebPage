@@ -8,6 +8,8 @@ export type AuditAction =
   | 'loan.approve'
   | 'loan.reject'
   | 'payment.register'
+  | 'payment.update'
+  | 'payment.delete'
   | 'investment.approve'
   | 'investment.reject'
   | 'investment.create'

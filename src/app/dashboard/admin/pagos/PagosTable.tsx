@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2 } from 'lucide-react'
 import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
+import EditPaymentModal from './EditPaymentModal'
+import DeletePaymentModal from './DeletePaymentModal'
 
 interface PagoAgrupado {
   referencia: string
@@ -44,6 +46,38 @@ function formatDate(dateStr: string): string {
 export default function PagosTable({ pagos }: PagosTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('fecha')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+
+  // Edit modal state
+  const [editRef, setEditRef] = useState<string | null>(null)
+
+  // Delete modal state
+  const [deletePago, setDeletePago] = useState<PagoAgrupado | null>(null)
+
+  // Long-press to edit
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTriggered = useRef(false)
+
+  const handlePointerDown = useCallback((referencia: string) => {
+    longPressTriggered.current = false
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true
+      setEditRef(referencia)
+    }, 500)
+  }, [])
+
+  const handlePointerUp = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
+
+  const handlePointerLeave = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -142,81 +176,128 @@ export default function PagosTable({ pagos }: PagosTableProps) {
   )
 
   return (
-    <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-      {/* Header con botón de exportar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-800/30">
-        <span className="text-sm text-slate-400">{pagos.length} pagos</span>
-        <ExportExcelButton
-          data={exportData}
-          filename="pagos_aluri"
-          sheetName="Pagos"
-          headers={exportHeaders}
-        />
+    <>
+      <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+        {/* Header con botón de exportar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-800/30">
+          <span className="text-sm text-slate-400">{pagos.length} pagos</span>
+          <ExportExcelButton
+            data={exportData}
+            filename="pagos_aluri"
+            sheetName="Pagos"
+            headers={exportHeaders}
+          />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-800 bg-slate-800/50">
+                <SortableHeader columnKey="fecha" label="Fecha" />
+                <SortableHeader columnKey="credito_codigo" label="Credito" />
+                <SortableHeader columnKey="propietario" label="Propietario" />
+                <SortableHeader columnKey="capital" label="Capital" align="right" />
+                <SortableHeader columnKey="intereses" label="Intereses" align="right" />
+                <SortableHeader columnKey="mora" label="Mora" align="right" />
+                <SortableHeader columnKey="total" label="Total" align="right" />
+                <th className="px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider text-center">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800">
+              {sortedPagos.map((pago) => (
+                <tr
+                  key={pago.referencia}
+                  className="hover:bg-slate-800/30 transition-colors group cursor-pointer select-none"
+                  onPointerDown={() => handlePointerDown(pago.referencia)}
+                  onPointerUp={handlePointerUp}
+                  onPointerLeave={handlePointerLeave}
+                  onContextMenu={(e) => e.preventDefault()}
+                >
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
+                    {formatDate(pago.fecha)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <Link
+                      href={`/dashboard/admin/colocaciones/${pago.credito_id}`}
+                      className="px-2 py-1 bg-slate-800 text-teal-400 text-xs font-mono rounded hover:bg-slate-700 transition-colors"
+                    >
+                      {pago.credito_codigo}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
+                    {pago.propietario}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                    {pago.capital > 0 ? (
+                      <span className="text-blue-400">{formatCOP(pago.capital)}</span>
+                    ) : (
+                      <span className="text-slate-600">-</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                    {pago.intereses > 0 ? (
+                      <span className="text-emerald-400">{formatCOP(pago.intereses)}</span>
+                    ) : (
+                      <span className="text-slate-600">-</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                    {pago.mora > 0 ? (
+                      <span className="text-red-400">{formatCOP(pago.mora)}</span>
+                    ) : (
+                      <span className="text-slate-600">-</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-white">
+                    {formatCOP(pago.total)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-center">
+                    <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => setEditRef(pago.referencia)}
+                        title="Editar pago"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={() => setDeletePago(pago)}
+                        title="Eliminar pago"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-800 bg-slate-800/50">
-              <SortableHeader columnKey="fecha" label="Fecha" />
-              <SortableHeader columnKey="credito_codigo" label="Credito" />
-              <SortableHeader columnKey="propietario" label="Propietario" />
-              <SortableHeader columnKey="capital" label="Capital" align="right" />
-              <SortableHeader columnKey="intereses" label="Intereses" align="right" />
-              <SortableHeader columnKey="mora" label="Mora" align="right" />
-              <SortableHeader columnKey="total" label="Total" align="right" />
-              <SortableHeader columnKey="referencia" label="Referencia" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800">
-            {sortedPagos.map((pago) => (
-              <tr key={pago.referencia} className="hover:bg-slate-800/30 transition-colors">
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
-                  {formatDate(pago.fecha)}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <Link
-                    href={`/dashboard/admin/colocaciones/${pago.credito_id}`}
-                    className="px-2 py-1 bg-slate-800 text-teal-400 text-xs font-mono rounded hover:bg-slate-700 transition-colors"
-                  >
-                    {pago.credito_codigo}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
-                  {pago.propietario}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                  {pago.capital > 0 ? (
-                    <span className="text-blue-400">{formatCOP(pago.capital)}</span>
-                  ) : (
-                    <span className="text-slate-600">-</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                  {pago.intereses > 0 ? (
-                    <span className="text-emerald-400">{formatCOP(pago.intereses)}</span>
-                  ) : (
-                    <span className="text-slate-600">-</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                  {pago.mora > 0 ? (
-                    <span className="text-red-400">{formatCOP(pago.mora)}</span>
-                  ) : (
-                    <span className="text-slate-600">-</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-white">
-                  {formatCOP(pago.total)}
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap text-xs text-slate-500 font-mono">
-                  {pago.referencia.substring(0, 20)}...
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {/* Edit Modal */}
+      {editRef && (
+        <EditPaymentModal
+          referencia={editRef}
+          isOpen={!!editRef}
+          onClose={() => setEditRef(null)}
+        />
+      )}
+
+      {/* Delete Modal */}
+      {deletePago && (
+        <DeletePaymentModal
+          referencia={deletePago.referencia}
+          creditoCodigo={deletePago.credito_codigo}
+          propietario={deletePago.propietario}
+          total={deletePago.total}
+          isOpen={!!deletePago}
+          onClose={() => setDeletePago(null)}
+        />
+      )}
+    </>
   )
 }
