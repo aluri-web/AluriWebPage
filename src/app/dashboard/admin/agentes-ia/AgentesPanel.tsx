@@ -51,7 +51,7 @@ const AGENT_CONFIGS = [
     key: 'kyc',
     label: 'Fase 1: Triage KYC/SARLAFT',
     icon: ShieldCheck,
-    docs: ['cedula', 'reporte_auco'],
+    docs: ['cedula', 'reporte_auco', 'camara_comercio', 'rut', 'composicion_accionaria'],
     color: 'blue',
     phase: 1,
     description: 'Verificación de identidad y listas restrictivas',
@@ -78,24 +78,30 @@ const AGENT_CONFIGS = [
 
 // Docs to hide based on persona type
 // Docs that are optional (not required for agent readiness)
-const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3']
+const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3', 'camara_comercio', 'rut', 'composicion_accionaria']
 
 const PERSONA_HIDDEN_DOCS: Record<string, string[]> = {
-  persona_natural: ['estados_financieros'],   // PN no necesita EEFF
-  persona_juridica: ['certificado_ingresos'], // PJ no usa certificado laboral
+  persona_natural: ['estados_financieros', 'camara_comercio', 'rut', 'composicion_accionaria'],  // PN no necesita docs PJ
+  persona_juridica: ['certificado_ingresos'],  // PJ no usa certificado laboral
 }
 
 const DOC_LABELS: Record<string, string> = {
+  // Common
   libertad_tradicion: 'Certificado Libertad y Tradicion',
   escritura: 'Escritura',
-  cedula: 'Cedula de ciudadania',
+  cedula: 'Cedula de ciudadania / Rep. Legal',
   extractos: 'Extractos bancarios (mes 1 o consolidado)',
   extractos_2: 'Extractos bancarios (mes 2)',
   extractos_3: 'Extractos bancarios (mes 3)',
   declaracion_renta: 'Declaracion de renta',
-  certificado_ingresos: 'Certificado laboral / de ingresos',
-  estados_financieros: 'Estados financieros',
   reporte_auco: 'Reporte AUCO (PDF)',
+  // PN specific
+  certificado_ingresos: 'Certificado laboral / de ingresos',
+  // PJ specific
+  estados_financieros: 'Estados financieros',
+  camara_comercio: 'Camara de Comercio (< 30 dias)',
+  rut: 'RUT',
+  composicion_accionaria: 'Composicion accionaria (socios)',
 }
 
 const INITIAL_SLOTS: Record<string, DocumentSlot> = Object.fromEntries(
