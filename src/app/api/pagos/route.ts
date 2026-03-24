@@ -11,25 +11,6 @@ interface SolicitudPago {
   monto: number // Monto total del pago — se distribuye automáticamente: mora → intereses → capital
 }
 
-/**
- * Calcula los meses de interés debidos entre dos fechas.
- * Replica la lógica de la función SQL public.months_of_interest_due()
- */
-function monthsOfInterestDue(baseDate: Date, targetDate: Date, anticipada: boolean): number {
-  let periods = (targetDate.getFullYear() - baseDate.getFullYear()) * 12
-    + (targetDate.getMonth() - baseDate.getMonth())
-
-  if (targetDate.getDate() >= baseDate.getDate()) {
-    periods += 1
-  }
-
-  if (!anticipada) {
-    periods -= 1
-  }
-
-  return Math.max(0, periods)
-}
-
 interface AplicacionPago {
   monto_mora: number
   monto_interes: number
@@ -128,7 +109,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
 
     const { data: credito, error: creditoError } = await supabase
       .from('creditos')
-      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, tasa_nominal, tipo_liquidacion, tipo_amortizacion, valor_colocado, fecha_desembolso, fecha_ultimo_pago, plazo')
+      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora')
       .eq(isUUID ? 'id' : 'codigo_credito', credito_id)
       .single()
 
@@ -143,107 +124,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
     const montoCredito = credito.monto_solicitado || 0
 
     // =========================================
-    // RECALCULAR saldo_intereses EN TIEMPO REAL
-    // (misma lógica que el cron SQL calcular_mora_diaria)
+    // SALDOS: usar valores de la DB mantenidos por causación diaria
+    // El cron de causación (Vercel) actualiza saldo_intereses y saldo_mora
+    // diariamente. No recalcular con fórmula mensual antigua.
     // =========================================
-    const tasaNominal = credito.tasa_nominal || 0
-    const esAnticipada = (credito.tipo_liquidacion || 'vencida') === 'anticipada'
-    const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
-    const principal = credito.valor_colocado || credito.monto_solicitado || 0
-    const fechaPago = new Date(fecha_pago + 'T12:00:00') // Usar fecha del pago como referencia
-
-    let saldoInteresesCalculado = 0
-
-    if (tasaNominal > 0 && credito.fecha_desembolso) {
-      if (esSoloInteres) {
-        // SOLO INTERES: los pagos cubren intereses del plazo COMPLETO antes de tocar capital
-        // Total intereses previstos = plazo * cuota_mensual_interes
-        const plazoMeses = credito.plazo || 12
-        const totalInterestForTerm = plazoMeses * (principal * tasaNominal / 100)
-
-        // Sumar todos los pagos de interés ya registrados
-        const { data: interestPayments } = await supabase
-          .from('transacciones')
-          .select('monto')
-          .eq('credito_id', creditoId)
-          .eq('tipo_transaccion', 'pago_interes')
-
-        const totalInterestPaid = (interestPayments || []).reduce((sum, t) => sum + (t.monto || 0), 0)
-        saldoInteresesCalculado = Math.max(0, Math.round(totalInterestForTerm - totalInterestPaid))
-      } else {
-        // FRANCESA: desde último pago de interés (o desembolso)
-        const { data: lastInterestPayment } = await supabase
-          .from('transacciones')
-          .select('fecha_transaccion')
-          .eq('credito_id', creditoId)
-          .eq('tipo_transaccion', 'pago_interes')
-          .order('fecha_transaccion', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        const baseDate = lastInterestPayment?.fecha_transaccion
-          ? new Date(lastInterestPayment.fecha_transaccion + 'T12:00:00')
-          : new Date(credito.fecha_desembolso + 'T12:00:00')
-
-        const monthsDue = monthsOfInterestDue(baseDate, fechaPago, esAnticipada)
-        saldoInteresesCalculado = Math.round(
-          monthsDue * ((credito.saldo_capital || 0) * tasaNominal / 100)
-        )
-      }
-    }
-
-    // =========================================
-    // RECALCULAR saldo_mora SEGÚN FECHA DEL PAGO
-    // Interés compuesto diario, base = capital + intereses
-    // Tasa de usura SFC por periodo (EA → diaria)
-    // =========================================
-    const toDateStr = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
-    let saldoMoraCalculado = 0
-
-    if (credito.fecha_ultimo_pago && credito.fecha_desembolso) {
-      const fechaUltimoPago = new Date(credito.fecha_ultimo_pago + 'T12:00:00')
-      const diaPago = new Date(credito.fecha_desembolso + 'T12:00:00').getDate()
-
-      // Calcular próximo vencimiento = fecha_ultimo_pago + 1 mes, ajustado al día de pago
-      const proximoVencimiento = new Date(fechaUltimoPago)
-      proximoVencimiento.setMonth(proximoVencimiento.getMonth() + 1)
-      const lastDayOfMonth = new Date(proximoVencimiento.getFullYear(), proximoVencimiento.getMonth() + 1, 0).getDate()
-      proximoVencimiento.setDate(Math.min(diaPago, lastDayOfMonth))
-
-      if (fechaPago > proximoVencimiento) {
-        // Obtener todas las tasas de usura que cubren el periodo de mora
-        const fechaInicioMora = toDateStr(proximoVencimiento)
-        const { data: tasasRows } = await supabase
-          .from('tasas_oficiales')
-          .select('tasa_ea, vigencia_desde, vigencia_hasta')
-          .eq('tipo', 'usura_consumo')
-          .lte('vigencia_desde', fecha_pago)
-          .gte('vigencia_hasta', fechaInicioMora)
-          .order('vigencia_desde', { ascending: true })
-
-        // Base = capital + intereses impagos
-        const baseMora = (credito.saldo_capital || 0) + saldoInteresesCalculado
-        let moraAcumulada = 0
-        const curDate = new Date(proximoVencimiento)
-
-        while (curDate < fechaPago) {
-          const dStr = toDateStr(curDate)
-          const tasaMatch = (tasasRows || []).find(t =>
-            dStr >= t.vigencia_desde && dStr <= t.vigencia_hasta
-          )
-          const tasaEA = tasaMatch?.tasa_ea || 25.52
-          const tasaDiaria = Math.pow(1 + tasaEA / 100, 1 / 365) - 1
-
-          // Compuesto: mora del día sobre base + mora acumulada
-          moraAcumulada += (baseMora + moraAcumulada) * tasaDiaria
-          curDate.setDate(curDate.getDate() + 1)
-        }
-
-        saldoMoraCalculado = Math.round(moraAcumulada)
-      }
-    }
+    const saldoInteresesCalculado = credito.saldo_intereses || 0
+    const saldoMoraCalculado = credito.saldo_mora || 0
 
     // =========================================
     // CASCADA: mora → intereses → capital
