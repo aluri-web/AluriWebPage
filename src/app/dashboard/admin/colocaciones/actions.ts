@@ -537,6 +537,7 @@ export interface LoanTableRow {
   saldo_intereses: number
   saldo_mora: number
   en_mora: boolean
+  tipo_amortizacion: string | null
 }
 
 export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; error: string | null }> {
@@ -565,6 +566,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       saldo_intereses,
       saldo_mora,
       en_mora,
+      tipo_amortizacion,
       created_at,
       fecha_desembolso,
       cliente:profiles!cliente_id (
@@ -684,6 +686,7 @@ export async function getAllLoansWithDetails(): Promise<{ data: LoanTableRow[]; 
       saldo_intereses: (credito as any).saldo_intereses || 0,
       saldo_mora: (credito as any).saldo_mora || 0,
       en_mora: (credito as any).en_mora || false,
+      tipo_amortizacion: (credito as any).tipo_amortizacion || null,
     }
   })
 
@@ -956,7 +959,7 @@ export async function registerLoanPayment(
     // Buscar el crédito
     const { data: credito, error: creditoError } = await supabase
       .from('creditos')
-      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora')
+      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, tipo_amortizacion, plazo, fecha_desembolso')
       .eq('id', data.loan_id)
       .single()
 
@@ -982,7 +985,10 @@ export async function registerLoanPayment(
     restante -= montoInteres
 
     // 3. El sobrante va a capital
-    const montoCapital = Math.min(restante, saldoCapitalAnterior)
+    // Para créditos "solo_interes", NO aplicar a capital automáticamente
+    // (el capital se paga completo al vencimiento del plazo)
+    const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
+    const montoCapital = esSoloInteres ? 0 : Math.min(restante, saldoCapitalAnterior)
 
     // Nuevos saldos
     const nuevoSaldoMora = saldoMoraAnterior - montoMora
