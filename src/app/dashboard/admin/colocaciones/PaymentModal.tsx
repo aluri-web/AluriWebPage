@@ -54,7 +54,8 @@ export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoInte
     let restante = total
     const mora = Math.min(restante, saldoMora)
     restante -= mora
-    const intereses = Math.min(restante, saldoIntereses)
+    // Solo interés anticipado: todo el restante va a intereses (no limitado por saldo)
+    const intereses = esSoloInteres ? restante : Math.min(restante, saldoIntereses)
     restante -= intereses
     // Solo interés: no aplicar a capital (se paga al vencimiento)
     const capital = esSoloInteres ? 0 : Math.min(restante, saldoCapital)

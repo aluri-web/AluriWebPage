@@ -973,6 +973,7 @@ export async function registerLoanPayment(
     const saldoMoraAnterior = credito.saldo_mora || 0
     const saldoInteresesAnterior = credito.saldo_intereses || 0
     const saldoCapitalAnterior = credito.saldo_capital || 0
+    const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
 
     let restante = montoTotal
 
@@ -981,18 +982,19 @@ export async function registerLoanPayment(
     restante -= montoMora
 
     // 2. Luego pagar intereses
-    const montoInteres = Math.min(restante, saldoInteresesAnterior)
+    // Solo interés anticipado: el pago de intereses NO se limita por saldo_intereses
+    // (los intereses se cobran anticipados, no dependen de la causación diaria)
+    const montoInteres = esSoloInteres ? restante : Math.min(restante, saldoInteresesAnterior)
     restante -= montoInteres
 
     // 3. El sobrante va a capital
     // Para créditos "solo_interes", NO aplicar a capital automáticamente
     // (el capital se paga completo al vencimiento del plazo)
-    const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
     const montoCapital = esSoloInteres ? 0 : Math.min(restante, saldoCapitalAnterior)
 
     // Nuevos saldos
     const nuevoSaldoMora = saldoMoraAnterior - montoMora
-    const nuevoSaldoIntereses = saldoInteresesAnterior - montoInteres
+    const nuevoSaldoIntereses = esSoloInteres ? 0 : (saldoInteresesAnterior - montoInteres)
     const nuevoSaldoCapital = saldoCapitalAnterior - montoCapital
 
     const aplicacion = {
