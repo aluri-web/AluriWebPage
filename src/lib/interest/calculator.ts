@@ -470,6 +470,7 @@ export async function procesarCausacionCredito(
     const causacion: CausacionDiaria = {
       credito_id: credito.id,
       fecha_causacion: fechaHoy,
+      saldo_base: capitalEsperado,
       capital_esperado: capitalEsperado,
       capital_real: capitalReal,
       tasa_nominal: credito.tasa_nominal,
