@@ -1052,6 +1052,15 @@ export async function registerLoanPayment(
       })
     }
 
+    // Validar que al menos algo se distribuyó
+    const totalAplicado = montoMora + montoInteres + montoCapital
+    if (totalAplicado === 0) {
+      const motivo = esSoloInteres
+        ? `No hay saldo de intereses ni mora pendiente (intereses: ${saldoInteresesAnterior.toLocaleString()}, mora: ${saldoMoraAnterior.toLocaleString()}). Verifique que la causación diaria haya corrido.`
+        : `No hay saldos pendientes para aplicar el pago.`
+      return { success: false, error: motivo }
+    }
+
     if (filasTransaccion.length > 0) {
       const { error: txError } = await supabase
         .from('transacciones')
