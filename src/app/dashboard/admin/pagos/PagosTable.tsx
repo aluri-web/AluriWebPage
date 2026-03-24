@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Trash2 } from 'lucide-react'
 import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
@@ -52,6 +52,32 @@ export default function PagosTable({ pagos }: PagosTableProps) {
 
   // Delete modal state
   const [deletePago, setDeletePago] = useState<PagoAgrupado | null>(null)
+
+  // Long-press to edit
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressTriggered = useRef(false)
+
+  const handlePointerDown = useCallback((referencia: string) => {
+    longPressTriggered.current = false
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true
+      setEditRef(referencia)
+    }, 500)
+  }, [])
+
+  const handlePointerUp = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
+
+  const handlePointerLeave = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -181,7 +207,14 @@ export default function PagosTable({ pagos }: PagosTableProps) {
             </thead>
             <tbody className="divide-y divide-slate-800">
               {sortedPagos.map((pago) => (
-                <tr key={pago.referencia} className="hover:bg-slate-800/30 transition-colors group">
+                <tr
+                  key={pago.referencia}
+                  className="hover:bg-slate-800/30 transition-colors group cursor-pointer select-none"
+                  onPointerDown={() => handlePointerDown(pago.referencia)}
+                  onPointerUp={handlePointerUp}
+                  onPointerLeave={handlePointerLeave}
+                  onContextMenu={(e) => e.preventDefault()}
+                >
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
                     {formatDate(pago.fecha)}
                   </td>
