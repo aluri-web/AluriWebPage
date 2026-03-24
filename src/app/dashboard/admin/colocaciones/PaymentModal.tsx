@@ -11,11 +11,12 @@ interface PaymentModalProps {
   saldoCapital: number
   saldoIntereses: number
   saldoMora: number
+  tipoAmortizacion?: string | null
   isOpen: boolean
   onClose: () => void
 }
 
-export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoIntereses, saldoMora, isOpen, onClose }: PaymentModalProps) {
+export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoIntereses, saldoMora, tipoAmortizacion, isOpen, onClose }: PaymentModalProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -46,6 +47,8 @@ export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoInte
     }).format(amount)
   }
 
+  const esSoloInteres = tipoAmortizacion === 'solo_interes'
+
   // Simulate cascading distribution preview
   const calcDistribution = (total: number) => {
     let restante = total
@@ -53,7 +56,8 @@ export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoInte
     restante -= mora
     const intereses = Math.min(restante, saldoIntereses)
     restante -= intereses
-    const capital = Math.min(restante, saldoCapital)
+    // Solo interés: no aplicar a capital (se paga al vencimiento)
+    const capital = esSoloInteres ? 0 : Math.min(restante, saldoCapital)
     return { mora, intereses, capital }
   }
 
@@ -187,7 +191,11 @@ export default function PaymentModal({ loanId, loanCode, saldoCapital, saldoInte
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Monto del Pago ($)
                 </label>
-                <p className="text-xs text-slate-500 mb-1.5">Se distribuye automaticamente: mora → intereses → capital</p>
+                <p className="text-xs text-slate-500 mb-1.5">
+                  {esSoloInteres
+                    ? 'Solo interés: mora → intereses (sin abono a capital)'
+                    : 'Se distribuye automaticamente: mora → intereses → capital'}
+                </p>
                 <input
                   type="number"
                   value={monto || ''}
