@@ -1662,12 +1662,15 @@ export interface SaldoDiscrepancy {
   propietario: string
   monto_financiado: number
   db_saldo_capital: number
+  db_saldo_capital_esperado: number
   db_saldo_intereses: number
   db_saldo_mora: number
   calc_saldo_capital: number
+  calc_saldo_capital_esperado: number
   calc_saldo_intereses: number
   calc_saldo_mora: number
   diff_capital: number
+  diff_capital_esperado: number
   diff_intereses: number
   diff_mora: number
 }
@@ -1684,7 +1687,7 @@ export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]
 
   const { data: creditos, error: creditosError } = await supabase
     .from('creditos')
-    .select('id, codigo_credito, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, cliente:profiles!cliente_id(full_name)')
+    .select('id, codigo_credito, monto_solicitado, saldo_capital, saldo_capital_esperado, saldo_intereses, saldo_mora, cliente:profiles!cliente_id(full_name)')
     .in('estado', ['activo', 'mora', 'publicado', 'firmado'])
 
   if (creditosError || !creditos) return { discrepancies: [], total_checked: 0, error: creditosError?.message || 'Error al cargar créditos' }
@@ -1724,19 +1727,24 @@ export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]
     const payments = paymentsByCredit[c.id] || { capital: 0, intereses: 0, mora: 0 }
     const causacion = causacionesByCredit[c.id] || { intereses: 0, mora: 0 }
 
-    const calcCapital = (c.monto_solicitado || 0) - payments.capital
+    // saldo_capital y saldo_capital_esperado deberían iniciar en monto_solicitado
+    const montoBase = c.monto_solicitado || 0
+    const calcCapital = montoBase - payments.capital
+    const calcCapitalEsperado = montoBase - payments.capital
     const calcIntereses = causacion.intereses - payments.intereses
     const calcMora = causacion.mora - payments.mora
 
     const dbCapital = c.saldo_capital || 0
+    const dbCapitalEsperado = (c as Record<string, unknown>).saldo_capital_esperado as number || 0
     const dbIntereses = c.saldo_intereses || 0
     const dbMora = c.saldo_mora || 0
 
     const diffCapital = Math.round(dbCapital - calcCapital)
+    const diffCapitalEsperado = Math.round(dbCapitalEsperado - calcCapitalEsperado)
     const diffIntereses = Math.round(dbIntereses - calcIntereses)
     const diffMora = Math.round(dbMora - calcMora)
 
-    if (diffCapital !== 0 || diffIntereses !== 0 || diffMora !== 0) {
+    if (diffCapital !== 0 || diffCapitalEsperado !== 0 || diffIntereses !== 0 || diffMora !== 0) {
       const clienteRaw = c.cliente as unknown
       const clienteData = Array.isArray(clienteRaw) ? clienteRaw[0] : clienteRaw as { full_name?: string } | null
 
@@ -1744,14 +1752,17 @@ export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]
         credito_id: c.id,
         codigo: c.codigo_credito,
         propietario: clienteData?.full_name || 'Sin nombre',
-        monto_financiado: c.monto_solicitado || 0,
+        monto_financiado: montoBase,
         db_saldo_capital: dbCapital,
+        db_saldo_capital_esperado: dbCapitalEsperado,
         db_saldo_intereses: dbIntereses,
         db_saldo_mora: dbMora,
         calc_saldo_capital: calcCapital,
+        calc_saldo_capital_esperado: calcCapitalEsperado,
         calc_saldo_intereses: calcIntereses,
         calc_saldo_mora: calcMora,
         diff_capital: diffCapital,
+        diff_capital_esperado: diffCapitalEsperado,
         diff_intereses: diffIntereses,
         diff_mora: diffMora,
       })
@@ -1761,45 +1772,101 @@ export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]
   return { discrepancies, total_checked: creditos.length, error: null }
 }
 
-export async function fixSaldos(creditoIds?: string[]): Promise<{ fixed: number; error: string | null }> {
+export async function fixSaldos(creditoIds?: string[]): Promise<{ fixed: number; details: string[]; error: string | null }> {
   const adminCheck = await verifyAdmin()
-  if (!adminCheck.authorized) return { fixed: 0, error: adminCheck.error || 'No autorizado' }
+  if (!adminCheck.authorized) return { fixed: 0, details: [], error: adminCheck.error || 'No autorizado' }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !serviceRoleKey) return { fixed: 0, error: 'Configuracion incompleta' }
+  if (!supabaseUrl || !serviceRoleKey) return { fixed: 0, details: [], error: 'Configuracion incompleta' }
 
   const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
 
   const audit = await auditSaldos()
-  if (audit.error) return { fixed: 0, error: audit.error }
+  if (audit.error) return { fixed: 0, details: [], error: audit.error }
 
   const toFix = creditoIds
     ? audit.discrepancies.filter(d => creditoIds.includes(d.credito_id))
     : audit.discrepancies
 
   let fixed = 0
+  const details: string[] = []
+
   for (const d of toFix) {
+    // 1. Fix saldos on the credit
     const { error } = await supabase
       .from('creditos')
       .update({
         saldo_capital: d.calc_saldo_capital,
+        saldo_capital_esperado: d.calc_saldo_capital_esperado,
         saldo_intereses: d.calc_saldo_intereses,
         saldo_mora: d.calc_saldo_mora,
       })
       .eq('id', d.credito_id)
 
-    if (!error) fixed++
+    if (error) {
+      details.push(`${d.codigo}: Error - ${error.message}`)
+      continue
+    }
+
+    // 2. If saldo_capital_esperado was wrong, causaciones were calculated on wrong base.
+    //    Delete wrong causacion data and transactions so they get re-calculated.
+    if (d.diff_capital_esperado !== 0) {
+      // Delete causaciones_diarias
+      await supabase
+        .from('causaciones_diarias')
+        .delete()
+        .eq('credito_id', d.credito_id)
+
+      // Delete causaciones_inversionistas
+      await supabase
+        .from('causaciones_inversionistas')
+        .delete()
+        .eq('credito_id', d.credito_id)
+
+      // Delete causacion transactions (they have wrong amounts)
+      await supabase
+        .from('transacciones')
+        .delete()
+        .eq('credito_id', d.credito_id)
+        .in('tipo_transaccion', ['causacion_interes', 'causacion_mora'])
+
+      // Reset acumulados on inversiones
+      await supabase
+        .from('inversiones')
+        .update({ interes_acumulado: 0, mora_acumulada: 0, ultima_causacion: null })
+        .eq('credito_id', d.credito_id)
+        .eq('estado', 'activo')
+
+      // Reset causacion-related fields on credit (so cron re-processes)
+      await supabase
+        .from('creditos')
+        .update({
+          saldo_capital: d.calc_saldo_capital_esperado,
+          saldo_capital_esperado: d.calc_saldo_capital_esperado,
+          saldo_intereses: 0,
+          saldo_mora: 0,
+          ultima_causacion: null,
+          interes_acumulado_total: 0,
+        })
+        .eq('id', d.credito_id)
+
+      details.push(`${d.codigo}: Saldos + causaciones reseteadas (capital_esperado era ${d.db_saldo_capital_esperado.toLocaleString()} → ${d.calc_saldo_capital_esperado.toLocaleString()})`)
+    } else {
+      details.push(`${d.codigo}: Saldos corregidos`)
+    }
+
+    fixed++
   }
 
   await auditLog({
     action: 'admin.action',
     resource_type: 'credito',
-    details: { action: 'fix_saldos', fixed, total_discrepancies: toFix.length },
+    details: { action: 'fix_saldos', fixed, total_discrepancies: toFix.length, details },
   })
 
   revalidatePath('/dashboard/admin/colocaciones')
   revalidatePath('/dashboard/admin/pagos')
 
-  return { fixed, error: null }
+  return { fixed, details, error: null }
 }
