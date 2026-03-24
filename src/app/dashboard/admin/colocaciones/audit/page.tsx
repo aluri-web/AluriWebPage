@@ -19,7 +19,7 @@ export default function AuditSaldosPage() {
   const [discrepancies, setDiscrepancies] = useState<SaldoDiscrepancy[] | null>(null)
   const [totalChecked, setTotalChecked] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [fixResult, setFixResult] = useState<string | null>(null)
+  const [fixResult, setFixResult] = useState<string[] | null>(null)
 
   const runAudit = async () => {
     setLoading(true)
@@ -43,8 +43,7 @@ export default function AuditSaldosPage() {
     if (result.error) {
       setError(result.error)
     } else {
-      setFixResult(`${result.fixed} créditos corregidos exitosamente`)
-      // Re-run audit
+      setFixResult(result.details)
       await runAudit()
     }
     setFixing(false)
@@ -56,7 +55,7 @@ export default function AuditSaldosPage() {
     if (result.error) {
       setError(result.error)
     } else {
-      setFixResult(`Crédito corregido exitosamente`)
+      setFixResult(result.details)
       await runAudit()
     }
     setFixing(false)
@@ -70,9 +69,9 @@ export default function AuditSaldosPage() {
             <ShieldCheck className="text-amber-400" size={28} />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white">Auditoría de Saldos</h1>
+            <h1 className="text-3xl font-bold text-white">Auditoria de Saldos</h1>
             <p className="text-slate-400 mt-1">
-              Verifica que los saldos de capital, intereses y mora sean correctos
+              Verifica saldo_capital, saldo_capital_esperado, intereses y mora
             </p>
           </div>
         </div>
@@ -86,7 +85,7 @@ export default function AuditSaldosPage() {
           className="flex items-center gap-2 px-6 py-3 bg-teal-500 hover:bg-teal-400 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
         >
           <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-          {loading ? 'Verificando...' : 'Ejecutar Auditoría'}
+          {loading ? 'Verificando...' : 'Ejecutar Auditoria'}
         </button>
 
         {discrepancies && discrepancies.length > 0 && (
@@ -107,12 +106,23 @@ export default function AuditSaldosPage() {
         </div>
       )}
 
-      {fixResult && (
-        <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 flex items-center gap-2">
-          <CheckCircle size={18} />
-          {fixResult}
+      {fixResult && fixResult.length > 0 && (
+        <div className="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg space-y-1">
+          <div className="flex items-center gap-2 text-emerald-400 font-medium mb-2">
+            <CheckCircle size={18} />
+            Correcciones aplicadas:
+          </div>
+          {fixResult.map((detail, i) => (
+            <p key={i} className="text-emerald-400/80 text-sm font-mono">{detail}</p>
+          ))}
         </div>
       )}
+
+      {/* Info box */}
+      <div className="mb-6 p-4 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-slate-400 space-y-1">
+        <p><strong className="text-slate-300">Capital Esperado</strong>: base para calculo de intereses en la causacion diaria. Debe iniciar igual al monto financiado.</p>
+        <p><strong className="text-amber-400">Si capital_esperado esta mal</strong>: al corregir se eliminan las causaciones incorrectas y el cron las recalcula.</p>
+      </div>
 
       {/* Results */}
       {discrepancies !== null && (
@@ -120,7 +130,7 @@ export default function AuditSaldosPage() {
           {/* Summary */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-              <p className="text-slate-400 text-sm mb-1">Créditos Verificados</p>
+              <p className="text-slate-400 text-sm mb-1">Creditos Verificados</p>
               <p className="text-2xl font-bold text-white">{totalChecked}</p>
             </div>
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
@@ -141,78 +151,75 @@ export default function AuditSaldosPage() {
               <p className="text-emerald-400 text-lg font-medium">Todos los saldos son correctos</p>
             </div>
           ) : (
-            <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-800 bg-slate-800/50">
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Crédito</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Propietario</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Financiado</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Capital BD</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Capital Calc</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Δ Capital</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Intereses BD</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Intereses Calc</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Δ Intereses</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Mora BD</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Mora Calc</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase">Δ Mora</th>
-                      <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {discrepancies.map((d) => (
-                      <tr key={d.credito_id} className="hover:bg-slate-800/30">
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="px-2 py-1 bg-slate-800 text-teal-400 text-xs font-mono rounded">{d.codigo}</span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-white">{d.propietario}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-300">{formatCOP(d.monto_financiado)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-300">{formatCOP(d.db_saldo_capital)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-teal-400 font-medium">{formatCOP(d.calc_saldo_capital)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                          {d.diff_capital !== 0 && (
-                            <span className={d.diff_capital > 0 ? 'text-red-400' : 'text-amber-400'}>
-                              <AlertTriangle size={12} className="inline mr-1" />
-                              {formatCOP(d.diff_capital)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-300">{formatCOP(d.db_saldo_intereses)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-teal-400 font-medium">{formatCOP(d.calc_saldo_intereses)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                          {d.diff_intereses !== 0 && (
-                            <span className={d.diff_intereses > 0 ? 'text-red-400' : 'text-amber-400'}>
-                              <AlertTriangle size={12} className="inline mr-1" />
-                              {formatCOP(d.diff_intereses)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-slate-300">{formatCOP(d.db_saldo_mora)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-teal-400 font-medium">{formatCOP(d.calc_saldo_mora)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                          {d.diff_mora !== 0 && (
-                            <span className={d.diff_mora > 0 ? 'text-red-400' : 'text-amber-400'}>
-                              <AlertTriangle size={12} className="inline mr-1" />
-                              {formatCOP(d.diff_mora)}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-center">
-                          <button
-                            onClick={() => handleFixOne(d.credito_id)}
-                            disabled={fixing}
-                            className="px-3 py-1.5 bg-amber-500/20 text-amber-400 text-xs font-medium rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50"
-                          >
-                            Corregir
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="space-y-4">
+              {discrepancies.map((d) => (
+                <div key={d.credito_id} className="bg-slate-900 rounded-xl border border-slate-800 p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="px-2.5 py-1 bg-slate-800 text-teal-400 text-sm font-mono rounded">{d.codigo}</span>
+                      <span className="text-white font-medium">{d.propietario}</span>
+                      <span className="text-slate-500 text-sm">Financiado: {formatCOP(d.monto_financiado)}</span>
+                    </div>
+                    <button
+                      onClick={() => handleFixOne(d.credito_id)}
+                      disabled={fixing}
+                      className="px-4 py-2 bg-amber-500/20 text-amber-400 text-sm font-medium rounded-lg hover:bg-amber-500/30 transition-colors disabled:opacity-50"
+                    >
+                      {fixing ? 'Corrigiendo...' : 'Corregir'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Capital */}
+                    <div className={`p-3 rounded-lg ${d.diff_capital !== 0 ? 'bg-red-500/5 border border-red-500/20' : 'bg-slate-800/50'}`}>
+                      <p className="text-xs text-slate-400 mb-1">Capital</p>
+                      <p className="text-sm text-slate-300">BD: {formatCOP(d.db_saldo_capital)}</p>
+                      <p className="text-sm text-teal-400">Calc: {formatCOP(d.calc_saldo_capital)}</p>
+                      {d.diff_capital !== 0 && (
+                        <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                          <AlertTriangle size={10} /> {formatCOP(d.diff_capital)}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Capital Esperado */}
+                    <div className={`p-3 rounded-lg ${d.diff_capital_esperado !== 0 ? 'bg-red-500/5 border border-red-500/20' : 'bg-slate-800/50'}`}>
+                      <p className="text-xs text-slate-400 mb-1">Capital Esperado</p>
+                      <p className="text-sm text-slate-300">BD: {formatCOP(d.db_saldo_capital_esperado)}</p>
+                      <p className="text-sm text-teal-400">Calc: {formatCOP(d.calc_saldo_capital_esperado)}</p>
+                      {d.diff_capital_esperado !== 0 && (
+                        <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                          <AlertTriangle size={10} /> {formatCOP(d.diff_capital_esperado)} — causaciones seran recalculadas
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Intereses */}
+                    <div className={`p-3 rounded-lg ${d.diff_intereses !== 0 ? 'bg-red-500/5 border border-red-500/20' : 'bg-slate-800/50'}`}>
+                      <p className="text-xs text-slate-400 mb-1">Intereses</p>
+                      <p className="text-sm text-slate-300">BD: {formatCOP(d.db_saldo_intereses)}</p>
+                      <p className="text-sm text-teal-400">Calc: {formatCOP(d.calc_saldo_intereses)}</p>
+                      {d.diff_intereses !== 0 && (
+                        <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                          <AlertTriangle size={10} /> {formatCOP(d.diff_intereses)}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Mora */}
+                    <div className={`p-3 rounded-lg ${d.diff_mora !== 0 ? 'bg-red-500/5 border border-red-500/20' : 'bg-slate-800/50'}`}>
+                      <p className="text-xs text-slate-400 mb-1">Mora</p>
+                      <p className="text-sm text-slate-300">BD: {formatCOP(d.db_saldo_mora)}</p>
+                      <p className="text-sm text-teal-400">Calc: {formatCOP(d.calc_saldo_mora)}</p>
+                      {d.diff_mora !== 0 && (
+                        <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                          <AlertTriangle size={10} /> {formatCOP(d.diff_mora)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </>
