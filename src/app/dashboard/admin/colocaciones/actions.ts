@@ -1653,3 +1653,153 @@ export async function getCreditDeleteInfo(creditId: string): Promise<{
     error: null
   }
 }
+
+// ========== AUDIT & RECONCILE SALDOS ==========
+
+export interface SaldoDiscrepancy {
+  credito_id: string
+  codigo: string
+  propietario: string
+  monto_financiado: number
+  db_saldo_capital: number
+  db_saldo_intereses: number
+  db_saldo_mora: number
+  calc_saldo_capital: number
+  calc_saldo_intereses: number
+  calc_saldo_mora: number
+  diff_capital: number
+  diff_intereses: number
+  diff_mora: number
+}
+
+export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]; total_checked: number; error: string | null }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { discrepancies: [], total_checked: 0, error: adminCheck.error || 'No autorizado' }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) return { discrepancies: [], total_checked: 0, error: 'Configuracion incompleta' }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const { data: creditos, error: creditosError } = await supabase
+    .from('creditos')
+    .select('id, codigo_credito, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, cliente:profiles!cliente_id(full_name)')
+    .in('estado', ['activo', 'mora', 'publicado', 'firmado'])
+
+  if (creditosError || !creditos) return { discrepancies: [], total_checked: 0, error: creditosError?.message || 'Error al cargar créditos' }
+
+  const { data: txns, error: txnsError } = await supabase
+    .from('transacciones')
+    .select('credito_id, tipo_transaccion, monto')
+    .in('tipo_transaccion', ['pago_capital', 'pago_interes', 'pago_mora'])
+
+  if (txnsError) return { discrepancies: [], total_checked: 0, error: txnsError.message }
+
+  const { data: causaciones } = await supabase
+    .from('transacciones')
+    .select('credito_id, tipo_transaccion, monto')
+    .in('tipo_transaccion', ['causacion_interes', 'causacion_mora'])
+
+  // Sum payments per credit
+  const paymentsByCredit: Record<string, { capital: number; intereses: number; mora: number }> = {}
+  for (const tx of (txns || [])) {
+    if (!paymentsByCredit[tx.credito_id]) paymentsByCredit[tx.credito_id] = { capital: 0, intereses: 0, mora: 0 }
+    if (tx.tipo_transaccion === 'pago_capital') paymentsByCredit[tx.credito_id].capital += tx.monto
+    else if (tx.tipo_transaccion === 'pago_interes') paymentsByCredit[tx.credito_id].intereses += tx.monto
+    else if (tx.tipo_transaccion === 'pago_mora') paymentsByCredit[tx.credito_id].mora += tx.monto
+  }
+
+  // Sum causaciones per credit
+  const causacionesByCredit: Record<string, { intereses: number; mora: number }> = {}
+  for (const tx of (causaciones || [])) {
+    if (!causacionesByCredit[tx.credito_id]) causacionesByCredit[tx.credito_id] = { intereses: 0, mora: 0 }
+    if (tx.tipo_transaccion === 'causacion_interes') causacionesByCredit[tx.credito_id].intereses += tx.monto
+    else if (tx.tipo_transaccion === 'causacion_mora') causacionesByCredit[tx.credito_id].mora += tx.monto
+  }
+
+  const discrepancies: SaldoDiscrepancy[] = []
+
+  for (const c of creditos) {
+    const payments = paymentsByCredit[c.id] || { capital: 0, intereses: 0, mora: 0 }
+    const causacion = causacionesByCredit[c.id] || { intereses: 0, mora: 0 }
+
+    const calcCapital = (c.monto_solicitado || 0) - payments.capital
+    const calcIntereses = causacion.intereses - payments.intereses
+    const calcMora = causacion.mora - payments.mora
+
+    const dbCapital = c.saldo_capital || 0
+    const dbIntereses = c.saldo_intereses || 0
+    const dbMora = c.saldo_mora || 0
+
+    const diffCapital = Math.round(dbCapital - calcCapital)
+    const diffIntereses = Math.round(dbIntereses - calcIntereses)
+    const diffMora = Math.round(dbMora - calcMora)
+
+    if (diffCapital !== 0 || diffIntereses !== 0 || diffMora !== 0) {
+      const clienteRaw = c.cliente as unknown
+      const clienteData = Array.isArray(clienteRaw) ? clienteRaw[0] : clienteRaw as { full_name?: string } | null
+
+      discrepancies.push({
+        credito_id: c.id,
+        codigo: c.codigo_credito,
+        propietario: clienteData?.full_name || 'Sin nombre',
+        monto_financiado: c.monto_solicitado || 0,
+        db_saldo_capital: dbCapital,
+        db_saldo_intereses: dbIntereses,
+        db_saldo_mora: dbMora,
+        calc_saldo_capital: calcCapital,
+        calc_saldo_intereses: calcIntereses,
+        calc_saldo_mora: calcMora,
+        diff_capital: diffCapital,
+        diff_intereses: diffIntereses,
+        diff_mora: diffMora,
+      })
+    }
+  }
+
+  return { discrepancies, total_checked: creditos.length, error: null }
+}
+
+export async function fixSaldos(creditoIds?: string[]): Promise<{ fixed: number; error: string | null }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { fixed: 0, error: adminCheck.error || 'No autorizado' }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) return { fixed: 0, error: 'Configuracion incompleta' }
+
+  const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+  const audit = await auditSaldos()
+  if (audit.error) return { fixed: 0, error: audit.error }
+
+  const toFix = creditoIds
+    ? audit.discrepancies.filter(d => creditoIds.includes(d.credito_id))
+    : audit.discrepancies
+
+  let fixed = 0
+  for (const d of toFix) {
+    const { error } = await supabase
+      .from('creditos')
+      .update({
+        saldo_capital: d.calc_saldo_capital,
+        saldo_intereses: d.calc_saldo_intereses,
+        saldo_mora: d.calc_saldo_mora,
+      })
+      .eq('id', d.credito_id)
+
+    if (!error) fixed++
+  }
+
+  await auditLog({
+    action: 'admin.action',
+    resource_type: 'credito',
+    details: { action: 'fix_saldos', fixed, total_discrepancies: toFix.length },
+  })
+
+  revalidatePath('/dashboard/admin/colocaciones')
+  revalidatePath('/dashboard/admin/pagos')
+
+  return { fixed, error: null }
+}
