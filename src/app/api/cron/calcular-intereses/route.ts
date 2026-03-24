@@ -210,8 +210,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { count: creditosPendientes } = await supabase
       .from('creditos')
       .select('id', { count: 'exact', head: true })
-      .in('estado_credito', ['activo'])
+      .not('estado_credito', 'in', '(pagado,anulado,castigado)')
       .gt('saldo_capital', 0)
+      .not('fecha_desembolso', 'is', null)
+      .lt('fecha_desembolso', hoy)
       .or(`ultima_causacion.is.null,ultima_causacion.lt.${hoy}`)
 
     return NextResponse.json({

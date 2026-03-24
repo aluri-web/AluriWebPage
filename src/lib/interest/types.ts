@@ -17,9 +17,13 @@ export interface Credito {
   saldo_capital_anterior?: number    // Capital del día anterior (para mora)
   saldo_intereses: number
   saldo_mora: number
-  tasa_nominal: number               // Tasa EA del crédito
+  tasa_nominal: number               // Tasa nominal mensual (ej: 1.87%)
+  tasa_interes_ea?: number           // Tasa EA del crédito (ej: 24.9%)
   tasa_mora?: number
-  estado_credito: string
+  estado: string                     // Estado workflow: firmado, activo, etc.
+  estado_credito: string             // Estado financiero: activo, pagado, etc.
+  tipo_amortizacion?: string         // 'francesa' | 'solo_interes'
+  tipo_liquidacion?: string          // 'anticipada' | 'vencida'
   fecha_desembolso: string
   fecha_ultimo_pago?: string
   fecha_proximo_pago?: string        // Próxima fecha de pago esperada
@@ -129,7 +133,9 @@ export interface ResumenEjecucion {
 // Constantes
 // ============================================
 
-export const ESTADOS_CREDITO_ACTIVO = ['activo'] as const
+// Estados de credito que deben causar intereses diarios
+// Excluimos solo 'pagado' y 'anulado' - el filtro principal es fecha_desembolso + saldo_capital > 0
+export const ESTADOS_CREDITO_EXCLUIDOS = ['pagado', 'anulado', 'castigado'] as const
 export const DIAS_ANIO = 365    // Días base para cálculo anual (EA → diaria)
 
 // Tasas de usura oficiales SFC por mes (fallback si no hay conexión a BD)

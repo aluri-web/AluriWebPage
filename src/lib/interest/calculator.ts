@@ -36,7 +36,7 @@ import type {
   ResultadoCausacion,
   ResumenEjecucion
 } from './types'
-import { DIAS_ANIO, ESTADOS_CREDITO_ACTIVO, TASAS_USURA_SFC, TASA_USURA_DEFAULT } from './types'
+import { DIAS_ANIO, ESTADOS_CREDITO_EXCLUIDOS, TASAS_USURA_SFC, TASA_USURA_DEFAULT } from './types'
 import { SupabaseClient } from '@supabase/supabase-js'
 
 // ============================================
@@ -152,11 +152,14 @@ export function esDiaDePago(
 
 /**
  * Calcula los días de mora basado en fecha de último pago y fecha de vencimiento
+ *
+ * @param esAnticipada - Si true, el primer pago vence en la fecha de desembolso (no un mes después)
  */
 export function calcularDiasMora(
   fechaUltimoPago: string | null,
   fechaDesembolso: string,
-  fechaActual: Date
+  fechaActual: Date,
+  esAnticipada: boolean = false
 ): { diasMora: number; enMora: boolean; fechaVencimiento: Date | null } {
   // Día de pago = día del desembolso
   const desembolso = new Date(fechaDesembolso)
@@ -181,9 +184,12 @@ export function calcularDiasMora(
 
   // Si no hay fecha de último pago, verificar si ya pasó el primer vencimiento
   if (!fechaUltimoPago) {
-    // Primer pago debería ser un mes después del desembolso
+    // Anticipada: primer pago vence en la fecha de desembolso
+    // Vencida: primer pago vence un mes después del desembolso
     const primerVencimiento = new Date(desembolso)
-    primerVencimiento.setMonth(primerVencimiento.getMonth() + 1)
+    if (!esAnticipada) {
+      primerVencimiento.setMonth(primerVencimiento.getMonth() + 1)
+    }
 
     if (fechaActual > primerVencimiento) {
       const diffTime = fechaActual.getTime() - primerVencimiento.getTime()
@@ -301,21 +307,23 @@ export function distribuirEntreInversionistas(
 // ============================================
 
 /**
- * Obtiene créditos activos que no han sido procesados hoy
+ * Obtiene créditos que necesitan causación diaria.
+ * Filtro principal: fecha_desembolso existe y < hoy, saldo_capital > 0.
+ * Excluye estados terminales (pagado, anulado, castigado).
  */
 export async function obtenerCreditosPendientes(
   supabase: SupabaseClient,
   fechaHoy: string,
   limite: number = 50
 ): Promise<Credito[]> {
-  // Solo procesar créditos desembolsados ANTES de hoy
-  // (la causación empieza el día DESPUÉS del desembolso)
+  // Construir filtro NOT IN para estados excluidos
   const { data, error } = await supabase
     .from('creditos')
     .select('*')
-    .in('estado_credito', ESTADOS_CREDITO_ACTIVO)
+    .not('estado_credito', 'in', `(${ESTADOS_CREDITO_EXCLUIDOS.join(',')})`)
     .gt('saldo_capital', 0)
-    .lt('fecha_desembolso', fechaHoy)  // Solo créditos desembolsados antes de hoy
+    .not('fecha_desembolso', 'is', null)
+    .lt('fecha_desembolso', fechaHoy)  // Causación empieza día después de desembolso
     .or(`ultima_causacion.is.null,ultima_causacion.lt.${fechaHoy}`)
     .limit(limite)
 
@@ -392,6 +400,10 @@ export async function procesarCausacionCredito(
   try {
     const fechaActual = new Date(fechaHoy)
 
+    // Determinar tipo de crédito
+    const esAnticipada = (credito.tipo_liquidacion || 'vencida') === 'anticipada'
+    const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
+
     // 1. Obtener capitales del día anterior o usar valores iniciales
     const capitalesAnteriores = await obtenerCapitalesAnteriores(supabase, credito.id, fechaHoy)
 
@@ -407,19 +419,20 @@ export async function procesarCausacionCredito(
       capitalReal = credito.saldo_capital
     }
 
-    // 2. Calcular días de mora y estado
+    // 2. Calcular días de mora y estado (anticipada: primer pago vence al desembolso)
     const moraInfo = calcularDiasMora(
       credito.fecha_ultimo_pago || null,
       credito.fecha_desembolso,
-      fechaActual
+      fechaActual,
+      esAnticipada
     )
 
     // 3. Verificar si hoy es día de pago esperado
     const esPagoDia = esDiaDePago(credito.fecha_desembolso, fechaActual)
     const montoEsperado = credito.monto_pago_esperado || 0
 
-    // Si es día de pago, reducir el capital esperado (aunque no haya pago real)
-    if (esPagoDia && montoEsperado > 0) {
+    // Si es día de pago, reducir el capital esperado (excepto solo_interes: capital se paga al vencimiento)
+    if (esPagoDia && montoEsperado > 0 && !esSoloInteres) {
       capitalEsperado = Math.max(0, capitalEsperado - montoEsperado)
     }
 
@@ -427,10 +440,12 @@ export async function procesarCausacionCredito(
     const tasaUsura = await obtenerTasaUsuraDB(supabase, fechaHoy)
 
     // 5. Calcular interés y mora diaria (lógica Excel)
+    // Usar tasa_interes_ea si está disponible, sino derivar de tasa_nominal mensual
+    const tasaEA = credito.tasa_interes_ea || ((Math.pow(1 + credito.tasa_nominal / 100, 12) - 1) * 100)
     const calculo = calcularInteresDiario(
       capitalEsperado,              // Base para Int. Corriente
       capitalReal,                  // Capital real acumulado
-      credito.tasa_nominal,         // Tasa EA del crédito
+      tasaEA,                       // Tasa EA del crédito
       tasaUsura,                    // Tasa usura SFC
       moraInfo.diasMora,
       moraInfo.enMora
