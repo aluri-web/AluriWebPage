@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { verificarAuth } from '@/lib/api-keys'
 import { apiLimiter, getClientIp } from '@/lib/rate-limit'
-import { auditLogApi } from '@/lib/audit-log'
 
 /**
  * GET /api/creditos/[id]
@@ -51,19 +49,10 @@ export async function GET(
     // Determinar si es UUID o código
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(creditoIdParam)
 
-    // Buscar el crédito
+    // Buscar el crédito (sin join para evitar fallos cuando cliente_id es NULL)
     let query = supabase
       .from('creditos')
-      .select(`
-        *,
-        propietario:profiles!cliente_id (
-          id,
-          full_name,
-          documento,
-          email,
-          telefono
-        )
-      `)
+      .select('*')
 
     if (isUUID) {
       query = query.eq('id', creditoIdParam)
@@ -74,10 +63,22 @@ export async function GET(
     const { data: credito, error } = await query.single()
 
     if (error || !credito) {
+      console.error('Error buscando crédito:', error?.message, error?.code)
       return NextResponse.json(
         { success: false, error: 'Crédito no encontrado' },
         { status: 404 }
       )
+    }
+
+    // Obtener propietario por separado (cliente_id puede ser NULL)
+    let propietario = null
+    if (credito.cliente_id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name, documento, email, telefono')
+        .eq('id', credito.cliente_id)
+        .single()
+      propietario = profile
     }
 
     // Obtener inversiones del crédito
@@ -140,7 +141,7 @@ export async function GET(
         tipo_liquidacion: credito.tipo_liquidacion,
         interes_acumulado_total: credito.interes_acumulado_total,
         // Propietario
-        propietario: credito.propietario,
+        propietario,
         // Inmueble
         tipo_inmueble: credito.tipo_inmueble,
         direccion_inmueble: credito.direccion_inmueble,
