@@ -970,9 +970,10 @@ export async function registerLoanPayment(
     const montoTotal = data.monto
 
     // CASCADA: mora → intereses → capital
-    const saldoMoraAnterior = credito.saldo_mora || 0
-    const saldoInteresesAnterior = credito.saldo_intereses || 0
-    const saldoCapitalAnterior = credito.saldo_capital || 0
+    // Usar Math.max(0, ...) para proteger contra saldos negativos en BD
+    const saldoMoraAnterior = Math.max(0, credito.saldo_mora || 0)
+    const saldoInteresesAnterior = Math.max(0, credito.saldo_intereses || 0)
+    const saldoCapitalAnterior = Math.max(0, credito.saldo_capital || 0)
     const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
 
     let restante = montoTotal
@@ -1114,6 +1115,89 @@ export async function registerLoanPayment(
   } catch (error) {
     console.error('Unexpected error:', error)
     return { success: false, error: 'Error inesperado al registrar el pago.' }
+  }
+}
+
+// ========== DELETE PAYMENT & RECALCULATE SALDOS ==========
+
+export async function deletePaymentAndRecalculate(
+  referenciaPago: string,
+  creditoId: string
+): Promise<{ success: boolean; error?: string }> {
+  const adminCheck = await verifyAdmin()
+  if (!adminCheck.authorized) return { success: false, error: adminCheck.error }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !serviceRoleKey) return { success: false, error: 'Configuracion del servidor incompleta.' }
+
+  try {
+    const supabase = createAdminClient(supabaseUrl, serviceRoleKey)
+
+    // Obtener las transacciones del pago a eliminar
+    const { data: txns, error: txError } = await supabase
+      .from('transacciones')
+      .select('id, tipo_transaccion, monto')
+      .eq('referencia_pago', referenciaPago)
+      .eq('credito_id', creditoId)
+
+    if (txError) return { success: false, error: 'Error buscando transacciones: ' + txError.message }
+    if (!txns || txns.length === 0) return { success: false, error: 'No se encontraron transacciones con esa referencia.' }
+
+    // Calcular montos a revertir
+    let capitalRevertir = 0
+    let interesRevertir = 0
+    let moraRevertir = 0
+    for (const txn of txns) {
+      if (txn.tipo_transaccion === 'pago_capital') capitalRevertir += txn.monto
+      if (txn.tipo_transaccion === 'pago_interes') interesRevertir += txn.monto
+      if (txn.tipo_transaccion === 'pago_mora') moraRevertir += txn.monto
+    }
+
+    // Obtener saldos actuales del crédito
+    const { data: credito, error: cError } = await supabase
+      .from('creditos')
+      .select('saldo_capital, saldo_intereses, saldo_mora')
+      .eq('id', creditoId)
+      .single()
+
+    if (cError || !credito) return { success: false, error: 'Crédito no encontrado.' }
+
+    // Eliminar transacciones
+    const { error: delError } = await supabase
+      .from('transacciones')
+      .delete()
+      .eq('referencia_pago', referenciaPago)
+      .eq('credito_id', creditoId)
+
+    if (delError) return { success: false, error: 'Error eliminando transacciones: ' + delError.message }
+
+    // Revertir saldos (sumar lo que se había restado)
+    const { error: updError } = await supabase
+      .from('creditos')
+      .update({
+        saldo_capital: (credito.saldo_capital || 0) + capitalRevertir,
+        saldo_intereses: (credito.saldo_intereses || 0) + interesRevertir,
+        saldo_mora: (credito.saldo_mora || 0) + moraRevertir,
+      })
+      .eq('id', creditoId)
+
+    if (updError) return { success: false, error: 'Error actualizando saldos: ' + updError.message }
+
+    await auditLog({
+      action: 'payment.delete',
+      resource_type: 'pago',
+      resource_id: creditoId,
+      details: { referencia: referenciaPago, capital: capitalRevertir, interes: interesRevertir, mora: moraRevertir }
+    })
+
+    revalidatePath('/dashboard/admin/colocaciones')
+    revalidatePath('/dashboard/admin/pagos')
+
+    return { success: true }
+  } catch (err) {
+    console.error('Error deleting payment:', err)
+    return { success: false, error: 'Error inesperado al eliminar el pago.' }
   }
 }
 
@@ -1740,10 +1824,10 @@ export async function auditSaldos(): Promise<{ discrepancies: SaldoDiscrepancy[]
 
     // saldo_capital y saldo_capital_esperado deberían iniciar en monto_solicitado
     const montoBase = c.monto_solicitado || 0
-    const calcCapital = montoBase - payments.capital
-    const calcCapitalEsperado = montoBase - payments.capital
-    const calcIntereses = causacion.intereses - payments.intereses
-    const calcMora = causacion.mora - payments.mora
+    const calcCapital = Math.max(0, montoBase - payments.capital)
+    const calcCapitalEsperado = Math.max(0, montoBase - payments.capital)
+    const calcIntereses = Math.max(0, causacion.intereses - payments.intereses)
+    const calcMora = Math.max(0, causacion.mora - payments.mora)
 
     const dbCapital = c.saldo_capital || 0
     const dbCapitalEsperado = (c as Record<string, unknown>).saldo_capital_esperado as number || 0
