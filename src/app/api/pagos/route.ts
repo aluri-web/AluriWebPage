@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { verificarAuth } from '@/lib/api-keys'
 import { apiLimiter, getClientIp } from '@/lib/rate-limit'
 import { auditLogApi } from '@/lib/audit-log'
+import { procesarCausacionCredito } from '@/lib/interest/calculator'
+import type { Credito } from '@/lib/interest/types'
 
 // Tipos para la API
 interface SolicitudPago {
@@ -124,20 +127,82 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
     const montoCredito = credito.monto_solicitado || 0
 
     // =========================================
-    // SALDOS: usar valores de la DB mantenidos por causación diaria
-    // El cron de causación (Vercel) actualiza saldo_intereses y saldo_mora
-    // diariamente. No recalcular con fórmula mensual antigua.
+    // CAUSACIÓN: ejecutar hasta la fecha del pago antes de aplicar
+    // Esto garantiza que saldo_intereses y saldo_mora estén
+    // actualizados al momento del pago, incluso para pagos retroactivos.
     // =========================================
-    const saldoInteresesCalculado = credito.saldo_intereses || 0
-    const saldoMoraCalculado = credito.saldo_mora || 0
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    if (supabaseUrl && serviceRoleKey) {
+      const supabaseAdmin = createSupabaseClient(supabaseUrl, serviceRoleKey)
+
+      // Obtener crédito completo para la causación
+      const { data: creditoCompleto } = await supabaseAdmin
+        .from('creditos')
+        .select('*')
+        .eq('id', creditoId)
+        .single()
+
+      if (creditoCompleto && creditoCompleto.fecha_desembolso) {
+        const ultimaCausacion = creditoCompleto.ultima_causacion
+        const fechaDesembolso = creditoCompleto.fecha_desembolso.split('T')[0]
+
+        // Determinar desde cuándo causar
+        let fechaDesde: string
+        if (ultimaCausacion) {
+          const desde = new Date(ultimaCausacion)
+          desde.setDate(desde.getDate() + 1)
+          fechaDesde = desde.toISOString().split('T')[0]
+        } else {
+          const desde = new Date(fechaDesembolso)
+          desde.setDate(desde.getDate() + 1)
+          fechaDesde = desde.toISOString().split('T')[0]
+        }
+
+        // Causar día a día hasta la fecha del pago
+        if (fechaDesde <= fecha_pago) {
+          const fecha = new Date(fechaDesde)
+          const fechaFin = new Date(fecha_pago)
+
+          while (fecha <= fechaFin) {
+            const fechaStr = fecha.toISOString().split('T')[0]
+
+            // Re-obtener crédito actualizado para cada día
+            const { data: creditoDia } = await supabaseAdmin
+              .from('creditos')
+              .select('*')
+              .eq('id', creditoId)
+              .single()
+
+            if (creditoDia) {
+              await procesarCausacionCredito(supabaseAdmin, creditoDia as Credito, fechaStr)
+            }
+
+            fecha.setDate(fecha.getDate() + 1)
+          }
+        }
+      }
+    }
+
+    // Re-obtener saldos actualizados después de la causación
+    const { data: creditoActualizado } = await supabase
+      .from('creditos')
+      .select('saldo_capital, saldo_intereses, saldo_mora')
+      .eq('id', creditoId)
+      .single()
+
+    const saldoInteresesCalculado = creditoActualizado?.saldo_intereses || 0
+    const saldoMoraCalculado = creditoActualizado?.saldo_mora || 0
+    const saldoCapitalActualizado = creditoActualizado?.saldo_capital || credito.saldo_capital || 0
 
     // =========================================
     // CASCADA: mora → intereses → capital
-    // Usa saldo_intereses y saldo_mora RECALCULADOS, no los guardados
+    // Usa saldos actualizados por la causación diaria
     // =========================================
     const saldoMoraAnterior = saldoMoraCalculado
     const saldoInteresesAnterior = saldoInteresesCalculado
-    const saldoCapitalAnterior = credito.saldo_capital || 0
+    const saldoCapitalAnterior = saldoCapitalActualizado
 
     let restante = montoTotal
 
