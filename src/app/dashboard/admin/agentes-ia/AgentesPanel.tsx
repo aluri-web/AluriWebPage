@@ -445,7 +445,7 @@ export default function AgentesPanel({
 
       // ── Step 2: Poll for results every 5 seconds ──
       const POLL_INTERVAL = 5000
-      const MAX_POLLS = 180 // 15 minutes max
+      const MAX_POLLS = 360 // 30 minutes max (sequential agents can take 10-20 min)
 
       for (let poll = 0; poll < MAX_POLLS; poll++) {
         await new Promise(r => setTimeout(r, POLL_INTERVAL))
@@ -589,7 +589,7 @@ export default function AgentesPanel({
       }
 
       // If we get here, polling timed out
-      throw new Error('Timeout: la evaluación tardó más de 15 minutos')
+      throw new Error('Timeout: la evaluación tardó más de 30 minutos')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error de conexión'
       const completedAt = Date.now()
