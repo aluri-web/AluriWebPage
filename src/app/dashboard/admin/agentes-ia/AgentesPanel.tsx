@@ -803,136 +803,6 @@ export default function AgentesPanel({
         )}
       </div>
 
-      {/* Section 2: Document Assignment by Agent */}
-      <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
-        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-5">
-          Documentos por Agente
-        </h3>
-
-        <div className="space-y-6">
-          {AGENT_CONFIGS.map((agent) => {
-            const AgentIcon = agent.icon
-            const ready = agentReady(agent.key)
-
-            return (
-              <div key={agent.key}>
-                <div className="flex items-center gap-2 mb-3">
-                  <AgentIcon size={16} className={`text-${agent.color}-400`} />
-                  <span className="text-sm font-medium text-white">{agent.label}</span>
-                  {ready && <CheckCircle size={14} className="text-emerald-400" />}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {agent.docs.filter((docKey) => !(PERSONA_HIDDEN_DOCS[personaType] || []).includes(docKey)).map((docKey) => {
-                    const slot = slots[docKey]
-                    return (
-                      <div
-                        key={docKey}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm ${
-                          slot.url
-                            ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
-                            : 'bg-slate-700/30 border-slate-600/30 text-slate-400'
-                        }`}
-                      >
-                        {slot.uploading ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : slot.url ? (
-                          <CheckCircle size={14} />
-                        ) : (
-                          <XCircle size={14} className="text-slate-500" />
-                        )}
-
-                        <span className="flex-1 truncate">{slot.label}</span>
-
-                        {slot.url ? (
-                          <div className="flex items-center gap-1">
-                            <a
-                              href={slot.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 hover:text-white transition-colors"
-                              title="Ver documento"
-                            >
-                              <ExternalLink size={12} />
-                            </a>
-                            {!isProcessing && (
-                              <button
-                                onClick={() => clearSlot(docKey)}
-                                className="p-1 hover:text-red-400 transition-colors"
-                                title="Remover"
-                              >
-                                <X size={12} />
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <>
-                            <input
-                              ref={(el) => { fileInputRefs.current[docKey] = el }}
-                              type="file"
-                              accept=".pdf,image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0]
-                                if (file) handleFileUpload(docKey, file)
-                                e.target.value = ''
-                              }}
-                            />
-                            <button
-                              onClick={() => fileInputRefs.current[docKey]?.click()}
-                              disabled={slot.uploading || isProcessing}
-                              className="flex items-center gap-1 px-2 py-1 bg-slate-600 hover:bg-slate-500 text-slate-300 rounded text-xs transition-colors disabled:opacity-50"
-                            >
-                              <Upload size={11} />
-                              Subir
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Section 2.5: Photo uploads */}
-      <div className="space-y-2">
-        <p className="text-xs text-slate-400 font-medium">Fotos del inmueble (opcional)</p>
-        <div className="flex flex-wrap gap-2">
-          {manualPhotos.map((url, i) => (
-            <div key={i} className="relative group">
-              <img src={url} alt={`Foto ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-slate-600" />
-              <button
-                onClick={() => removePhoto(i)}
-                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                &times;
-              </button>
-            </div>
-          ))}
-          <label className="w-20 h-20 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center cursor-pointer hover:border-amber-500 transition-colors">
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              disabled={isProcessing}
-              onChange={(e) => {
-                const files = e.target.files
-                if (files) {
-                  Array.from(files).forEach(f => handlePhotoUpload(f))
-                }
-                e.target.value = ''
-              }}
-            />
-            <Upload size={16} className="text-slate-500" />
-          </label>
-        </div>
-      </div>
-
       {/* Section 3: Operation Parameters */}
       <div className="space-y-3">
         {/* Loan details */}
@@ -1151,7 +1021,137 @@ export default function AgentesPanel({
         </div>
       </div>
 
-      {/* Section 4: Agent Progress & Results */}
+{/* Section 2: Document Assignment by Agent */}
+      <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
+        <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-5">
+          Documentos por Agente
+        </h3>
+
+        <div className="space-y-6">
+          {AGENT_CONFIGS.map((agent) => {
+            const AgentIcon = agent.icon
+            const ready = agentReady(agent.key)
+
+            return (
+              <div key={agent.key}>
+                <div className="flex items-center gap-2 mb-3">
+                  <AgentIcon size={16} className={`text-${agent.color}-400`} />
+                  <span className="text-sm font-medium text-white">{agent.label}</span>
+                  {ready && <CheckCircle size={14} className="text-emerald-400" />}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {agent.docs.filter((docKey) => !(PERSONA_HIDDEN_DOCS[personaType] || []).includes(docKey)).map((docKey) => {
+                    const slot = slots[docKey]
+                    return (
+                      <div
+                        key={docKey}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm ${
+                          slot.url
+                            ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
+                            : 'bg-slate-700/30 border-slate-600/30 text-slate-400'
+                        }`}
+                      >
+                        {slot.uploading ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : slot.url ? (
+                          <CheckCircle size={14} />
+                        ) : (
+                          <XCircle size={14} className="text-slate-500" />
+                        )}
+
+                        <span className="flex-1 truncate">{slot.label}</span>
+
+                        {slot.url ? (
+                          <div className="flex items-center gap-1">
+                            <a
+                              href={slot.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 hover:text-white transition-colors"
+                              title="Ver documento"
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                            {!isProcessing && (
+                              <button
+                                onClick={() => clearSlot(docKey)}
+                                className="p-1 hover:text-red-400 transition-colors"
+                                title="Remover"
+                              >
+                                <X size={12} />
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <input
+                              ref={(el) => { fileInputRefs.current[docKey] = el }}
+                              type="file"
+                              accept=".pdf,image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) handleFileUpload(docKey, file)
+                                e.target.value = ''
+                              }}
+                            />
+                            <button
+                              onClick={() => fileInputRefs.current[docKey]?.click()}
+                              disabled={slot.uploading || isProcessing}
+                              className="flex items-center gap-1 px-2 py-1 bg-slate-600 hover:bg-slate-500 text-slate-300 rounded text-xs transition-colors disabled:opacity-50"
+                            >
+                              <Upload size={11} />
+                              Subir
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Section 2.5: Photo uploads */}
+      <div className="space-y-2">
+        <p className="text-xs text-slate-400 font-medium">Fotos del inmueble (opcional)</p>
+        <div className="flex flex-wrap gap-2">
+          {manualPhotos.map((url, i) => (
+            <div key={i} className="relative group">
+              <img src={url} alt={`Foto ${i + 1}`} className="w-20 h-20 object-cover rounded-lg border border-slate-600" />
+              <button
+                onClick={() => removePhoto(i)}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+          <label className="w-20 h-20 border-2 border-dashed border-slate-600 rounded-lg flex items-center justify-center cursor-pointer hover:border-amber-500 transition-colors">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              disabled={isProcessing}
+              onChange={(e) => {
+                const files = e.target.files
+                if (files) {
+                  Array.from(files).forEach(f => handlePhotoUpload(f))
+                }
+                e.target.value = ''
+              }}
+            />
+            <Upload size={16} className="text-slate-500" />
+          </label>
+        </div>
+      </div>
+
+            {/* Section 4: Agent Progress & Results */}
       {viewingEvaluation && (
         <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-xl px-5 py-3">
           <div className="flex items-center gap-3">
