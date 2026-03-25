@@ -583,7 +583,10 @@ export async function procesarCausacionCredito(
 }
 
 /**
- * Ejecuta el proceso completo de causación diaria
+ * Ejecuta el proceso completo de causación diaria con backfill.
+ * Para cada crédito pendiente, causa día a día desde ultima_causacion+1
+ * hasta fechaHoy. Esto garantiza que no se salten días si el cron
+ * no corrió o si un crédito tiene días atrasados.
  */
 export async function ejecutarCausacionDiaria(
   supabase: SupabaseClient,
@@ -608,17 +611,78 @@ export async function ejecutarCausacionDiaria(
     const creditos = await obtenerCreditosPendientes(supabase, fecha, 50)
     resumen.creditosProcesados = creditos.length
 
-    // Procesar cada crédito
+    // Procesar cada crédito con backfill de días pendientes
     for (const credito of creditos) {
-      const resultado = await procesarCausacionCredito(supabase, credito, fecha)
-      resumen.resultados.push(resultado)
+      const fechaDesembolso = credito.fecha_desembolso?.split('T')[0]
+      if (!fechaDesembolso) continue
 
-      if (resultado.error) {
+      // Determinar desde cuándo causar
+      let fechaDesde: string
+      if (credito.ultima_causacion) {
+        const desde = new Date(credito.ultima_causacion)
+        desde.setDate(desde.getDate() + 1)
+        fechaDesde = desde.toISOString().split('T')[0]
+      } else {
+        const desde = new Date(fechaDesembolso)
+        desde.setDate(desde.getDate() + 1)
+        fechaDesde = desde.toISOString().split('T')[0]
+      }
+
+      // Causar día a día hasta fechaHoy
+      if (fechaDesde > fecha) continue
+
+      let creditoInteres = 0
+      let creditoMora = 0
+      let creditoError: string | undefined
+
+      const diaActual = new Date(fechaDesde)
+      const diaFin = new Date(fecha)
+
+      while (diaActual <= diaFin) {
+        const diaStr = diaActual.toISOString().split('T')[0]
+
+        // Re-obtener crédito actualizado para cada día
+        const { data: creditoActualizado } = await supabase
+          .from('creditos')
+          .select('*')
+          .eq('id', credito.id)
+          .single()
+
+        if (!creditoActualizado) {
+          creditoError = 'Error obteniendo crédito actualizado'
+          break
+        }
+
+        const resultado = await procesarCausacionCredito(supabase, creditoActualizado as Credito, diaStr)
+
+        if (resultado.error) {
+          creditoError = resultado.error
+          break
+        }
+
+        creditoInteres += resultado.interesCausado
+        creditoMora += resultado.moraCausada
+        diaActual.setDate(diaActual.getDate() + 1)
+      }
+
+      const resultadoCredito: ResultadoCausacion = {
+        creditoId: credito.id,
+        codigoCredito: credito.codigo_credito,
+        fecha,
+        interesCausado: creditoInteres,
+        moraCausada: creditoMora,
+        inversionistasActualizados: 0,
+        error: creditoError
+      }
+
+      resumen.resultados.push(resultadoCredito)
+
+      if (creditoError) {
         resumen.creditosConError++
       } else {
         resumen.creditosExitosos++
-        resumen.totalInteresCausado += resultado.interesCausado
-        resumen.totalMoraCausada += resultado.moraCausada
+        resumen.totalInteresCausado += creditoInteres
+        resumen.totalMoraCausada += creditoMora
       }
     }
 
