@@ -19,6 +19,7 @@ import { z } from "zod";
 
 // ── Config ──────────────────────────────────────────────────────────
 const API_BASE_URL = process.env.API_BASE_URL || "https://aluri.co/api";
+const TITULOS_API_URL = process.env.TITULOS_API_URL || "https://aluri-agent-titulos.onrender.com";
 const API_KEY = process.env.ALURI_API_KEY || "";
 const MCP_AUTH_TOKEN = process.env.MCP_AUTH_TOKEN || "";
 const PORT = parseInt(process.env.PORT || "3100", 10);
@@ -45,6 +46,19 @@ async function apiRequest(
   if (!response.ok) {
     const error = await response.text();
     throw new Error(`API Error (${response.status}): ${error}`);
+  }
+  return response.json();
+}
+
+// ── Títulos API helper ──────────────────────────────────────────────
+async function titulosRequest(
+  endpoint: string,
+): Promise<unknown> {
+  const url = `${TITULOS_API_URL}${endpoint}`;
+  const response = await fetch(url, { headers: { "Content-Type": "application/json" } });
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Títulos API Error (${response.status}): ${error}`);
   }
   return response.json();
 }
@@ -190,6 +204,32 @@ function createMcpServer(): McpServer {
     async ({ credito_id, limite }) => {
       const lim = limite || 100;
       const result = await apiRequest(`/causaciones?credito_id=${encodeURIComponent(credito_id)}&limite=${lim}`);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  // ── Estudio de Títulos ──
+  server.tool(
+    "listar_estudios_titulos",
+    "Lista los estudios de títulos realizados. Puede filtrar por cédula del solicitante.",
+    { solicitor_document: z.string().optional(), limite: z.number().optional() },
+    async ({ solicitor_document, limite }) => {
+      let endpoint = "/api/v1/studies";
+      const params: string[] = [];
+      if (solicitor_document) params.push(`solicitor_document=${encodeURIComponent(solicitor_document)}`);
+      if (limite) params.push(`limit=${limite}`);
+      if (params.length) endpoint += `?${params.join("&")}`;
+      const result = await titulosRequest(endpoint);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.tool(
+    "obtener_estudio_titulos",
+    "Obtiene el detalle completo de un estudio de títulos, incluyendo reporte, nivel de riesgo, banderas rojas y datos del inmueble.",
+    { study_id: z.string() },
+    async ({ study_id }) => {
+      const result = await titulosRequest(`/api/v1/studies/${encodeURIComponent(study_id)}`);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     },
   );
