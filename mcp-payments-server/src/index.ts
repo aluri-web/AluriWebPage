@@ -10,6 +10,7 @@ import {
 
 // Configuración de la API base
 const API_BASE_URL = process.env.API_BASE_URL || "https://aluri.co/api";
+const TITULOS_API_URL = process.env.TITULOS_API_URL || "https://aluri-agent-titulos.onrender.com";
 const API_KEY = process.env.ALURI_API_KEY || "";
 const AUTH_TOKEN = process.env.ALURI_AUTH_TOKEN || "";  // Fallback para compatibilidad
 
@@ -51,6 +52,26 @@ async function apiRequest(
     throw new Error(`API Error (${response.status}): ${error}`);
   }
 
+  return response.json();
+}
+
+// Función helper para requests al agente de títulos
+async function titulosRequest(
+  endpoint: string,
+  method: "GET" | "POST" = "GET",
+  body?: Record<string, unknown>,
+): Promise<unknown> {
+  const url = `${TITULOS_API_URL}${endpoint}`;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const options: RequestInit = { method, headers };
+  if (body && method === "POST") {
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Títulos API Error (${response.status}): ${error}`);
+  }
   return response.json();
 }
 
@@ -253,6 +274,40 @@ const tools: Tool[] = [
       required: ["credito_id"],
     },
   },
+
+  // ========== ESTUDIO DE TÍTULOS ==========
+  {
+    name: "listar_estudios_titulos",
+    description: "Lista los estudios de títulos realizados. Puede filtrar por cédula del solicitante.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        solicitor_document: {
+          type: "string",
+          description: "Cédula del solicitante para filtrar resultados",
+        },
+        limite: {
+          type: "number",
+          description: "Número máximo de resultados (default: 20)",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "obtener_estudio_titulos",
+    description: "Obtiene el detalle completo de un estudio de títulos, incluyendo reporte, nivel de riesgo, banderas rojas y datos del inmueble.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        study_id: {
+          type: "string",
+          description: "UUID del estudio de títulos",
+        },
+      },
+      required: ["study_id"],
+    },
+  },
 ];
 
 // Crear el servidor MCP
@@ -405,6 +460,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "obtener_credito_detalle": {
         const { credito_id } = args as { credito_id: string };
         const result = await apiRequest(`/creditos/${encodeURIComponent(credito_id)}`, "GET", undefined, true);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      // ========== ESTUDIO DE TÍTULOS ==========
+      case "listar_estudios_titulos": {
+        const { solicitor_document, limite } = (args || {}) as { solicitor_document?: string; limite?: number };
+        let endpoint = "/api/v1/studies";
+        const params: string[] = [];
+        if (solicitor_document) params.push(`solicitor_document=${encodeURIComponent(solicitor_document)}`);
+        if (limite) params.push(`limit=${limite}`);
+        if (params.length > 0) endpoint += `?${params.join("&")}`;
+        const result = await titulosRequest(endpoint);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      case "obtener_estudio_titulos": {
+        const { study_id } = args as { study_id: string };
+        const result = await titulosRequest(`/api/v1/studies/${encodeURIComponent(study_id)}`);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
