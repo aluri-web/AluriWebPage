@@ -165,6 +165,7 @@ export async function getEvaluations(solicitudId?: string): Promise<{
   let query = supabase
     .from('evaluaciones_ia')
     .select('*')
+    .not('verdict', 'is', null)
     .order('created_at', { ascending: false })
     .limit(50)
 

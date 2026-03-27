@@ -155,7 +155,7 @@ export default function AgentesPanel({
   const [isProcessing, setIsProcessing] = useState(false)
   const [fichaPdfUrl, setFichaPdfUrl] = useState<string | null>(null)
   const [interestRate, setInterestRate] = useState(1.5)
-  const [netRate, setNetRate] = useState(1.2)
+  // Tasa neta se calcula automáticamente en el orquestador (tasa bruta × 0.80)
   const [rateType, setRateType] = useState<'anticipado' | 'vencido'>('anticipado')
   const [paymentMode, setPaymentMode] = useState<'solo_intereses' | 'capital_intereses'>('solo_intereses')
   const [propertyType, setPropertyType] = useState('casa')
@@ -408,7 +408,7 @@ export default function AgentesPanel({
         city: selectedSolicitud?.ciudad || 'Sin ciudad',
         payment_mode: paymentMode,
         rate_type: rateType,
-        net_rate_monthly: netRate,
+        // net_rate_monthly se calcula automáticamente en el orquestador (tasa × 0.80)
         property_address: selectedSolicitud?.direccion_inmueble || '',
         // Admin-declared values for contrast
         ...(declaredIncome ? { declared_income_cop: declaredIncome } : {}),
@@ -920,20 +920,7 @@ export default function AgentesPanel({
             />
           </div>
 
-          {/* Tasa neta */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">Tasa neta (%)</label>
-            <input
-              type="number"
-              value={netRate}
-              onChange={e => setNetRate(Number(e.target.value))}
-              step={0.01}
-              min={0.1}
-              max={5}
-              disabled={isProcessing}
-              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm text-center focus:outline-none focus:border-amber-500 disabled:opacity-50"
-            />
-          </div>
+          {/* Tasa neta se calcula automáticamente: tasa bruta × 0.80 (20% comisión Aluri) */}
         </div>
 
         {/* Additional context fields */}
