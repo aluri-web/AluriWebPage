@@ -533,8 +533,12 @@ export default function AgentesPanel({
             setFichaPdfUrl(`/api/orchestrator/pdf?id=${evaluationId}`)
           }
 
-          // Store operation data for flash card
-          setLastOperation(operation)
+          // Store operation data for flash card — use city from orchestrator if extracted
+          const updatedOperation = {
+            ...operation,
+            city: evaluation.operation_data?.city || operation.city,
+          }
+          setLastOperation(updatedOperation)
           setLastPhotoUrls(photoUrls)
           setLastApplicantName(applicant.name)
 
@@ -547,7 +551,7 @@ export default function AgentesPanel({
           saveEvaluation({
             solicitud_id: selectedSolicitudId,
             applicant,
-            operation,
+            operation: updatedOperation,
             documents: savedDocuments,
             verdict: verdict || null,
             risk_level: riskLevel || null,
