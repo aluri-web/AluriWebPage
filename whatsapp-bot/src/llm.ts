@@ -265,7 +265,7 @@ async function obtenerContextoCompleto(mensaje: string): Promise<string> {
     if (mensajeLower.includes('invers') || mensajeLower.includes('rentabilidad') || mensajeLower.includes('ganar') || mensajeLower.includes('retorno')) {
       contexto.push(`\n*Informacion para inversionistas:*
 - Rentabilidad promedio: +20% EA
-- Inversion minima: $50,000,000 COP
+- Inversion minima: $40,000,000 COP
 - Los creditos estan respaldados por hipoteca
 - Usa /inversionistas para ver el listado completo`)
     }

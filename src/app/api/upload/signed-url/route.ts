@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'El archivo debe ser una imagen o PDF' }, { status: 400 })
     }
 
-    const maxSize = isPdf ? 25 * 1024 * 1024 : 5 * 1024 * 1024
+    const maxSize = isPdf ? 60 * 1024 * 1024 : 5 * 1024 * 1024
     if (fileSize > maxSize) {
-      return NextResponse.json({ error: `El archivo excede ${isPdf ? '25' : '5'}MB` }, { status: 400 })
+      return NextResponse.json({ error: `El archivo excede ${isPdf ? '60' : '5'}MB` }, { status: 400 })
     }
 
     const adminSupabase = createAdminClient(
