@@ -533,14 +533,22 @@ export default function AgentesPanel({
             setFichaPdfUrl(`/api/orchestrator/pdf?id=${evaluationId}`)
           }
 
-          // Store operation data for flash card — use city from orchestrator if extracted
+          // Extract verified name from KYC and city from títulos
+          const kycName = evaluation.kyc_output?.result?.applicant?.name as string | undefined
+          const extractedCity = evaluation.operation_data?.city as string | undefined
+          const verifiedName = kycName || applicant.name
           const updatedOperation = {
             ...operation,
-            city: evaluation.operation_data?.city || operation.city,
+            city: (extractedCity && extractedCity !== 'Sin ciudad') ? extractedCity : operation.city,
           }
+          const updatedApplicant = {
+            ...applicant,
+            name: verifiedName,
+          }
+
           setLastOperation(updatedOperation)
           setLastPhotoUrls(photoUrls)
-          setLastApplicantName(applicant.name)
+          setLastApplicantName(verifiedName)
 
           // Persist to frontend DB
           const savedDocuments: Record<string, string> = {}
@@ -550,7 +558,7 @@ export default function AgentesPanel({
 
           saveEvaluation({
             solicitud_id: selectedSolicitudId,
-            applicant,
+            applicant: updatedApplicant,
             operation: updatedOperation,
             documents: savedDocuments,
             verdict: verdict || null,
