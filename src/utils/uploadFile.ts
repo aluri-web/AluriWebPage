@@ -29,8 +29,9 @@ async function trimPdfIfNeeded(file: File): Promise<File> {
     }
 
     const trimmedBytes = await trimmed.save()
+    const trimmedBlob = new Blob([trimmedBytes.buffer as ArrayBuffer], { type: 'application/pdf' })
     const trimmedFile = new File(
-      [trimmedBytes],
+      [trimmedBlob],
       file.name,
       { type: 'application/pdf' }
     )
