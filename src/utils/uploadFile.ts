@@ -1,48 +1,5 @@
-import { PDFDocument } from 'pdf-lib'
-
-const MAX_PDF_PAGES = 5
-const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB Supabase limit
-
-/**
- * Trim a PDF to the first N pages if it exceeds the size limit.
- * Returns a new File with fewer pages, or the original if small enough.
- */
-async function trimPdfIfNeeded(file: File): Promise<File> {
-  if (file.type !== 'application/pdf' || file.size <= MAX_FILE_SIZE) {
-    return file
-  }
-
-  try {
-    const buffer = await file.arrayBuffer()
-    const pdf = await PDFDocument.load(buffer)
-    const totalPages = pdf.getPageCount()
-
-    if (totalPages <= MAX_PDF_PAGES) {
-      return file // Can't trim further
-    }
-
-    // Create new PDF with only first N pages
-    const trimmed = await PDFDocument.create()
-    const pages = await trimmed.copyPages(pdf, Array.from({ length: MAX_PDF_PAGES }, (_, i) => i))
-    for (const page of pages) {
-      trimmed.addPage(page)
-    }
-
-    const trimmedBytes = await trimmed.save()
-    const trimmedBlob = new Blob([trimmedBytes.buffer as ArrayBuffer], { type: 'application/pdf' })
-    const trimmedFile = new File(
-      [trimmedBlob],
-      file.name,
-      { type: 'application/pdf' }
-    )
-
-    console.log(`[upload] Trimmed PDF from ${totalPages} pages (${(file.size / 1024 / 1024).toFixed(1)}MB) to ${MAX_PDF_PAGES} pages (${(trimmedFile.size / 1024 / 1024).toFixed(1)}MB)`)
-    return trimmedFile
-  } catch (error) {
-    console.error('[upload] Failed to trim PDF, uploading original:', error)
-    return file
-  }
-}
+// No PDF trimming — Supabase Pro supports large files.
+// The titulo agent handles page limits internally (max_pages=5 in OCR).
 
 /**
  * Upload a file directly to Supabase Storage using a signed URL.
@@ -60,8 +17,7 @@ export async function uploadFile(
   loanCode: string = 'default'
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
-    // Step 0: Trim large PDFs to first 5 pages
-    const fileToUpload = await trimPdfIfNeeded(file)
+    const fileToUpload = file
 
     // Step 1: Get signed upload URL from our API
     const signedRes = await fetch('/api/upload/signed-url', {
