@@ -125,7 +125,7 @@ export async function saveEvaluation(input: SaveEvaluationInput): Promise<{
       documents: input.documents,
       verdict: input.verdict || null,
       risk_level: input.risk_level || null,
-      risk_score: input.risk_score ?? null,
+      risk_score: input.risk_score != null ? Math.round(input.risk_score) : null,
       sections: input.sections || null,
       pdf_url: input.pdf_url || null,
       evaluation_id: input.evaluation_id || null,
