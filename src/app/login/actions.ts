@@ -74,6 +74,17 @@ export async function login(formData: FormData) {
   } else if (profile?.role === 'propietario') {
     redirect('/dashboard/propietario')
   } else if (profile?.role === 'demo') {
+    // Auto-rotar contraseña demo para que sea de un solo uso
+    try {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+      fetch(`${siteUrl}/api/demo-access`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-key': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+        },
+      }).catch(() => {}) // fire-and-forget, no bloquear el login
+    } catch {}
     redirect('/dashboard/demo')
   } else {
     redirect('/dashboard/inversionista')
