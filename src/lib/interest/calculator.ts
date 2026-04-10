@@ -12,7 +12,7 @@
  * - La causación empieza el día DESPUÉS del desembolso
  * - Int. Corriente = Capital ESPERADO × Tasa Diaria (NO sobre Capital Real)
  * - Int. Moratorio = Capital ESPERADO × Tasa Mora (SIEMPRE se calcula, incluso sin mora)
- * - Tasa Diaria = (1 + Tasa_EA/100)^(1/365) - 1 → redondeada a 4 decimales (0.0619%)
+ * - Tasa Diaria = (1 + Tasa_EA/100)^(1/365) - 1 → DOUBLE PRECISION (15 dígitos como Excel)
  * - Tasa Mora = Tasa de Usura SFC vigente por mes
  *
  * PAGOS:
@@ -229,11 +229,19 @@ export function calcularDiasMora(
 /**
  * Calcula el interés y mora diaria para un crédito (Lógica Excel)
  *
- * IMPORTANTE (diferencias con lógica anterior):
- * - Int. Corriente: se calcula sobre CAPITAL ESPERADO (no Real)
- * - Int. Moratorio Potencial: SIEMPRE se calcula (incluso sin mora)
- * - Int. Moratorio: solo se cobra cuando enMora = true
- * - Monto para colocarse: Capital Real - Capital Esperado
+ * REGLAS DE MORA POR TIPO DE CONTRATO:
+ *
+ * HIPOTECARIO:
+ * - Base mora = Capital Esperado × Tasa Usura Diaria
+ * - Solo intereses: mora = MAX(interés_acordado_diario, interés_moratorio_diario)
+ *   porque la cuota en mora no puede ser menor al interés pactado.
+ * - Francesa: mora = Capital Esperado × Tasa Usura Diaria (estándar)
+ *
+ * RETROVENTA:
+ * - Base mora = Canon Mensual (monto_pago_esperado) × Tasa Usura Diaria
+ *   El canon homologa la cuota como arriendo, por lo que la mora se calcula
+ *   sobre el canon, NO sobre el capital vigente.
+ * - La mora en retroventa NO afecta la siguiente cuota a pagar.
  *
  * @param capitalEsperado - Capital si pagos a tiempo (base para Int. Corriente)
  * @param capitalReal - Capital real acumulado
@@ -241,6 +249,9 @@ export function calcularDiasMora(
  * @param tasaUsuraEA - Tasa de usura SFC vigente
  * @param diasMora - Días de mora actuales
  * @param enMora - Si el crédito está actualmente en mora
+ * @param tipoContrato - 'hipotecario' | 'retroventa' (default: hipotecario)
+ * @param esSoloInteres - true si tipo_amortizacion = 'solo_interes'
+ * @param canonMensual - Monto del pago/canon mensual esperado (para retroventa)
  */
 export function calcularInteresDiario(
   capitalEsperado: number,
@@ -248,7 +259,10 @@ export function calcularInteresDiario(
   tasaNominalEA: number,
   tasaUsuraEA: number,
   diasMora: number,
-  enMora: boolean = false
+  enMora: boolean = false,
+  tipoContrato: string = 'hipotecario',
+  esSoloInteres: boolean = false,
+  canonMensual: number = 0
 ): CalculoInteresDiario {
   // Tasa diaria corriente (del crédito)
   const tasaDiaria = calcularTasaDiaria(tasaNominalEA)
@@ -259,12 +273,29 @@ export function calcularInteresDiario(
   // Int. Corriente: sobre CAPITAL ESPERADO (no Real) - Lógica Excel
   const interesDiario = capitalEsperado * tasaDiaria
 
-  // Int. Moratorio Potencial: SIEMPRE se calcula sobre Capital Esperado
-  // Esto muestra el costo potencial de no pagar
-  const interesMoratorioPotencial = capitalEsperado * tasaMoraDiaria
+  // Int. Moratorio según tipo de contrato
+  let interesMoratorioPotencial: number
+  let moraDiaria: number
 
-  // Int. Moratorio efectivo: solo cuando está en mora
-  const moraDiaria = enMora ? interesMoratorioPotencial : 0
+  if (tipoContrato === 'retroventa') {
+    // RETROVENTA: mora sobre el canon mensual diario, no sobre capital
+    // Canon diario = canon mensual / 30
+    const canonDiario = canonMensual / 30
+    interesMoratorioPotencial = canonDiario * tasaMoraDiaria
+    moraDiaria = enMora ? interesMoratorioPotencial : 0
+  } else {
+    // HIPOTECARIO: mora sobre capital esperado
+    const moraUsura = capitalEsperado * tasaMoraDiaria
+    interesMoratorioPotencial = moraUsura
+
+    if (esSoloInteres && enMora) {
+      // Solo intereses: la cuota en mora es la MAYOR entre
+      // el interés acordado diario y el interés moratorio
+      moraDiaria = Math.max(interesDiario, moraUsura)
+    } else {
+      moraDiaria = enMora ? moraUsura : 0
+    }
+  }
 
   // Monto para colocarse al día: diferencia entre Real y Esperado
   const montoParaColocarse = capitalReal - capitalEsperado
@@ -403,6 +434,8 @@ export async function procesarCausacionCredito(
     // Determinar tipo de crédito
     const esAnticipada = (credito.tipo_liquidacion || 'vencida') === 'anticipada'
     const esSoloInteres = (credito.tipo_amortizacion || 'francesa') === 'solo_interes'
+    const tipoContrato = credito.tipo_contrato || 'hipotecario'
+    const canonMensual = credito.monto_pago_esperado || 0
 
     // 1. Obtener capitales del día anterior o usar valores iniciales
     const capitalesAnteriores = await obtenerCapitalesAnteriores(supabase, credito.id, fechaHoy)
@@ -448,7 +481,10 @@ export async function procesarCausacionCredito(
       tasaEA,                       // Tasa EA del crédito
       tasaUsura,                    // Tasa usura SFC
       moraInfo.diasMora,
-      moraInfo.enMora
+      moraInfo.enMora,
+      tipoContrato,                 // 'hipotecario' | 'retroventa'
+      esSoloInteres,                // true si solo_interes
+      canonMensual                  // Canon mensual (para retroventa)
     )
 
     // Redondear para guardar en DB
@@ -555,7 +591,7 @@ export async function procesarCausacionCredito(
       await supabase.from('transacciones').insert({
         credito_id: credito.id,
         tipo_transaccion: 'causacion_interes',
-        concepto: `Causación diaria - ${fechaHoy} | Cap.Esp: $${capitalEsperado.toLocaleString()} | Tasa: ${(calculo.tasaDiaria * 100).toFixed(4)}%`,
+        concepto: `Causación diaria - ${fechaHoy} | Cap.Esp: $${capitalEsperado.toLocaleString()} | Tasa: ${(calculo.tasaDiaria * 100).toFixed(10)}%`,
         monto: interesDiarioRedondeado,
         fecha_transaccion: new Date().toISOString(),
         fecha_aplicacion: fechaHoy,
@@ -567,7 +603,7 @@ export async function procesarCausacionCredito(
       await supabase.from('transacciones').insert({
         credito_id: credito.id,
         tipo_transaccion: 'causacion_mora',
-        concepto: `Mora (${moraInfo.diasMora} días) - ${fechaHoy} | Tasa Usura: ${(calculo.tasaMoraDiaria * 100).toFixed(4)}%`,
+        concepto: `Mora (${moraInfo.diasMora} días) - ${fechaHoy} | Tasa Usura: ${(calculo.tasaMoraDiaria * 100).toFixed(10)}%`,
         monto: moraDiariaRedondeada,
         fecha_transaccion: new Date().toISOString(),
         fecha_aplicacion: fechaHoy,

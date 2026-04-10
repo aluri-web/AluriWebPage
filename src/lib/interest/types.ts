@@ -22,6 +22,7 @@ export interface Credito {
   tasa_mora?: number
   estado: string                     // Estado workflow: firmado, activo, etc.
   estado_credito: string             // Estado financiero: activo, pagado, etc.
+  tipo_contrato?: string             // 'hipotecario' | 'retroventa'
   tipo_amortizacion?: string         // 'francesa' | 'solo_interes'
   tipo_liquidacion?: string          // 'anticipada' | 'vencida'
   fecha_desembolso: string
@@ -57,7 +58,7 @@ export interface CausacionDiaria {
   saldo_base?: number            // Deprecated: usar capital_esperado
   saldo_base_anterior?: number   // Capital del día anterior
   tasa_nominal: number           // Tasa EA del crédito
-  tasa_diaria: number            // Tasa diaria corriente (4 decimales como Excel)
+  tasa_diaria: number            // Tasa diaria corriente (DOUBLE PRECISION, 15 dígitos como Excel)
   tasa_mora_diaria: number       // Tasa diaria de mora (usura SFC)
   interes_causado: number        // Int. Corriente (sobre capital_esperado)
   mora_causada: number           // Int. Moratorio cuando en_mora = true
@@ -84,8 +85,8 @@ export interface CausacionInversionista {
 // ============================================
 
 export interface CalculoInteresDiario {
-  tasaDiaria: number              // Tasa efectiva diaria (corriente) - 4 decimales
-  tasaMoraDiaria: number          // Tasa diaria de mora (usura SFC) - 4 decimales
+  tasaDiaria: number              // Tasa efectiva diaria (corriente) - 15 dígitos como Excel
+  tasaMoraDiaria: number          // Tasa diaria de mora (usura SFC) - 15 dígitos como Excel
   interesDiario: number           // Int. Corriente (sobre capital ESPERADO)
   moraDiaria: number              // Int. Moratorio cuando en_mora = true
   interesMoratorioPotencial: number  // Int. Moratorio SIEMPRE (potencial)
@@ -139,7 +140,7 @@ export const ESTADOS_CREDITO_EXCLUIDOS = ['pagado', 'anulado', 'castigado'] as c
 export const DIAS_ANIO = 365    // Días base para cálculo anual (EA → diaria)
 
 // Tasas de usura oficiales SFC por mes (fallback si no hay conexión a BD)
-// Redondeadas a 4 decimales como en Excel
+// Tasas EA oficiales (porcentaje)
 export const TASAS_USURA_SFC: Record<string, number> = {
   '2025-12': 25.02,  // Diciembre 2025
   '2026-01': 24.36,  // Enero 2026

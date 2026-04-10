@@ -112,7 +112,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Respuesta
 
     const { data: credito, error: creditoError } = await supabase
       .from('creditos')
-      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora')
+      .select('id, codigo_credito, cliente_id, monto_solicitado, saldo_capital, saldo_intereses, saldo_mora, tipo_contrato')
       .eq(isUUID ? 'id' : 'codigo_credito', credito_id)
       .single()
 
