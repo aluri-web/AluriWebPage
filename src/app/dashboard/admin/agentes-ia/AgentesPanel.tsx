@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   CreditCard,
   FileDown,
+  FileText,
   History,
   Clock,
   ChevronDown,
@@ -24,6 +25,7 @@ import {
 import { uploadFile } from '@/utils/uploadFile'
 import { type SolicitudSummary, type EvaluacionIA, saveEvaluation } from './actions'
 import FlashCardGenerator from './FlashCardGenerator'
+import ContractModal from './ContractModal'
 
 // ── Types ──────────────────────────────────────────────
 
@@ -60,7 +62,7 @@ const AGENT_CONFIGS = [
     key: 'credito',
     label: 'Fase 2: Estudio de Crédito',
     icon: CreditCard,
-    docs: ['extractos', 'extractos_2', 'extractos_3', 'declaracion_renta', 'certificado_ingresos', 'estados_financieros'],
+    docs: ['extractos', 'extractos_2', 'extractos_3', 'declaracion_renta', 'certificado_ingresos', 'estados_financieros', 'impuesto_predial'],
     color: 'emerald',
     phase: 2,
     description: 'Análisis de capacidad de pago',
@@ -78,7 +80,7 @@ const AGENT_CONFIGS = [
 
 // Docs to hide based on persona type
 // Docs that are optional (not required for agent readiness)
-const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3', 'camara_comercio', 'rut', 'composicion_accionaria']
+const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3', 'camara_comercio', 'rut', 'composicion_accionaria', 'impuesto_predial']
 
 const PERSONA_HIDDEN_DOCS: Record<string, string[]> = {
   persona_natural: ['estados_financieros', 'camara_comercio', 'rut', 'composicion_accionaria'],  // PN no necesita docs PJ
@@ -102,6 +104,8 @@ const DOC_LABELS: Record<string, string> = {
   camara_comercio: 'Camara de Comercio (< 30 dias)',
   rut: 'RUT',
   composicion_accionaria: 'Composicion accionaria (socios)',
+  // Common — complementary
+  impuesto_predial: 'Impuesto predial (año en curso)',
 }
 
 const INITIAL_SLOTS: Record<string, DocumentSlot> = Object.fromEntries(
@@ -177,6 +181,7 @@ export default function AgentesPanel({
   const [manualPhotos, setManualPhotos] = useState<string[]>([])
   const [lastApplicantName, setLastApplicantName] = useState('')
   const [viewingEvaluation, setViewingEvaluation] = useState<EvaluacionIA | null>(null)
+  const [contractModalEvalId, setContractModalEvalId] = useState<string | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const selectedSolicitud = solicitudes.find((s) => s.id === selectedSolicitudId) || null
@@ -1255,16 +1260,27 @@ export default function AgentesPanel({
                   <p className="text-xs text-emerald-400">
                     {agents.ficha.result?.resumen_general}
                   </p>
-                  {fichaPdfUrl && (
-                    <a
-                      href={`/api/orchestrator/pdf?id=${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || ''}`}
-                      download={pdfFilename(viewingEvaluation?.applicant?.name || lastApplicantName, viewingEvaluation?.created_at)}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-lg transition-colors text-sm"
-                    >
-                      <Download size={14} />
-                      Descargar Ficha Tecnica PDF
-                    </a>
-                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {fichaPdfUrl && (
+                      <a
+                        href={`/api/orchestrator/pdf?id=${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || ''}`}
+                        download={pdfFilename(viewingEvaluation?.applicant?.name || lastApplicantName, viewingEvaluation?.created_at)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-lg transition-colors text-sm"
+                      >
+                        <Download size={14} />
+                        Descargar Ficha Tecnica PDF
+                      </a>
+                    )}
+                    {(viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId) && (
+                      <button
+                        onClick={() => setContractModalEvalId(viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-teal-500 hover:bg-teal-400 text-black font-semibold rounded-lg transition-colors text-sm"
+                      >
+                        <FileText size={14} />
+                        Generar Pagare
+                      </button>
+                    )}
+                  </div>
                   {lastEvaluationId && !isProcessing && Object.values(agents).some(a => a.status === 'error') && (
                     <button
                       onClick={handleRetryFailed}
@@ -1337,11 +1353,21 @@ export default function AgentesPanel({
                   evaluation={ev}
                   isActive={viewingEvaluation?.id === ev.id}
                   onLoad={() => loadEvaluation(ev)}
+                  onGenerateContract={ev.evaluation_id ? () => setContractModalEvalId(ev.evaluation_id!) : undefined}
                 />
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {/* Contract Generation Modal */}
+      {contractModalEvalId && (
+        <ContractModal
+          evaluationId={contractModalEvalId}
+          applicantName={viewingEvaluation?.applicant?.name || lastApplicantName || 'Solicitante'}
+          onClose={() => setContractModalEvalId(null)}
+        />
       )}
     </div>
   )
@@ -1353,10 +1379,12 @@ function EvaluationHistoryCard({
   evaluation,
   isActive,
   onLoad,
+  onGenerateContract,
 }: {
   evaluation: EvaluacionIA
   isActive: boolean
   onLoad: () => void
+  onGenerateContract?: () => void
 }) {
   const date = new Date(evaluation.created_at)
   const formattedDate = date.toLocaleDateString('es-CO', {
@@ -1426,14 +1454,25 @@ function EvaluationHistoryCard({
           {isActive ? 'Viendo' : 'Ver'}
         </button>
         {evaluation.evaluation_id && (
-          <a
-            href={`/api/orchestrator/pdf?id=${evaluation.evaluation_id}`}
-            download={`FT_${(evaluation.applicant?.name || 'solicitante').replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ ]/g, '').trim().replace(/\s+/g, '_')}_${evaluation.created_at?.substring(0, 10) || 'report'}.pdf`}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-medium transition-colors"
-          >
-            <Download size={12} />
-            PDF
-          </a>
+          <>
+            <a
+              href={`/api/orchestrator/pdf?id=${evaluation.evaluation_id}`}
+              download={`FT_${(evaluation.applicant?.name || 'solicitante').replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ ]/g, '').trim().replace(/\s+/g, '_')}_${evaluation.created_at?.substring(0, 10) || 'report'}.pdf`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg text-xs font-medium transition-colors"
+            >
+              <Download size={12} />
+              PDF
+            </a>
+            {onGenerateContract && (
+              <button
+                onClick={onGenerateContract}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20 rounded-lg text-xs font-medium transition-colors"
+              >
+                <FileText size={12} />
+                Pagare
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
