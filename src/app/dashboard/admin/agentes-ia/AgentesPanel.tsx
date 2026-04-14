@@ -53,7 +53,7 @@ const AGENT_CONFIGS = [
     key: 'kyc',
     label: 'Fase 1: Triage KYC/SARLAFT',
     icon: ShieldCheck,
-    docs: ['cedula', 'reporte_auco', 'camara_comercio', 'rut', 'composicion_accionaria'],
+    docs: ['cedula', 'reporte_auco', 'camara_comercio', 'rut', 'composicion_accionaria', 'codeudor_cedula'],
     color: 'blue',
     phase: 1,
     description: 'Verificación de identidad y listas restrictivas',
@@ -62,7 +62,7 @@ const AGENT_CONFIGS = [
     key: 'credito',
     label: 'Fase 2: Estudio de Crédito',
     icon: CreditCard,
-    docs: ['extractos', 'extractos_2', 'extractos_3', 'declaracion_renta', 'certificado_ingresos', 'estados_financieros', 'impuesto_predial'],
+    docs: ['extractos', 'extractos_2', 'extractos_3', 'declaracion_renta', 'certificado_ingresos', 'estados_financieros', 'impuesto_predial', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_estados_financieros', 'codeudor_camara_comercio'],
     color: 'emerald',
     phase: 2,
     description: 'Análisis de capacidad de pago',
@@ -80,7 +80,10 @@ const AGENT_CONFIGS = [
 
 // Docs to hide based on persona type
 // Docs that are optional (not required for agent readiness)
-const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3', 'camara_comercio', 'rut', 'composicion_accionaria', 'impuesto_predial']
+const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3', 'camara_comercio', 'rut', 'composicion_accionaria', 'impuesto_predial',
+  'codeudor_cedula', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
+
+const CODEUDOR_DOCS = ['codeudor_cedula', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
 
 const PERSONA_HIDDEN_DOCS: Record<string, string[]> = {
   persona_natural: ['estados_financieros', 'camara_comercio', 'rut', 'composicion_accionaria'],  // PN no necesita docs PJ
@@ -106,6 +109,15 @@ const DOC_LABELS: Record<string, string> = {
   composicion_accionaria: 'Composicion accionaria (socios)',
   // Common — complementary
   impuesto_predial: 'Impuesto predial (año en curso)',
+  // Codeudor documents
+  codeudor_cedula: 'Cedula codeudor',
+  codeudor_extractos: 'Extractos codeudor (mes 1)',
+  codeudor_extractos_2: 'Extractos codeudor (mes 2)',
+  codeudor_extractos_3: 'Extractos codeudor (mes 3)',
+  codeudor_declaracion_renta: 'Declaracion de renta codeudor',
+  codeudor_certificado_ingresos: 'Certificado ingresos codeudor',
+  codeudor_estados_financieros: 'Estados financieros codeudor',
+  codeudor_camara_comercio: 'Camara de Comercio codeudor',
 }
 
 const INITIAL_SLOTS: Record<string, DocumentSlot> = Object.fromEntries(
@@ -173,6 +185,10 @@ export default function AgentesPanel({
   const [declaredIncome, setDeclaredIncome] = useState<number | ''>('')
   const [declaredAppraisal, setDeclaredAppraisal] = useState<number | ''>('')
   const [adminNotes, setAdminNotes] = useState('')
+  // Codeudor
+  const [hasCodeudor, setHasCodeudor] = useState(false)
+  const [codeudorType, setCodeudorType] = useState<'persona_natural' | 'persona_juridica'>('persona_natural')
+  const [codeudorName, setCodeudorName] = useState('')
   const [evaluations, setEvaluations] = useState<EvaluacionIA[]>(previousEvaluations)
   const [showHistory, setShowHistory] = useState(false)
   const [lastOperation, setLastOperation] = useState<Record<string, unknown> | null>(null)
@@ -419,6 +435,13 @@ export default function AgentesPanel({
         ...(declaredIncome ? { declared_income_cop: declaredIncome } : {}),
         ...(declaredAppraisal ? { declared_appraisal_cop: declaredAppraisal } : {}),
         persona_type: personaType,
+        // Codeudor
+        ...(hasCodeudor ? {
+          has_codeudor: true,
+          codeudor_type: codeudorType,
+          codeudor_name: codeudorName,
+          codeudor_cedula: 'pending-kyc',
+        } : {}),
       }
 
       const applicant = {
@@ -997,6 +1020,51 @@ export default function AgentesPanel({
           />
         </div>
 
+        {/* Codeudor toggle + fields */}
+        <div className="mt-3 border border-slate-700 rounded-lg p-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={hasCodeudor}
+              onChange={e => setHasCodeudor(e.target.checked)}
+              disabled={isProcessing}
+              className="accent-amber-500"
+            />
+            <span className="text-sm text-slate-300">Tiene codeudor</span>
+          </label>
+
+          {hasCodeudor && (
+            <div className="mt-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs text-slate-400">Nombre del codeudor</label>
+                  <input
+                    value={codeudorName}
+                    onChange={e => setCodeudorName(e.target.value)}
+                    placeholder="Nombre completo o razón social"
+                    disabled={isProcessing}
+                    className="w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400">Tipo de codeudor</label>
+                  <select
+                    value={codeudorType}
+                    onChange={e => setCodeudorType(e.target.value as 'persona_natural' | 'persona_juridica')}
+                    disabled={isProcessing}
+                    className="w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                  >
+                    <option value="persona_natural">Persona Natural</option>
+                    <option value="persona_juridica">Persona Juridica</option>
+                  </select>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-500 mt-1">Suba los documentos del codeudor en los campos con prefijo &quot;codeudor&quot; en la sección de documentos arriba.</p>
+            </div>
+          )}
+        </div>
+
         {/* Process button */}
         <div className="flex items-center justify-center gap-4 mt-3">
           <button
@@ -1045,7 +1113,18 @@ export default function AgentesPanel({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {agent.docs.filter((docKey) => !(PERSONA_HIDDEN_DOCS[personaType] || []).includes(docKey)).map((docKey) => {
+                  {agent.docs.filter((docKey) => {
+                    if ((PERSONA_HIDDEN_DOCS[personaType] || []).includes(docKey)) return false
+                    if (!hasCodeudor && CODEUDOR_DOCS.includes(docKey)) return false
+                    // Hide codeudor PJ docs if codeudor is PN and vice versa
+                    if (hasCodeudor && docKey.startsWith('codeudor_')) {
+                      const codHiddenPN = ['codeudor_estados_financieros', 'codeudor_camara_comercio']
+                      const codHiddenPJ = ['codeudor_certificado_ingresos']
+                      if (codeudorType === 'persona_natural' && codHiddenPN.includes(docKey)) return false
+                      if (codeudorType === 'persona_juridica' && codHiddenPJ.includes(docKey)) return false
+                    }
+                    return true
+                  }).map((docKey) => {
                     const slot = slots[docKey]
                     return (
                       <div
