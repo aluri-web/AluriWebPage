@@ -43,7 +43,7 @@ export default function CreditWorkflow({ credit }: CreditWorkflowProps) {
     // Determine current step index
     const currentStepIndex = STEPS.findIndex(s => s.id === credit.estado)
     const isFinished = credit.estado === 'finalizado'
-    const isCancelled = ['castigado', 'anulado'].includes(credit.estado)
+    const isCancelled = ['castigado', 'no_colocado'].includes(credit.estado)
 
     const handleStatusUpdate = async (newStatus: string, dateField?: 'fecha_firma_programada' | 'fecha_desembolso', extraData?: { notaria?: string; costos_notaria?: number }) => {
         // Clear previous messages

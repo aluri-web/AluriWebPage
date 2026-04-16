@@ -135,8 +135,8 @@ export interface ResumenEjecucion {
 // ============================================
 
 // Estados de credito que deben causar intereses diarios
-// Excluimos solo 'pagado' y 'anulado' - el filtro principal es fecha_desembolso + saldo_capital > 0
-export const ESTADOS_CREDITO_EXCLUIDOS = ['pagado', 'anulado', 'castigado'] as const
+// Excluimos 'pagado', 'no_colocado' y 'castigado' - el filtro principal es fecha_desembolso + saldo_capital > 0
+export const ESTADOS_CREDITO_EXCLUIDOS = ['pagado', 'no_colocado', 'castigado'] as const
 export const DIAS_ANIO = 365    // Días base para cálculo anual (EA → diaria)
 
 // Tasas de usura oficiales SFC por mes (fallback si no hay conexión a BD)

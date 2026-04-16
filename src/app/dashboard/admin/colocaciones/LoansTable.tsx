@@ -170,7 +170,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
       active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
       completed: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
       defaulted: 'bg-red-500/20 text-red-400 border-red-500/30',
-      cancelled: 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+      cancelled: 'bg-orange-500/20 text-orange-400 border-orange-500/30'
     }
     const labels: Record<string, string> = {
       fundraising: 'Colocando',

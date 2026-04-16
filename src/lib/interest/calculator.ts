@@ -340,7 +340,7 @@ export function distribuirEntreInversionistas(
 /**
  * Obtiene créditos que necesitan causación diaria.
  * Filtro principal: fecha_desembolso existe y < hoy, saldo_capital > 0.
- * Excluye estados terminales (pagado, anulado, castigado).
+ * Excluye estados terminales (pagado, no_colocado, castigado).
  */
 export async function obtenerCreditosPendientes(
   supabase: SupabaseClient,

@@ -210,7 +210,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { count: creditosPendientes } = await supabase
       .from('creditos')
       .select('id', { count: 'exact', head: true })
-      .not('estado_credito', 'in', '(pagado,anulado,castigado)')
+      .not('estado_credito', 'in', '(pagado,no_colocado,castigado)')
       .gt('saldo_capital', 0)
       .not('fecha_desembolso', 'is', null)
       .lt('fecha_desembolso', hoy)

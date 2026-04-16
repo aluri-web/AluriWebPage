@@ -3,21 +3,21 @@
 import { createAdminClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-type CreditStatus = 'solicitado' | 'aprobado' | 'publicado' | 'en_firma' | 'firmado' | 'activo' | 'finalizado' | 'castigado' | 'mora' | 'anulado'
+type CreditStatus = 'solicitado' | 'aprobado' | 'publicado' | 'en_firma' | 'firmado' | 'activo' | 'finalizado' | 'castigado' | 'mora' | 'no_colocado'
 
 // Define valid state transitions
 const VALID_TRANSITIONS: Record<CreditStatus, CreditStatus[]> = {
-    'solicitado': ['aprobado', 'anulado'],
-    'aprobado': ['publicado', 'anulado'],
-    'publicado': ['en_firma', 'anulado'],
-    'en_firma': ['firmado', 'anulado'],
-    'firmado': ['activo', 'anulado'],
+    'solicitado': ['aprobado', 'no_colocado'],
+    'aprobado': ['publicado', 'no_colocado'],
+    'publicado': ['en_firma', 'no_colocado'],
+    'en_firma': ['firmado', 'no_colocado'],
+    'firmado': ['activo', 'no_colocado'],
     'activo': ['finalizado', 'castigado', 'mora'],
     'mora': ['activo', 'castigado'],
     // Terminal states - no transitions allowed
     'finalizado': [],
     'castigado': [],
-    'anulado': []
+    'no_colocado': []
 }
 
 interface UpdateStatusParams {

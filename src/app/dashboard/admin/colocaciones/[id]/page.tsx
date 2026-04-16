@@ -95,10 +95,10 @@ export default async function CreditDetailsPage({ params }: { params: Promise<{ 
                                     credit.estado === 'en_firma' ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' :
                                         credit.estado === 'firmado' ? 'bg-blue-500/10 border-blue-500/20 text-blue-400' :
                                             credit.estado === 'finalizado' ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400' :
-                                                ['castigado', 'anulado'].includes(credit.estado) ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                                                ['castigado', 'no_colocado'].includes(credit.estado) ? 'bg-red-500/10 border-red-500/20 text-red-400' :
                                                     'bg-slate-800 border-slate-700 text-slate-400'
                                 }`}>
-                                {{ publicado: 'COLOCANDO', activo: 'DESEMBOLSADO', en_firma: 'EN FIRMA', firmado: 'FIRMADO', finalizado: 'FINALIZADO', castigado: 'CASTIGADO', anulado: 'ANULADO', mora: 'EN MORA', no_colocado: 'NO COLOCADO' }[credit.estado] || credit.estado.toUpperCase().replace('_', ' ')}
+                                {{ publicado: 'COLOCANDO', activo: 'DESEMBOLSADO', en_firma: 'EN FIRMA', firmado: 'FIRMADO', finalizado: 'FINALIZADO', castigado: 'CASTIGADO', mora: 'EN MORA', no_colocado: 'NO COLOCADO' }[credit.estado] || credit.estado.toUpperCase().replace('_', ' ')}
                             </span>
                         </h1>
                         <p className="text-slate-400 mt-1">

@@ -14,7 +14,7 @@ export function getEstadoLabel(estado: string): string {
         'finalizado': 'Completado',
         'castigado': 'Castigado',
         'mora': 'En Mora',
-        'anulado': 'Anulado',
+        'no_colocado': 'No Colocado',
     }
     return labels[estado] || estado
 }
@@ -31,7 +31,7 @@ export function getEstadoStyle(estado: string): string {
         'finalizado': 'bg-teal-500/20 text-teal-400 border-teal-500/30',
         'castigado': 'bg-red-500/20 text-red-400 border-red-500/30',
         'mora': 'bg-red-500/20 text-red-400 border-red-500/30',
-        'anulado': 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+        'no_colocado': 'bg-orange-500/20 text-orange-400 border-orange-500/30',
     }
     return styles[estado] || 'bg-slate-500/20 text-slate-400 border-slate-500/30'
 }

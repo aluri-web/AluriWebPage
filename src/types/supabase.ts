@@ -23,7 +23,7 @@ export interface Database {
           fecha_primer_pago: string | null
           fecha_ultimo_pago: string | null
           producto: string | null
-          estado: 'solicitado' | 'aprobado' | 'publicado' | 'en_firma' | 'firmado' | 'activo' | 'finalizado' | 'castigado' | 'mora' | 'anulado'
+          estado: 'solicitado' | 'aprobado' | 'publicado' | 'en_firma' | 'firmado' | 'activo' | 'finalizado' | 'castigado' | 'mora' | 'no_colocado'
           saldo_capital: number
           saldo_intereses: number
           saldo_mora: number
@@ -45,7 +45,7 @@ export interface Database {
           fecha_primer_pago?: string | null
           fecha_ultimo_pago?: string | null
           producto?: string | null
-          estado?: 'solicitado' | 'aprobado' | 'publicado' | 'en_firma' | 'firmado' | 'activo' | 'finalizado' | 'castigado' | 'mora' | 'anulado'
+          estado?: 'solicitado' | 'aprobado' | 'publicado' | 'en_firma' | 'firmado' | 'activo' | 'finalizado' | 'castigado' | 'mora' | 'no_colocado'
           saldo_capital?: number
           saldo_intereses?: number
           saldo_mora?: number
@@ -67,7 +67,7 @@ export interface Database {
           fecha_primer_pago?: string | null
           fecha_ultimo_pago?: string | null
           producto?: string | null
-          estado?: 'solicitado' | 'aprobado' | 'publicado' | 'en_firma' | 'firmado' | 'activo' | 'finalizado' | 'castigado' | 'mora' | 'anulado'
+          estado?: 'solicitado' | 'aprobado' | 'publicado' | 'en_firma' | 'firmado' | 'activo' | 'finalizado' | 'castigado' | 'mora' | 'no_colocado'
           saldo_capital?: number
           saldo_intereses?: number
           saldo_mora?: number
