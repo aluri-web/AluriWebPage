@@ -4,10 +4,8 @@ import { useState } from 'react'
 import { FileText, Download, Loader2, X } from 'lucide-react'
 import { getExtractoPropietario, type ExtractoData } from './extracto-actions'
 
-const MESES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-]
+const CURRENT_YEAR = new Date().getFullYear()
+const ANIOS_DISPONIBLES = [2025, 2026, 2027].filter(y => y <= CURRENT_YEAR + 1)
 
 function formatCOP(value: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -30,10 +28,9 @@ export default function ExtractoModal({
   creditoId: string
   codigoCredito: string
 }) {
-  const now = new Date()
   const [open, setOpen] = useState(false)
-  const [mes, setMes] = useState(now.getMonth() + 1)
-  const [anio, setAnio] = useState(now.getFullYear())
+  // 'global' = all years; otherwise a specific year number
+  const [seleccion, setSeleccion] = useState<'global' | number>(CURRENT_YEAR)
   const [loading, setLoading] = useState(false)
   const [extracto, setExtracto] = useState<ExtractoData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -43,7 +40,8 @@ export default function ExtractoModal({
     setError(null)
     setExtracto(null)
 
-    const result = await getExtractoPropietario(creditoId, mes, anio)
+    const anio = seleccion === 'global' ? null : seleccion
+    const result = await getExtractoPropietario(creditoId, anio)
 
     if (result.error) {
       setError(result.error)
@@ -57,30 +55,108 @@ export default function ExtractoModal({
     if (!extracto) return
 
     const { default: jsPDF } = await import('jspdf')
-    await import('jspdf-autotable')
+    const { default: autoTable } = await import('jspdf-autotable')
 
     const doc = new jsPDF()
 
-    // Header
-    doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
-    doc.text('ALURI', 14, 20)
+    // Colores de marca
+    const emerald: [number, number, number] = [5, 150, 105]
+    const gray700: [number, number, number] = [55, 65, 81]
+    const gray500: [number, number, number] = [107, 114, 128]
+    const gray200: [number, number, number] = [229, 231, 235]
 
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'normal')
-    doc.text(`Extracto — ${extracto.credito.codigo_credito}`, 14, 30)
-    doc.text(extracto.periodo.label, 14, 37)
-
-    // Propietario info
-    doc.setFontSize(10)
-    doc.text(`Propietario: ${extracto.propietario.nombre}`, 14, 50)
-    if (extracto.propietario.documento) {
-      doc.text(`Documento: ${extracto.propietario.documento}`, 14, 56)
+    // Logo arriba a la izquierda
+    try {
+      const logoUrl = '/images/AluriLogoGreen.png'
+      const response = await fetch(logoUrl)
+      const blob = await response.blob()
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.readAsDataURL(blob)
+      })
+      doc.addImage(dataUrl, 'PNG', 14, 14, 34, 10)
+    } catch {
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...gray700)
+      doc.text('ALURI', 14, 22)
     }
-    doc.text(`Monto del credito: ${formatCOP(extracto.credito.valor_colocado || extracto.credito.monto_solicitado)}`, 14, 62)
-    doc.text(`Saldo capital: ${formatCOP(extracto.credito.saldo_capital)}`, 14, 68)
 
-    let yPos = 81
+    // Titulo a la derecha
+    doc.setTextColor(...gray700)
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Extracto de credito', 196, 20, { align: 'right' })
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(...gray500)
+    doc.text(extracto.periodo.label, 196, 27, { align: 'right' })
+
+    // Linea divisoria
+    doc.setDrawColor(...gray200)
+    doc.setLineWidth(0.3)
+    doc.line(14, 34, 196, 34)
+
+    // Lista de detalles (formato fila por fila)
+    const listStart = 44
+    const rowGap = 8
+    const labelX = 20
+    const valueX = 75 // Valores alineados a la izquierda en columna consistente
+
+    const listRows: Array<{ label: string; value: string; bold?: boolean; highlight?: boolean }> = [
+      { label: 'Propietario', value: extracto.propietario.nombre, bold: true },
+    ]
+    if (extracto.propietario.documento) {
+      listRows.push({ label: 'Documento', value: `CC ${extracto.propietario.documento}` })
+    }
+    listRows.push(
+      { label: 'Credito', value: extracto.credito.codigo_credito, bold: true },
+      { label: 'Monto del credito', value: formatCOP(extracto.credito.valor_colocado || extracto.credito.monto_solicitado) },
+      { label: 'Saldo capital', value: formatCOP(extracto.credito.saldo_capital), highlight: true },
+    )
+
+    // Caja contenedora
+    const listH = listRows.length * rowGap + 6
+    doc.setDrawColor(...gray200)
+    doc.setFillColor(249, 250, 251)
+    doc.roundedRect(14, listStart - 6, 182, listH, 3, 3, 'FD')
+
+    listRows.forEach((row, i) => {
+      const y = listStart + i * rowGap
+
+      // Label
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...gray500)
+      doc.text(row.label, labelX, y)
+
+      // Value
+      doc.setFontSize(10)
+      if (row.highlight) {
+        doc.setTextColor(...emerald)
+        doc.setFont('helvetica', 'bold')
+      } else if (row.bold) {
+        doc.setTextColor(...gray700)
+        doc.setFont('helvetica', 'bold')
+      } else {
+        doc.setTextColor(...gray700)
+        doc.setFont('helvetica', 'normal')
+      }
+      doc.text(row.value, valueX, y)
+
+      // Linea divisoria entre filas (excepto la ultima)
+      if (i < listRows.length - 1) {
+        doc.setDrawColor(...gray200)
+        doc.line(labelX, y + 2.5, 190, y + 2.5)
+      }
+    })
+
+    // Reset para la tabla
+    doc.setTextColor(0, 0, 0)
+    doc.setFont('helvetica', 'normal')
+
+    const yPos = listStart + listH
 
     if (extracto.pagos.length === 0) {
       doc.setFontSize(11)
@@ -92,6 +168,7 @@ export default function ExtractoModal({
         formatCOP(p.interes),
         formatCOP(p.mora),
         formatCOP(p.total),
+        formatCOP(p.saldo),
       ])
 
       tableData.push([
@@ -100,17 +177,18 @@ export default function ExtractoModal({
         formatCOP(extracto.totales.interes),
         formatCOP(extracto.totales.mora),
         formatCOP(extracto.totales.total),
+        '',
       ])
 
-      ;(doc as any).autoTable({
+      autoTable(doc, {
         startY: yPos,
-        head: [['Fecha', 'Capital', 'Intereses', 'Mora', 'Total']],
+        head: [['Fecha', 'Capital', 'Intereses', 'Mora', 'Total', 'Saldo']],
         body: tableData,
         theme: 'striped',
         headStyles: { fillColor: [5, 150, 105] },
-        styles: { fontSize: 9, cellPadding: 3 },
+        styles: { fontSize: 8, cellPadding: 2.5 },
         margin: { left: 14, right: 14 },
-        didParseCell: (data: any) => {
+        didParseCell: (data) => {
           if (data.row.index === tableData.length - 1) {
             data.cell.styles.fontStyle = 'bold'
           }
@@ -119,6 +197,7 @@ export default function ExtractoModal({
     }
 
     // Footer
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const finalY = (doc as any).lastAutoTable?.finalY || yPos
     doc.setFontSize(8)
     doc.setFont('helvetica', 'normal')
@@ -129,8 +208,8 @@ export default function ExtractoModal({
       Math.min(finalY + 20, 285)
     )
 
-    const mesNombre = MESES[extracto.periodo.mes - 1].toLowerCase()
-    doc.save(`extracto_${codigoCredito}_${mesNombre}_${extracto.periodo.anio}.pdf`)
+    const sufijo = extracto.periodo.anio === null ? 'historico' : String(extracto.periodo.anio)
+    doc.save(`extracto_${codigoCredito}_${sufijo}.pdf`)
   }
 
   function handleClose() {
@@ -164,26 +243,18 @@ export default function ExtractoModal({
             <div className="p-6 border-b border-gray-100">
               <div className="flex flex-wrap items-end gap-4">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">Mes</label>
+                  <label className="block text-sm text-gray-500 mb-2">Periodo</label>
                   <select
-                    value={mes}
-                    onChange={(e) => setMes(Number(e.target.value))}
+                    value={seleccion === 'global' ? 'global' : String(seleccion)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setSeleccion(val === 'global' ? 'global' : Number(val))
+                    }}
                     className="bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
                   >
-                    {MESES.map((nombre, i) => (
-                      <option key={i} value={i + 1}>{nombre}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-2">Anio</label>
-                  <select
-                    value={anio}
-                    onChange={(e) => setAnio(Number(e.target.value))}
-                    className="bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-                  >
-                    {[2025, 2026, 2027].map(y => (
-                      <option key={y} value={y}>{y}</option>
+                    <option value="global">Todos los años (histórico)</option>
+                    {ANIOS_DISPONIBLES.map(y => (
+                      <option key={y} value={y}>Año {y}</option>
                     ))}
                   </select>
                 </div>
@@ -209,9 +280,10 @@ export default function ExtractoModal({
               {extracto && (
                 <>
                   {/* Header + PDF button */}
-                  <div className="flex flex-wrap justify-between items-start mb-4">
+                  <div className="flex flex-wrap justify-between items-start mb-4 gap-2">
                     <div>
-                      <p className="text-gray-500 text-sm">{extracto.propietario.nombre}</p>
+                      <p className="text-sm font-medium text-gray-900">{extracto.periodo.label}</p>
+                      <p className="text-gray-500 text-xs mt-0.5">{extracto.propietario.nombre}</p>
                       <p className="text-gray-400 text-xs mt-0.5">
                         Saldo capital: {formatCOP(extracto.credito.saldo_capital)}
                       </p>
@@ -242,6 +314,7 @@ export default function ExtractoModal({
                             <th className="text-right text-gray-500 font-medium py-3 px-3">Intereses</th>
                             <th className="text-right text-gray-500 font-medium py-3 px-3">Mora</th>
                             <th className="text-right text-gray-500 font-medium py-3 px-3">Total</th>
+                            <th className="text-right text-gray-500 font-medium py-3 px-3">Saldo</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -252,6 +325,7 @@ export default function ExtractoModal({
                               <td className="py-3 px-3 text-right text-gray-700">{formatCOP(pago.interes)}</td>
                               <td className="py-3 px-3 text-right text-gray-700">{formatCOP(pago.mora)}</td>
                               <td className="py-3 px-3 text-right text-gray-900 font-medium">{formatCOP(pago.total)}</td>
+                              <td className="py-3 px-3 text-right text-gray-900 font-medium">{formatCOP(pago.saldo)}</td>
                             </tr>
                           ))}
                           <tr className="bg-gray-50">
@@ -260,6 +334,7 @@ export default function ExtractoModal({
                             <td className="py-3 px-3 text-right font-semibold text-gray-800">{formatCOP(extracto.totales.interes)}</td>
                             <td className="py-3 px-3 text-right font-semibold text-gray-800">{formatCOP(extracto.totales.mora)}</td>
                             <td className="py-3 px-3 text-right font-bold text-emerald-600">{formatCOP(extracto.totales.total)}</td>
+                            <td></td>
                           </tr>
                         </tbody>
                       </table>

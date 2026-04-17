@@ -57,7 +57,7 @@ export default function ExtractoModal({
     if (!extracto) return
 
     const { default: jsPDF } = await import('jspdf')
-    await import('jspdf-autotable')
+    const { default: autoTable } = await import('jspdf-autotable')
 
     const doc = new jsPDF()
 
@@ -101,7 +101,7 @@ export default function ExtractoModal({
         formatCOP(extracto.totales.total),
       ])
 
-      ;(doc as any).autoTable({
+      autoTable(doc, {
         startY: yPos,
         head: [['Fecha', 'Capital', 'Intereses', 'Mora', 'Total']],
         body: tableData,
@@ -109,7 +109,7 @@ export default function ExtractoModal({
         headStyles: { fillColor: [20, 184, 166] },
         styles: { fontSize: 9, cellPadding: 3 },
         margin: { left: 14, right: 14 },
-        didParseCell: (data: any) => {
+        didParseCell: (data) => {
           if (data.row.index === tableData.length - 1) {
             data.cell.styles.fontStyle = 'bold'
           }

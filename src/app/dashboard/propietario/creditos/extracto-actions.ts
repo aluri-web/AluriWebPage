@@ -8,25 +8,20 @@ export interface ExtractoPago {
   interes: number
   mora: number
   total: number
+  saldo: number
 }
 
 export interface ExtractoData {
   propietario: { nombre: string; email: string; documento: string }
   credito: { codigo_credito: string; monto_solicitado: number; valor_colocado: number; saldo_capital: number }
-  periodo: { mes: number; anio: number; label: string }
+  periodo: { anio: number | null; label: string }
   pagos: ExtractoPago[]
   totales: { capital: number; interes: number; mora: number; total: number }
 }
 
-const MESES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-]
-
 export async function getExtractoPropietario(
   creditoId: string,
-  mes: number,
-  anio: number
+  anio: number | null
 ): Promise<{ data: ExtractoData | null; error: string | null }> {
   const supabase = await createClient()
 
@@ -54,20 +49,12 @@ export async function getExtractoPropietario(
     return { data: null, error: 'Crédito no encontrado' }
   }
 
-  // Date range for the month
-  const fechaInicio = `${anio}-${String(mes).padStart(2, '0')}-01T00:00:00`
-  const mesNext = mes === 12 ? 1 : mes + 1
-  const anioNext = mes === 12 ? anio + 1 : anio
-  const fechaFin = `${anioNext}-${String(mesNext).padStart(2, '0')}-01T00:00:00`
-
-  // Fetch transactions for this credit in the selected month
+  // Fetch ALL transactions (needed to compute running saldo correctly)
   const { data: transacciones } = await supabase
     .from('transacciones')
     .select('id, tipo_transaccion, monto, fecha_transaccion, referencia_pago')
     .eq('credito_id', credito.id)
     .in('tipo_transaccion', ['pago_capital', 'pago_interes', 'pago_mora'])
-    .gte('fecha_transaccion', fechaInicio)
-    .lt('fecha_transaccion', fechaFin)
     .order('fecha_transaccion', { ascending: true })
 
   // Group by referencia_pago
@@ -83,13 +70,28 @@ export async function getExtractoPropietario(
     else if (tx.tipo_transaccion === 'pago_mora') grupos[ref].mora += tx.monto || 0
   }
 
-  const pagos: ExtractoPago[] = Object.values(grupos).map(g => ({
-    fecha: g.fecha,
-    capital: g.capital,
-    interes: g.interes,
-    mora: g.mora,
-    total: g.capital + g.interes + g.mora,
-  }))
+  const valorInicial = credito.valor_colocado || credito.monto_solicitado
+  let saldoAcumulado = valorInicial
+
+  // Sort all payments chronologically and compute running saldo
+  const todosPagos = Object.values(grupos)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    .map(g => {
+      saldoAcumulado -= g.capital
+      return {
+        fecha: g.fecha,
+        capital: g.capital,
+        interes: g.interes,
+        mora: g.mora,
+        total: g.capital + g.interes + g.mora,
+        saldo: saldoAcumulado,
+      }
+    })
+
+  // Filter by year if specified (global = all payments)
+  const pagos: ExtractoPago[] = anio === null
+    ? todosPagos
+    : todosPagos.filter(p => new Date(p.fecha).getFullYear() === anio)
 
   const totales = pagos.reduce(
     (acc, p) => ({
@@ -114,7 +116,10 @@ export async function getExtractoPropietario(
         valor_colocado: credito.valor_colocado || 0,
         saldo_capital: credito.saldo_capital || 0,
       },
-      periodo: { mes, anio, label: `${MESES[mes - 1]} ${anio}` },
+      periodo: {
+        anio,
+        label: anio === null ? 'Histórico completo' : `Año ${anio}`,
+      },
       pagos,
       totales,
     },
