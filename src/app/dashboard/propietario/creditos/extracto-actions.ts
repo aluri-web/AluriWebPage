@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '../../../../utils/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export interface ExtractoPago {
   fecha: string
@@ -56,8 +57,13 @@ export async function getExtractoPropietario(
     return { data: null, error: 'Crédito no encontrado' }
   }
 
-  // Fetch inversionistas que fondearon el credito
-  const { data: inversionesData } = await supabase
+  // Fetch inversionistas que fondearon el credito (usa admin client porque
+  // RLS bloquea al propietario leer perfiles de otros usuarios)
+  const adminSupabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+  const { data: inversionesData } = await adminSupabase
     .from('inversiones')
     .select('monto_invertido, estado, profiles!inversionista_id(full_name)')
     .eq('credito_id', credito.id)
