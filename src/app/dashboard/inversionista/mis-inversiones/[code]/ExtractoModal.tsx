@@ -215,10 +215,10 @@ export default function ExtractoModal({
                     {extracto.pagos.length > 0 && (
                       <button
                         onClick={handleDescargarPDF}
-                        className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-white px-3 py-1.5 rounded-lg transition-colors text-sm"
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition-colors text-sm font-medium"
                       >
                         <Download size={14} />
-                        PDF
+                        Descargar PDF
                       </button>
                     )}
                   </div>
