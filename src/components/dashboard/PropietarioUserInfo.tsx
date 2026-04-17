@@ -7,9 +7,10 @@ import { useState } from 'react'
 interface PropietarioUserInfoProps {
   name: string
   email: string
+  avatarUrl?: string | null
 }
 
-export default function PropietarioUserInfo({ name, email }: PropietarioUserInfoProps) {
+export default function PropietarioUserInfo({ name, email, avatarUrl }: PropietarioUserInfoProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
@@ -41,9 +42,18 @@ export default function PropietarioUserInfo({ name, email }: PropietarioUserInfo
   return (
     <div className="p-4 border-t border-gray-200 mt-auto">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-600 font-semibold text-sm">
-          {initials || email[0]?.toUpperCase()}
-        </div>
+        {avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={avatarUrl}
+            alt={name || 'Avatar'}
+            className="w-10 h-10 rounded-full object-cover border border-gray-200"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-600 font-semibold text-sm">
+            {initials || email[0]?.toUpperCase()}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 truncate">{name || 'Usuario'}</p>
           <p className="text-xs text-gray-500 truncate">{email}</p>

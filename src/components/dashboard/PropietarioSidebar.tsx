@@ -6,6 +6,7 @@ interface PropietarioSidebarProps {
   user: {
     name: string
     email: string
+    avatarUrl: string | null
   }
 }
 
@@ -32,7 +33,7 @@ export default function PropietarioSidebar({ user }: PropietarioSidebarProps) {
       <PropietarioSidebarNav />
 
       {/* User Info */}
-      <PropietarioUserInfo name={user.name} email={user.email} />
+      <PropietarioUserInfo name={user.name} email={user.email} avatarUrl={user.avatarUrl} />
     </aside>
   )
 }

@@ -14,14 +14,21 @@ export interface ExtractoPago {
 export interface ExtractoData {
   propietario: { nombre: string; email: string; documento: string }
   credito: { codigo_credito: string; monto_solicitado: number; valor_colocado: number; saldo_capital: number }
-  periodo: { anio: number | null; label: string }
+  inversionistas: { nombre: string; monto_invertido: number }[]
+  periodo: { anio: number | null; mes: number | null; label: string }
   pagos: ExtractoPago[]
   totales: { capital: number; interes: number; mora: number; total: number }
 }
 
+const MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+]
+
 export async function getExtractoPropietario(
   creditoId: string,
-  anio: number | null
+  anio: number | null,
+  mes: number | null = null
 ): Promise<{ data: ExtractoData | null; error: string | null }> {
   const supabase = await createClient()
 
@@ -48,6 +55,22 @@ export async function getExtractoPropietario(
   if (creditoError || !credito) {
     return { data: null, error: 'Crédito no encontrado' }
   }
+
+  // Fetch inversionistas que fondearon el credito
+  const { data: inversionesData } = await supabase
+    .from('inversiones')
+    .select('monto_invertido, estado, profiles!inversionista_id(full_name)')
+    .eq('credito_id', credito.id)
+    .eq('estado', 'activo')
+
+  type InvRow = { monto_invertido: number | null; profiles: { full_name: string | null } | { full_name: string | null }[] | null }
+  const inversionistas = ((inversionesData as InvRow[] | null) || []).map(inv => {
+    const p = Array.isArray(inv.profiles) ? inv.profiles[0] : inv.profiles
+    return {
+      nombre: p?.full_name || 'Inversionista',
+      monto_invertido: inv.monto_invertido || 0,
+    }
+  })
 
   // Fetch ALL transactions (needed to compute running saldo correctly)
   const { data: transacciones } = await supabase
@@ -88,10 +111,15 @@ export async function getExtractoPropietario(
       }
     })
 
-  // Filter by year if specified (global = all payments)
+  // Filter: global (all), yearly, or monthly
   const pagos: ExtractoPago[] = anio === null
     ? todosPagos
-    : todosPagos.filter(p => new Date(p.fecha).getFullYear() === anio)
+    : todosPagos.filter(p => {
+        const d = new Date(p.fecha)
+        if (d.getFullYear() !== anio) return false
+        if (mes !== null && d.getMonth() + 1 !== mes) return false
+        return true
+      })
 
   const totales = pagos.reduce(
     (acc, p) => ({
@@ -116,9 +144,15 @@ export async function getExtractoPropietario(
         valor_colocado: credito.valor_colocado || 0,
         saldo_capital: credito.saldo_capital || 0,
       },
+      inversionistas,
       periodo: {
         anio,
-        label: anio === null ? 'Histórico completo' : `Año ${anio}`,
+        mes,
+        label: anio === null
+          ? 'Histórico completo'
+          : mes !== null
+            ? `${MESES[mes - 1]} ${anio}`
+            : `Año ${anio}`,
       },
       pagos,
       totales,

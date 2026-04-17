@@ -16,10 +16,10 @@ export default async function PropietarioLayout({
     return redirect('/login')
   }
 
-  // Fetch user profile for name and role verification
+  // Fetch user profile for name, avatar and role verification
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, role')
+    .select('full_name, role, avatar_url')
     .eq('id', user.id)
     .single()
 
@@ -33,15 +33,16 @@ export default async function PropietarioLayout({
 
   const userName = profile?.full_name || user.user_metadata?.full_name || 'Propietario'
   const userEmail = user.email || ''
+  const userAvatar = profile?.avatar_url || null
 
   return (
     <div className="min-h-screen bg-gray-50">
       <SessionTimeout />
       {/* Desktop sidebar */}
-      <PropietarioSidebar user={{ name: userName, email: userEmail }} />
+      <PropietarioSidebar user={{ name: userName, email: userEmail, avatarUrl: userAvatar }} />
 
       {/* Mobile sidebar */}
-      <PropietarioMobileSidebar user={{ name: userName, email: userEmail }} />
+      <PropietarioMobileSidebar user={{ name: userName, email: userEmail, avatarUrl: userAvatar }} />
 
       <main className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
         {children}

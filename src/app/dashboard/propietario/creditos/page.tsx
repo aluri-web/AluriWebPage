@@ -23,6 +23,10 @@ export default async function CreditosPage() {
       valor_comercial,
       created_at,
       fecha_desembolso,
+      fecha_ultimo_pago,
+      en_mora,
+      dias_mora_actual,
+      saldo_mora,
       inversiones(monto_invertido),
       transacciones(id, tipo_transaccion, monto, fecha_aplicacion, referencia_pago)
     `)

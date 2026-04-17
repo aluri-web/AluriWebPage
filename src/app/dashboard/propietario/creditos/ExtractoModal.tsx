@@ -6,6 +6,10 @@ import { getExtractoPropietario, type ExtractoData } from './extracto-actions'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const ANIOS_DISPONIBLES = [2025, 2026, 2027].filter(y => y <= CURRENT_YEAR + 1)
+const MESES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+]
 
 function formatCOP(value: number): string {
   return new Intl.NumberFormat('es-CO', {
@@ -31,6 +35,8 @@ export default function ExtractoModal({
   const [open, setOpen] = useState(false)
   // 'global' = all years; otherwise a specific year number
   const [seleccion, setSeleccion] = useState<'global' | number>(CURRENT_YEAR)
+  // 0 = todo el año; 1-12 = mes específico
+  const [mes, setMes] = useState<number>(0)
   const [loading, setLoading] = useState(false)
   const [extracto, setExtracto] = useState<ExtractoData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +47,8 @@ export default function ExtractoModal({
     setExtracto(null)
 
     const anio = seleccion === 'global' ? null : seleccion
-    const result = await getExtractoPropietario(creditoId, anio)
+    const mesParam = seleccion === 'global' || mes === 0 ? null : mes
+    const result = await getExtractoPropietario(creditoId, anio, mesParam)
 
     if (result.error) {
       setError(result.error)
@@ -67,7 +74,7 @@ export default function ExtractoModal({
 
     // Logo arriba a la izquierda
     try {
-      const logoUrl = '/images/AluriLogoGreen.png'
+      const logoUrl = '/images/aluri_logo_1.png'
       const response = await fetch(logoUrl)
       const blob = await response.blob()
       const dataUrl = await new Promise<string>((resolve) => {
@@ -87,7 +94,7 @@ export default function ExtractoModal({
     doc.setTextColor(...gray700)
     doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
-    doc.text('Extracto de credito', 196, 20, { align: 'right' })
+    doc.text('Estado de cuenta', 196, 20, { align: 'right' })
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...gray500)
@@ -115,6 +122,16 @@ export default function ExtractoModal({
       { label: 'Monto del credito', value: formatCOP(extracto.credito.valor_colocado || extracto.credito.monto_solicitado) },
       { label: 'Saldo capital', value: formatCOP(extracto.credito.saldo_capital), highlight: true },
     )
+
+    // Inversionistas: una fila por inversionista
+    if (extracto.inversionistas.length > 0) {
+      extracto.inversionistas.forEach((inv, idx) => {
+        listRows.push({
+          label: idx === 0 ? (extracto.inversionistas.length === 1 ? 'Inversionista' : 'Inversionistas') : '',
+          value: `${inv.nombre} — ${formatCOP(inv.monto_invertido)}`,
+        })
+      })
+    }
 
     // Caja contenedora
     const listH = listRows.length * rowGap + 6
@@ -208,7 +225,11 @@ export default function ExtractoModal({
       Math.min(finalY + 20, 285)
     )
 
-    const sufijo = extracto.periodo.anio === null ? 'historico' : String(extracto.periodo.anio)
+    const sufijo = extracto.periodo.anio === null
+      ? 'historico'
+      : extracto.periodo.mes !== null
+        ? `${extracto.periodo.anio}-${String(extracto.periodo.mes).padStart(2, '0')}`
+        : String(extracto.periodo.anio)
     doc.save(`extracto_${codigoCredito}_${sufijo}.pdf`)
   }
 
@@ -249,6 +270,7 @@ export default function ExtractoModal({
                     onChange={(e) => {
                       const val = e.target.value
                       setSeleccion(val === 'global' ? 'global' : Number(val))
+                      setMes(0) // Reset mes al cambiar año
                     }}
                     className="bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
                   >
@@ -258,6 +280,21 @@ export default function ExtractoModal({
                     ))}
                   </select>
                 </div>
+                {seleccion !== 'global' && (
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-2">Mes</label>
+                    <select
+                      value={mes}
+                      onChange={(e) => setMes(Number(e.target.value))}
+                      className="bg-white border border-gray-300 text-gray-900 rounded-lg px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500"
+                    >
+                      <option value={0}>Todo el año</option>
+                      {MESES.map((nombre, i) => (
+                        <option key={i + 1} value={i + 1}>{nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <button
                   onClick={handleGenerar}
                   disabled={loading}

@@ -10,6 +10,7 @@ interface PropietarioMobileSidebarProps {
   user: {
     name: string
     email: string
+    avatarUrl: string | null
   }
 }
 
@@ -70,7 +71,7 @@ export default function PropietarioMobileSidebar({ user }: PropietarioMobileSide
         </div>
 
         {/* User Info */}
-        <PropietarioUserInfo name={user.name} email={user.email} />
+        <PropietarioUserInfo name={user.name} email={user.email} avatarUrl={user.avatarUrl} />
       </aside>
     </>
   )

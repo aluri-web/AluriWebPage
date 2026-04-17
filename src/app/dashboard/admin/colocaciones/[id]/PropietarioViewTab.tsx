@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import { Building2, DollarSign, Hash, Calendar, TrendingUp, Home } from 'lucide-react'
+import { calcularDiasMoraLive } from '@/utils/mora-helper'
 
 interface Transaccion {
   id: string
@@ -29,6 +30,10 @@ interface PropietarioViewCredit {
   valor_comercial: number | null
   created_at: string
   fecha_desembolso: string | null
+  en_mora?: boolean | null
+  dias_mora_actual?: number | null
+  saldo_mora?: number | null
+  fecha_ultimo_pago?: string | null
   inversiones?: Inversion[]
   transacciones?: Transaccion[]
 }
@@ -163,11 +168,23 @@ export default function PropietarioViewTab({ credit }: { credit: PropietarioView
               <Home size={24} className="text-emerald-400" />
             </div>
             <div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <h3 className="text-lg font-semibold text-white">{credit.codigo_credito}</h3>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusClass(credit.estado)}`}>
                   {getStatusLabel(credit.estado)}
                 </span>
+                {(() => {
+                  const live = calcularDiasMoraLive(credit.fecha_desembolso, credit.fecha_ultimo_pago)
+                  const enMora = live.enMora || (credit.saldo_mora ?? 0) > 0
+                  const dias = live.diasMora
+                  if (!enMora) return null
+                  return (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium border bg-red-500/10 text-red-400 border-red-500/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse" />
+                      En Mora{dias > 0 ? ` (${dias} ${dias === 1 ? 'día' : 'días'})` : ''}
+                    </span>
+                  )
+                })()}
               </div>
               <p className="text-slate-400 text-sm mt-1">
                 {credit.ciudad_inmueble || 'Sin ubicacion'}

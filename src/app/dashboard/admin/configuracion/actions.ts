@@ -130,12 +130,18 @@ export async function uploadAvatar(formData: FormData) {
   const fileName = `${user.id}-${Date.now()}.${fileExt}`
   const filePath = `avatars/${fileName}`
 
-  // Upload to Supabase Storage
-  const { error: uploadError } = await supabase.storage
+  // Use admin client for storage (bypasses RLS; auth already verified above)
+  const adminSupabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
+  const { error: uploadError } = await adminSupabase.storage
     .from('profiles')
     .upload(filePath, file, {
       cacheControl: '3600',
-      upsert: true
+      upsert: true,
+      contentType: file.type,
     })
 
   if (uploadError) {
@@ -144,7 +150,7 @@ export async function uploadAvatar(formData: FormData) {
   }
 
   // Get public URL
-  const { data: { publicUrl } } = supabase.storage
+  const { data: { publicUrl } } = adminSupabase.storage
     .from('profiles')
     .getPublicUrl(filePath)
 

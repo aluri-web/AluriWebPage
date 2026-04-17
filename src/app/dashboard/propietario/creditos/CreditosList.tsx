@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { FileText, Building2, DollarSign, Hash, Calendar, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp } from 'lucide-react'
 import AbonosTable from '../../../../components/dashboard/AbonosTable'
 import ExtractoModal from './ExtractoModal'
+import { calcularDiasMoraLive } from '../../../../utils/mora-helper'
 
 type SortField = 'codigo' | 'estado' | 'monto' | 'fecha'
 type SortDirection = 'asc' | 'desc'
@@ -30,6 +31,10 @@ interface Credito {
   valor_comercial: number | null
   created_at: string
   fecha_desembolso: string | null
+  en_mora: boolean | null
+  dias_mora_actual: number | null
+  saldo_mora: number | null
+  fecha_ultimo_pago: string | null
   inversiones: { monto_invertido: number }[]
   transacciones: Transaccion[]
 }
@@ -206,11 +211,23 @@ export default function CreditosList({ creditos }: CreditosListProps) {
                     <Building2 size={24} className="text-emerald-600" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <h3 className="text-lg font-semibold text-gray-900">{credito.codigo_credito}</h3>
                       <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusClass(credito.estado)}`}>
                         {getStatusLabel(credito.estado)}
                       </span>
+                      {(() => {
+                        const live = calcularDiasMoraLive(credito.fecha_desembolso, credito.fecha_ultimo_pago)
+                        const enMora = live.enMora || (credito.saldo_mora ?? 0) > 0
+                        const dias = live.diasMora
+                        if (!enMora) return null
+                        return (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium border bg-red-50 text-red-600 border-red-200 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                            En Mora{dias > 0 ? ` (${dias} ${dias === 1 ? 'día' : 'días'})` : ''}
+                          </span>
+                        )
+                      })()}
                     </div>
                     <p className="text-gray-500 text-sm mt-1">
                       {credito.ciudad_inmueble || 'Sin ubicacion'}
