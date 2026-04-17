@@ -60,6 +60,12 @@ export async function login(formData: FormData) {
   // Revalidate cache
   revalidatePath('/', 'layout')
 
+  // Si la cuenta tiene contraseña temporal, forzar cambio antes del dashboard
+  const mustChangePassword = (data.user.app_metadata as Record<string, unknown> | undefined)?.must_change_password
+  if (mustChangePassword) {
+    redirect('/change-password')
+  }
+
   // Redirect según rol
   if (profile?.role === 'admin') {
     // Check if admin has MFA enrolled → redirect to verify

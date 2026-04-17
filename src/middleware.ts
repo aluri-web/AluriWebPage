@@ -35,8 +35,19 @@ export async function middleware(request: NextRequest) {
   }
 
   // ===============================================
-  // CASO 2: Usuario CON sesión en ruta protegida -> validar rol
+  // CASO 2: Usuario CON sesión -> validar must_change_password y rol
   // ===============================================
+  // Si debe cambiar contraseña, bloquear todo excepto /change-password
+  const mustChangePassword = (user?.app_metadata as Record<string, unknown> | undefined)?.must_change_password
+  if (user && mustChangePassword && pathname !== '/change-password') {
+    return NextResponse.redirect(new URL('/change-password', request.url))
+  }
+
+  // Si no debe cambiar, no puede estar en /change-password
+  if (user && !mustChangePassword && pathname === '/change-password') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
   if (isProtectedRoute && user) {
     const { data: profile } = await supabase
       .from('profiles')
