@@ -21,8 +21,11 @@ async function getCreditDetails(id: string) {
             .select(`
                 *,
                 transacciones (
+                    id,
                     tipo_transaccion,
-                    monto
+                    monto,
+                    fecha_aplicacion,
+                    referencia_pago
                 ),
                 inversiones (
                     monto_invertido,

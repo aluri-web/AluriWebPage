@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings, Eye, CreditCard, User, MapPin } from 'lucide-react'
+import { Settings, Eye, CreditCard, User, MapPin, Home } from 'lucide-react'
 import CreditWorkflow from '../CreditWorkflow'
 import InvestorViewTab from './InvestorViewTab'
+import PropietarioViewTab from './PropietarioViewTab'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default function CreditDetailTabs({ credit }: { credit: any }) {
-  const [activeTab, setActiveTab] = useState<'admin' | 'investor'>('admin')
+  const [activeTab, setActiveTab] = useState<'admin' | 'investor' | 'propietario'>('admin')
 
   return (
     <>
@@ -41,14 +42,26 @@ export default function CreditDetailTabs({ credit }: { credit: any }) {
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-400" />
           )}
         </button>
+        <button
+          onClick={() => setActiveTab('propietario')}
+          className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+            activeTab === 'propietario' ? 'text-teal-400' : 'text-slate-500 hover:text-slate-300'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Home size={16} />
+            Vista Propietario
+          </div>
+          {activeTab === 'propietario' && (
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-400" />
+          )}
+        </button>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'admin' ? (
-        <AdminViewContent credit={credit} />
-      ) : (
-        <InvestorViewTab credit={credit} />
-      )}
+      {activeTab === 'admin' && <AdminViewContent credit={credit} />}
+      {activeTab === 'investor' && <InvestorViewTab credit={credit} />}
+      {activeTab === 'propietario' && <PropietarioViewTab credit={credit} />}
     </>
   )
 }

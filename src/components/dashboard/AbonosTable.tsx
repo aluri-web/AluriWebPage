@@ -22,8 +22,11 @@ function formatCOP(value: number): string {
   }).format(value)
 }
 
-function formatDate(dateString: string): string {
-  const [year, month, day] = dateString.split('-').map(Number)
+function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return '-'
+  const parts = dateString.split('-').map(Number)
+  if (parts.length < 3 || parts.some(isNaN)) return '-'
+  const [year, month, day] = parts
   const date = new Date(year, month - 1, day)
   return date.toLocaleDateString('es-CO', {
     day: '2-digit',
@@ -58,6 +61,7 @@ export default function AbonosTable({ transacciones, valorColocado }: AbonosTabl
   const grupos = new Map<string, PagoAgrupado>()
 
   for (const tx of pagos) {
+    if (!tx.fecha_aplicacion) continue
     const key = tx.referencia_pago || tx.id
     const existing = grupos.get(key) || { fecha: tx.fecha_aplicacion, capital: 0, interes: 0, mora: 0, abono: 0 }
 
