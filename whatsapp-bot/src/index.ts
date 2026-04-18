@@ -137,7 +137,30 @@ async function conectarWhatsApp() {
 
         console.log(`📩 ${remitente}: ${texto}`)
 
-        // Procesar comando (pasar remitente como userId para el LLM)
+        // ── CRM Agent: forward message to Aluri CRM first ──
+        const CRM_URL = process.env.CRM_URL || 'http://localhost:8003'
+        try {
+          const crmRes = await fetch(`${CRM_URL}/api/v1/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: remitente,
+              message: texto,
+              name: msg.pushName || undefined,
+            }),
+          })
+          if (crmRes.ok) {
+            const data = await crmRes.json() as { response: string; agent: string; model_used: string }
+            console.log(`🤖 CRM [${data.agent}/${data.model_used}] → ${remitente}`)
+            await sock?.sendMessage(msg.key.remoteJid!, { text: data.response })
+            continue // CRM handled it, skip old command processing
+          }
+          console.log(`⚠️ CRM returned ${crmRes.status}, falling back to commands`)
+        } catch {
+          console.log('⚠️ CRM unavailable, falling back to commands')
+        }
+
+        // ── Fallback: existing command processing ──
         const respuesta = await procesarMensaje(texto, remitente)
 
         if (respuesta) {
