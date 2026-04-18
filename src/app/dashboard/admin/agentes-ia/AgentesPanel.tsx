@@ -846,23 +846,27 @@ export default function AgentesPanel({
         {/* Loan details */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">Monto requerido (COP) *</label>
+            <label className="text-xs text-slate-400">Monto requerido (millones COP) *</label>
             <input
               type="number"
-              value={manualLoanAmount}
-              onChange={e => setManualLoanAmount(e.target.value ? Number(e.target.value) : '')}
-              placeholder={selectedSolicitud ? String(selectedSolicitud.monto_requerido) : 'Ej: 250000000'}
+              step="0.1"
+              min="0"
+              value={manualLoanAmount === '' ? '' : manualLoanAmount / 1_000_000}
+              onChange={e => setManualLoanAmount(e.target.value ? Math.round(Number(e.target.value) * 1_000_000) : '')}
+              placeholder={selectedSolicitud ? String(selectedSolicitud.monto_requerido / 1_000_000) : 'Ej: 250'}
               disabled={isProcessing}
               className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">Valor inmueble (COP) *</label>
+            <label className="text-xs text-slate-400">Valor inmueble (millones COP) *</label>
             <input
               type="number"
-              value={manualPropertyValue}
-              onChange={e => setManualPropertyValue(e.target.value ? Number(e.target.value) : '')}
-              placeholder={selectedSolicitud ? String(selectedSolicitud.valor_inmueble) : 'Ej: 450000000'}
+              step="0.1"
+              min="0"
+              value={manualPropertyValue === '' ? '' : manualPropertyValue / 1_000_000}
+              onChange={e => setManualPropertyValue(e.target.value ? Math.round(Number(e.target.value) * 1_000_000) : '')}
+              placeholder={selectedSolicitud ? String(selectedSolicitud.valor_inmueble / 1_000_000) : 'Ej: 450'}
               disabled={isProcessing}
               className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
             />
@@ -979,12 +983,14 @@ export default function AgentesPanel({
 
           {/* Ingresos declarados */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">Ingresos declarados (COP)</label>
+            <label className="text-xs text-slate-400">Ingresos declarados (millones COP)</label>
             <input
               type="number"
-              value={declaredIncome}
-              onChange={e => setDeclaredIncome(e.target.value ? Number(e.target.value) : '')}
-              placeholder="Ej: 13000000"
+              step="0.1"
+              min="0"
+              value={declaredIncome === '' ? '' : declaredIncome / 1_000_000}
+              onChange={e => setDeclaredIncome(e.target.value ? Math.round(Number(e.target.value) * 1_000_000) : '')}
+              placeholder="Ej: 13"
               disabled={isProcessing}
               className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
             />
@@ -992,12 +998,14 @@ export default function AgentesPanel({
 
           {/* Avalúo indicado */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">Avalúo indicado (COP)</label>
+            <label className="text-xs text-slate-400">Avalúo indicado (millones COP)</label>
             <input
               type="number"
-              value={declaredAppraisal}
-              onChange={e => setDeclaredAppraisal(e.target.value ? Number(e.target.value) : '')}
-              placeholder="Ej: 450000000"
+              step="0.1"
+              min="0"
+              value={declaredAppraisal === '' ? '' : declaredAppraisal / 1_000_000}
+              onChange={e => setDeclaredAppraisal(e.target.value ? Math.round(Number(e.target.value) * 1_000_000) : '')}
+              placeholder="Ej: 450"
               disabled={isProcessing}
               className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
             />
