@@ -7,8 +7,8 @@ import { headers } from 'next/headers'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
+  const email = ((formData.get('email') as string) || '').trim().toLowerCase()
+  const password = ((formData.get('password') as string) || '').trim()
 
   // Validate inputs
   if (!email || !password) {
@@ -16,13 +16,24 @@ export async function login(formData: FormData) {
   }
 
   // Attempt login
-  const { error, data } = await supabase.auth.signInWithPassword({ 
-    email, 
-    password 
+  const { error, data } = await supabase.auth.signInWithPassword({
+    email,
+    password
   })
 
   if (error) {
-    return { error: 'Credenciales inválidas' }
+    // Distinguir errores comunes para facilitar diagnostico
+    const msg = (error.message || '').toLowerCase()
+    if (msg.includes('rate') || msg.includes('too many')) {
+      return { error: 'Demasiados intentos fallidos. Espera unos minutos antes de reintentar.' }
+    }
+    if (msg.includes('not confirmed') || msg.includes('confirm')) {
+      return { error: 'Tu correo no esta confirmado. Contacta al administrador.' }
+    }
+    if (msg.includes('invalid') || msg.includes('credentials')) {
+      return { error: 'Correo o contraseña incorrectos. Verifica que no tenga espacios extra.' }
+    }
+    return { error: 'No se pudo iniciar sesion: ' + (error.message || 'error desconocido') }
   }
 
   // Consultar rol del usuario
