@@ -5,6 +5,9 @@ import type { ResumenEjecucion } from '@/lib/interest/types'
 import crypto from 'crypto'
 import { cronLimiter, getClientIp } from '@/lib/rate-limit'
 
+// Vercel function timeout — needs long runtime when backfilling many days
+export const maxDuration = 300
+
 /**
  * POST /api/cron/calcular-intereses
  *
