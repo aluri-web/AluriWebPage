@@ -275,6 +275,23 @@ const tools: Tool[] = [
     },
   },
 
+  // ========== ANÁLISIS DE CRÉDITO (DEBUGGING) ==========
+  {
+    name: "obtener_analisis_credito",
+    description: "Consulta filas de credito_analyses para debugging del agente de crédito. Busca por nombre, cédula, ID o lead_id. Devuelve extracted_data, bank_analysis, recommendations, etc.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        search: { type: "string", description: "Nombre del solicitante (ILIKE) o cédula" },
+        id: { type: "string", description: "UUID del análisis" },
+        lead_id: { type: "string", description: "UUID del lead KYC vinculado" },
+        only_latest: { type: "boolean", description: "Solo la fila más reciente" },
+        limit: { type: "number", description: "Máx filas (1-20, default 5)" },
+      },
+      required: [],
+    },
+  },
+
   // ========== ESTUDIO DE TÍTULOS ==========
   {
     name: "listar_estudios_titulos",
@@ -460,6 +477,28 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "obtener_credito_detalle": {
         const { credito_id } = args as { credito_id: string };
         const result = await apiRequest(`/creditos/${encodeURIComponent(credito_id)}`, "GET", undefined, true);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      }
+
+      // ========== ANÁLISIS DE CRÉDITO (DEBUGGING) ==========
+      case "obtener_analisis_credito": {
+        const { search, id, lead_id, only_latest, limit } = (args || {}) as {
+          search?: string;
+          id?: string;
+          lead_id?: string;
+          only_latest?: boolean;
+          limit?: number;
+        };
+        const params: string[] = [];
+        if (search) params.push(`search=${encodeURIComponent(search)}`);
+        if (id) params.push(`id=${encodeURIComponent(id)}`);
+        if (lead_id) params.push(`lead_id=${encodeURIComponent(lead_id)}`);
+        if (only_latest) params.push(`only_latest=true`);
+        if (limit) params.push(`limit=${limit}`);
+        const endpoint = `/analisis/credito${params.length > 0 ? `?${params.join("&")}` : ""}`;
+        const result = await apiRequest(endpoint, "GET", undefined, true);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
