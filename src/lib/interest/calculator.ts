@@ -473,8 +473,10 @@ export async function procesarCausacionCredito(
     const tasaUsura = await obtenerTasaUsuraDB(supabase, fechaHoy)
 
     // 5. Calcular interés y mora diaria (lógica Excel)
-    // Usar tasa_interes_ea si está disponible, sino derivar de tasa_nominal mensual
-    const tasaEA = credito.tasa_interes_ea || ((Math.pow(1 + credito.tasa_nominal / 100, 12) - 1) * 100)
+    // Siempre derivar EA desde tasa_nominal mensual con precisión completa (15 dígitos).
+    // NO usar tasa_interes_ea de la DB porque suele estar truncada a 2 decimales
+    // (ej: 25.34 en vez de 25.341257272572...)
+    const tasaEA = (Math.pow(1 + credito.tasa_nominal / 100, 12) - 1) * 100
     const calculo = calcularInteresDiario(
       capitalEsperado,              // Base para Int. Corriente
       capitalReal,                  // Capital real acumulado
