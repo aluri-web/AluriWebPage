@@ -170,6 +170,29 @@ function createMcpServer(): McpServer {
     },
   );
 
+  server.tool(
+    "obtener_analisis_credito",
+    "Consulta filas de credito_analyses para debugging. Busca por nombre, cédula, ID de análisis o lead_id. Devuelve los campos JSONB completos (extracted_data, bank_analysis, recommendations, etc.).",
+    {
+      search: z.string().optional().describe("Nombre del solicitante (ILIKE) o cédula (exact)"),
+      id: z.string().optional().describe("UUID del análisis"),
+      lead_id: z.string().optional().describe("UUID del lead KYC vinculado"),
+      only_latest: z.boolean().optional().describe("Solo la fila más reciente"),
+      limit: z.number().optional().describe("Máx filas (1-20, default 5)"),
+    },
+    async ({ search, id, lead_id, only_latest, limit }) => {
+      const params: string[] = [];
+      if (search) params.push(`search=${encodeURIComponent(search)}`);
+      if (id) params.push(`id=${encodeURIComponent(id)}`);
+      if (lead_id) params.push(`lead_id=${encodeURIComponent(lead_id)}`);
+      if (only_latest) params.push(`only_latest=true`);
+      if (limit) params.push(`limit=${limit}`);
+      const endpoint = `/analisis/credito${params.length ? `?${params.join("&")}` : ""}`;
+      const result = await apiRequest(endpoint);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
   return server;
 }
 

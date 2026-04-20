@@ -28,7 +28,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // Procesar la solicitud (usuario autenticado como admin)
     const ALLOWED_TABLES = [
       'creditos', 'inversiones', 'solicitudes_credito', 'profiles',
-      'notificaciones', 'causaciones', 'log_ejecucion_cron', 'pagos'
+      'notificaciones', 'causaciones', 'log_ejecucion_cron', 'pagos',
+      'credito_analyses', 'kyc_analyses', 'kyc_leads', 'propietarios'
     ]
     const { searchParams } = new URL(request.url)
     const tabla = searchParams.get('tabla') || 'creditos'
