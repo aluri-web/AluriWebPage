@@ -1,12 +1,14 @@
 import { ClipboardList } from 'lucide-react'
 import { getMisSolicitudes } from './actions'
 import SolicitudCard from './SolicitudCard'
+import PageView from '@/lib/analytics/PageView'
 
 export default async function MisSolicitudesPage() {
   const { data: solicitudes } = await getMisSolicitudes()
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
+      <PageView event="ver_mis_solicitudes" />
       <header className="flex items-center gap-3">
         <div className="p-2 bg-emerald-500/10 rounded-xl">
           <ClipboardList size={24} className="text-emerald-600" />

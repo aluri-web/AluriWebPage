@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Activity,
   KeyRound,
+  BarChart3,
 } from 'lucide-react'
 
 const mainNavItems = [
@@ -29,6 +30,7 @@ const mainNavItems = [
   { href: '/dashboard/admin/dataroom', label: 'Dataroom', icon: FolderOpen },
   { href: '/dashboard/admin/agentes-ia', label: 'Agentes IA', icon: Bot },
   { href: '/dashboard/admin/sesiones', label: 'Sesiones', icon: Activity },
+  { href: '/dashboard/admin/actividad', label: 'Actividad', icon: BarChart3 },
   { href: '/dashboard/admin/demo-access', label: 'Credenciales', icon: KeyRound },
 ]
 

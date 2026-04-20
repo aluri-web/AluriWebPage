@@ -2,6 +2,7 @@ import { createClient } from '../../../../utils/supabase/server'
 import { Briefcase } from 'lucide-react'
 import Link from 'next/link'
 import InvestmentsTabs from './InvestmentsTabs'
+import PageView from '@/lib/analytics/PageView'
 
 // Transaction record from transacciones table
 interface Transaccion {
@@ -155,6 +156,7 @@ export default async function MisInversionesPage() {
 
   return (
     <div className="text-white p-8">
+      <PageView event="ver_mis_inversiones" />
       <header className="mb-8">
         <h1 className="text-3xl font-bold text-white">Mis Inversiones</h1>
         <p className="text-zinc-500 mt-1">

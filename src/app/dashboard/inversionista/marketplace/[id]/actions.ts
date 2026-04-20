@@ -2,6 +2,7 @@
 
 import { createClient } from '../../../../../utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logEvent } from '@/lib/analytics/log'
 
 export interface CreditoOpportunity {
   id: string
@@ -141,6 +142,15 @@ export async function investInLoan(
     console.error('Error creating inversion:', insertError.message)
     return { success: false, message: '', error: 'Error al crear la inversión: ' + insertError.message }
   }
+
+  await logEvent({
+    event: 'inversion_completada',
+    metadata: {
+      credito_id: loanId,
+      monto: amount,
+      porcentaje_credito: amountRequested > 0 ? Math.round((amount / amountRequested) * 10000) / 100 : 0,
+    },
+  })
 
   revalidatePath('/dashboard/inversionista/marketplace')
   revalidatePath(`/dashboard/inversionista/marketplace/${loanId}`)

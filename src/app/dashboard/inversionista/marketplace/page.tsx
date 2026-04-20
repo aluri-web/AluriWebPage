@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { getActiveLoans, MarketplaceCredito } from './actions'
 import { Store, MapPin, Calendar, Shield, Clock, DollarSign, Search, SlidersHorizontal, X, ArrowUpDown } from 'lucide-react'
+import { useTrackEvent } from '@/lib/analytics/useTrackEvent'
 
 type SortOption = 'newest' | 'oldest' | 'rate_high' | 'rate_low' | 'amount_high' | 'amount_low' | 'ltv_low' | 'ltv_high'
 import Link from 'next/link'
@@ -22,6 +23,7 @@ const calculateRiskScore = (loan: MarketplaceCredito) => {
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&h=600&fit=crop&q=80'
 
 export default function MarketplacePage() {
+  useTrackEvent('ver_marketplace')
   const [loans, setLoans] = useState<MarketplaceCredito[]>([])
   const [filteredLoans, setFilteredLoans] = useState<MarketplaceCredito[]>([])
   const [loading, setLoading] = useState(true)

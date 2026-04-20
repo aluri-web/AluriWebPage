@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { MapPin, FileText, Camera, ChevronRight, ChevronLeft, Upload, X, CheckCircle, AlertTriangle, Loader2, User } from 'lucide-react'
 import { submitCreditRequest } from './actions'
 import { uploadFile, deleteFile } from '@/utils/uploadFile'
+import { useTrackEvent } from '@/lib/analytics/useTrackEvent'
 
 const DOCUMENT_TYPES = [
   { key: 'libertad_tradicion', label: 'Certificado de Libertad y Tradicion' },
@@ -35,6 +36,7 @@ const SELECT_CLASS = 'w-full bg-gray-50 border border-gray-300 rounded-lg px-4 p
 const INPUT_CLASS = 'w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500'
 
 export default function SolicitarCreditoPage() {
+  useTrackEvent('solicitud_iniciada')
   const [step, setStep] = useState(0)
   const [isPending, startTransition] = useTransition()
   const [submitted, setSubmitted] = useState(false)

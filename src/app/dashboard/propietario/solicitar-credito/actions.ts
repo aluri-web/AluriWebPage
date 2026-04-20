@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logEvent } from '@/lib/analytics/log'
 
 interface DocumentItem {
   tipo: string
@@ -125,6 +126,18 @@ export async function submitCreditRequest(
 
       await supabase.from('notificaciones').insert(notifications)
     }
+
+    await logEvent({
+      event: 'solicitud_enviada',
+      metadata: {
+        monto: data.monto_requerido,
+        valor_inmueble: data.valor_inmueble,
+        ltv: Math.round(ltv * 10) / 10,
+        ciudad: data.ciudad,
+        plazo_meses: data.plazo_meses,
+        tipo_persona: data.solicitante.tipo_persona,
+      },
+    })
 
     revalidatePath('/dashboard/propietario/solicitar-credito')
     revalidatePath('/dashboard/propietario/mis-solicitudes')

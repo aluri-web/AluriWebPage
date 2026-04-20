@@ -1,6 +1,7 @@
 import { createClient } from '../../../../utils/supabase/server'
 import { FileText } from 'lucide-react'
 import CreditosList from './CreditosList'
+import PageView from '@/lib/analytics/PageView'
 
 export default async function CreditosPage() {
   const supabase = await createClient()
@@ -35,6 +36,7 @@ export default async function CreditosPage() {
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
+      <PageView event="ver_mis_creditos" metadata={{ count: creditos?.length ?? 0 }} />
       {/* Header */}
       <header className="flex items-center gap-3">
         <div className="p-2 bg-emerald-500/10 rounded-xl">

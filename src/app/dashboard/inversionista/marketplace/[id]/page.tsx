@@ -7,6 +7,7 @@ import InvestmentPanel from './InvestmentPanel'
 import BentoMetrics from './BentoMetrics'
 import RiskAnalysis from './RiskAnalysis'
 import ImageGallery from './ImageGallery'
+import PageView from '@/lib/analytics/PageView'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -46,6 +47,7 @@ export default async function OpportunityDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <PageView event="ver_credito_detalle" metadata={{ credito_id: id, codigo: loan.codigo_credito }} />
       {/* Top Navigation */}
       <div className="border-b border-white/5">
         <div className="max-w-7xl mx-auto px-6 py-4">
