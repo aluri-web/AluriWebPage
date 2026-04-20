@@ -75,7 +75,7 @@ export async function GET(
     if (credito.cliente_id) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id, full_name, documento, email, telefono')
+        .select('id, full_name, document_id, email, phone')
         .eq('id', credito.cliente_id)
         .single()
       propietario = profile
@@ -95,7 +95,7 @@ export async function GET(
         inversionista:profiles!inversionista_id (
           id,
           full_name,
-          documento,
+          document_id,
           email
         )
       `)
