@@ -18,6 +18,9 @@ type Credit = {
     fecha_desembolso?: string | null
     notaria?: string | null
     costos_notaria?: number | null
+    motivo_no_colocado?: string | null
+    motivo_no_colocado_detalle?: string | null
+    fecha_no_colocado?: string | null
 }
 
 interface CreditWorkflowProps {
@@ -95,12 +98,40 @@ export default function CreditWorkflow({ credit }: CreditWorkflowProps) {
     }
 
     if (isCancelled) {
+        const MOTIVO_LABELS: Record<string, string> = {
+            falta_fondeo: 'Falta de fondeo',
+            cliente_desistio: 'Cliente desistió',
+            documentos_incompletos: 'Documentos incompletos',
+            no_aprobado_comite: 'No aprobado por comité',
+            garantia_rechazada: 'Garantía rechazada',
+            riesgo: 'Por perfil de riesgo',
+            otro: 'Otro',
+        }
+        const motivoLabel = credit.motivo_no_colocado
+            ? (MOTIVO_LABELS[credit.motivo_no_colocado] || credit.motivo_no_colocado)
+            : null
         return (
-            <div className="bg-red-900/10 border border-red-800 rounded-xl p-6 flex items-center gap-4 text-red-400">
-                <AlertCircle size={24} />
-                <div>
+            <div className="bg-red-900/10 border border-red-800 rounded-xl p-6 flex items-start gap-4 text-red-400">
+                <AlertCircle size={24} className="flex-shrink-0 mt-1" />
+                <div className="flex-1 space-y-2">
                     <h3 className="font-semibold text-lg">Crédito {credit.estado.toUpperCase()}</h3>
                     <p className="text-sm opacity-80">Este crédito no puede avanzar en el flujo.</p>
+                    {motivoLabel && (
+                        <div className="mt-3 pt-3 border-t border-red-800/50 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs uppercase tracking-wider opacity-60">Motivo:</span>
+                                <span className="text-sm font-semibold">{motivoLabel}</span>
+                                {credit.fecha_no_colocado && (
+                                    <span className="text-xs opacity-60">
+                                        • {new Date(credit.fecha_no_colocado).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    </span>
+                                )}
+                            </div>
+                            {credit.motivo_no_colocado_detalle && (
+                                <p className="text-sm text-slate-300 italic">{credit.motivo_no_colocado_detalle}</p>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
         )

@@ -10,12 +10,24 @@ interface DeleteCreditModalProps {
   onClose: () => void
 }
 
+const MOTIVOS = [
+  { value: 'falta_fondeo', label: 'Falta de fondeo' },
+  { value: 'cliente_desistio', label: 'Cliente desistió' },
+  { value: 'documentos_incompletos', label: 'Documentos incompletos' },
+  { value: 'no_aprobado_comite', label: 'No aprobado por comité' },
+  { value: 'garantia_rechazada', label: 'Garantía rechazada' },
+  { value: 'riesgo', label: 'Por perfil de riesgo' },
+  { value: 'otro', label: 'Otro' },
+]
+
 export default function DeleteCreditModal({ creditId, isOpen, onClose }: DeleteCreditModalProps) {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [confirmCode, setConfirmCode] = useState('')
+  const [motivo, setMotivo] = useState('')
+  const [detalle, setDetalle] = useState('')
   const [info, setInfo] = useState<{
     code: string
     debtor_name: string | null
@@ -30,6 +42,8 @@ export default function DeleteCreditModal({ creditId, isOpen, onClose }: DeleteC
     setError(null)
     setSuccess(false)
     setConfirmCode('')
+    setMotivo('')
+    setDetalle('')
 
     getCreditDeleteInfo(creditId).then(({ data, error: fetchError }) => {
       if (fetchError || !data) {
@@ -43,11 +57,11 @@ export default function DeleteCreditModal({ creditId, isOpen, onClose }: DeleteC
   }, [isOpen, creditId])
 
   const handleDelete = async () => {
-    if (!info || confirmCode !== info.code) return
+    if (!info || confirmCode !== info.code || !motivo) return
     setProcessing(true)
     setError(null)
 
-    const result = await deleteCredit(creditId)
+    const result = await deleteCredit(creditId, { motivo, detalle: detalle.trim() || null })
 
     if (result.error) {
       setError(result.error)
@@ -112,6 +126,33 @@ export default function DeleteCreditModal({ creditId, isOpen, onClose }: DeleteC
               )}
             </div>
 
+            {/* Motivo dropdown */}
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Motivo *</label>
+              <select
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              >
+                <option value="">Selecciona un motivo...</option>
+                {MOTIVOS.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Detalle opcional */}
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Comentario (opcional)</label>
+              <textarea
+                value={detalle}
+                onChange={(e) => setDetalle(e.target.value)}
+                placeholder="Detalles adicionales sobre el motivo..."
+                rows={2}
+                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+              />
+            </div>
+
             {/* Confirmation input */}
             <div>
               <label className="block text-sm text-slate-300 mb-2">
@@ -143,7 +184,7 @@ export default function DeleteCreditModal({ creditId, isOpen, onClose }: DeleteC
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={processing || confirmCode !== info.code}
+                disabled={processing || confirmCode !== info.code || !motivo}
                 className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-600/30 disabled:text-amber-400/50 text-white font-semibold rounded-lg transition-colors"
               >
                 {processing ? 'Procesando...' : 'No Colocar'}

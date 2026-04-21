@@ -1468,7 +1468,8 @@ export async function updateCredit(
 // ========== DELETE CREDIT ==========
 
 export async function deleteCredit(
-  creditId: string
+  creditId: string,
+  params?: { motivo?: string; detalle?: string | null }
 ): Promise<{ success: boolean; error?: string }> {
   const adminCheck = await verifyAdmin()
   if (!adminCheck.authorized) return { success: false, error: adminCheck.error }
@@ -1513,12 +1514,16 @@ export async function deleteCredit(
   }).format(v)
 
   try {
-    // Soft delete: change estado to 'no_colocado'
+    // Soft delete: change estado to 'no_colocado' + save motivo
+    const now = new Date().toISOString()
     const { error: updateError } = await supabaseAdmin
       .from('creditos')
       .update({
         estado: 'no_colocado',
-        updated_at: new Date().toISOString()
+        motivo_no_colocado: params?.motivo ?? null,
+        motivo_no_colocado_detalle: params?.detalle ?? null,
+        fecha_no_colocado: now,
+        updated_at: now,
       })
       .eq('id', creditId)
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings, Eye, CreditCard, User, MapPin, Home } from 'lucide-react'
+import { Settings, Eye, CreditCard, User, MapPin, Home, HandCoins, TrendingUp } from 'lucide-react'
 import CreditWorkflow from '../CreditWorkflow'
 import InvestorViewTab from './InvestorViewTab'
 import PropietarioViewTab from './PropietarioViewTab'
@@ -225,6 +225,103 @@ function AdminViewContent({ credit }: { credit: any }) {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Fondeo & Inversionistas */}
+        <FondeoCard credit={credit} />
+      </div>
+    </div>
+  )
+}
+
+// ==================================================================
+// Card: Fondeo progress + lista de inversionistas
+// ==================================================================
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function FondeoCard({ credit }: { credit: any }) {
+  const formatCOP = (v: number) =>
+    new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inversiones = (credit.inversiones || []) as Array<any>
+  const activas = inversiones.filter(i => i.estado === 'activo')
+  const totalFondeado = activas.reduce((s, i) => s + (Number(i.monto_invertido) || 0), 0)
+  const objetivo = Number(credit.monto_solicitado) || 0
+  const progreso = objetivo > 0 ? Math.min((totalFondeado / objetivo) * 100, 100) : 0
+  const completo = totalFondeado >= objetivo && objetivo > 0
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-2">
+        <HandCoins size={18} className="text-emerald-400" />
+        <h3 className="font-semibold text-white">Fondeo</h3>
+        {completo && (
+          <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            Completo
+          </span>
+        )}
+      </div>
+      <div className="p-6 space-y-5">
+        {/* Progress bar */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-slate-400">Progreso</span>
+            <span className="text-sm font-semibold text-white">{progreso.toFixed(1)}%</span>
+          </div>
+          <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${completo ? 'bg-emerald-500' : 'bg-teal-500'}`}
+              style={{ width: `${progreso}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-slate-500">
+            <span>{formatCOP(totalFondeado)}</span>
+            <span>Objetivo: {formatCOP(objetivo)}</span>
+          </div>
+          {!completo && objetivo > totalFondeado && (
+            <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
+              <TrendingUp size={12} />
+              Falta por fondear: {formatCOP(objetivo - totalFondeado)}
+            </p>
+          )}
+        </div>
+
+        {/* Lista de inversionistas */}
+        <div>
+          <h4 className="text-sm font-semibold text-slate-300 mb-3">
+            Inversionistas ({activas.length})
+          </h4>
+          {activas.length === 0 ? (
+            <p className="text-sm text-slate-500 italic">Sin inversionistas aun</p>
+          ) : (
+            <div className="space-y-2">
+              {activas.map((inv, idx) => {
+                const inversionista = inv.inversionista || inv.profiles || {}
+                const nombre = inversionista.full_name || 'Inversionista'
+                const monto = Number(inv.monto_invertido) || 0
+                const pct = objetivo > 0 ? (monto / objetivo) * 100 : 0
+                return (
+                  <div
+                    key={inv.id ?? `inv-${idx}`}
+                    className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-xs font-bold text-emerald-400 shrink-0">
+                        {nombre.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-white truncate">{nombre}</p>
+                        <p className="text-xs text-slate-500">{pct.toFixed(1)}% del total</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-semibold text-emerald-400 whitespace-nowrap">
+                      {formatCOP(monto)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

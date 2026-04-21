@@ -374,9 +374,12 @@ export async function obtenerCapitalesAnteriores(
   creditoId: string,
   fechaHoy: string
 ): Promise<{ capitalEsperado: number; capitalReal: number } | null> {
+  // Se guarda capital_esperado/capital_real como el INPUT del día (antes de
+  // sumar el interés calculado). Para calcular el día siguiente necesitamos
+  // el valor al FINAL del día anterior = input + interés causado.
   const { data, error } = await supabase
     .from('causaciones_diarias')
-    .select('capital_esperado, capital_real')
+    .select('capital_esperado, capital_real, interes_causado')
     .eq('credito_id', creditoId)
     .lt('fecha_causacion', fechaHoy)
     .order('fecha_causacion', { ascending: false })
@@ -387,9 +390,10 @@ export async function obtenerCapitalesAnteriores(
     return null // No hay causación anterior
   }
 
+  const interes = Number(data.interes_causado) || 0
   return {
-    capitalEsperado: data.capital_esperado,
-    capitalReal: data.capital_real
+    capitalEsperado: Number(data.capital_esperado) + interes,
+    capitalReal: Number(data.capital_real) + interes,
   }
 }
 
