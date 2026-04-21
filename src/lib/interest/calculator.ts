@@ -347,14 +347,17 @@ export async function obtenerCreditosPendientes(
   fechaHoy: string,
   limite: number = 50
 ): Promise<Credito[]> {
-  // Construir filtro NOT IN para estados excluidos
+  // Solo causan intereses los creditos en estado 'activo' o 'mora'.
+  // en_firma / firmado / solicitado / aprobado / publicado NO causan aunque
+  // tengan fecha_desembolso seteada por error.
   const { data, error } = await supabase
     .from('creditos')
     .select('*')
+    .in('estado', ['activo', 'mora'])
     .not('estado_credito', 'in', `(${ESTADOS_CREDITO_EXCLUIDOS.join(',')})`)
     .gt('saldo_capital', 0)
     .not('fecha_desembolso', 'is', null)
-    .lt('fecha_desembolso', fechaHoy)  // Causación empieza día después de desembolso
+    .lt('fecha_desembolso', fechaHoy)
     .or(`ultima_causacion.is.null,ultima_causacion.lt.${fechaHoy}`)
     .limit(limite)
 
