@@ -469,11 +469,25 @@ export async function procesarCausacionCredito(
 
     // 3. Verificar si hoy es día de pago esperado
     const esPagoDia = esDiaDePago(credito.fecha_desembolso, fechaActual)
-    const montoEsperado = credito.monto_pago_esperado || 0
 
-    // Si es día de pago, reducir el capital esperado (excepto solo_interes: capital se paga al vencimiento)
-    if (esPagoDia && montoEsperado > 0 && !esSoloInteres) {
-      capitalEsperado = Math.max(0, capitalEsperado - montoEsperado)
+    // Si es día de pago, reducir capital_esperado por la porcion capital de
+    // la cuota francesa segun el periodo actual (formula francesa).
+    // Esto reemplaza el viejo monto_pago_esperado (que podia estar mal guardado).
+    // Solo aplica para amortizacion francesa; solo_interes no baja capital hasta el vencimiento.
+    if (esPagoDia && !esSoloInteres && credito.monto_solicitado && credito.plazo) {
+      const { calcularCapitalPeriodo, calcularPeriodoPago } = await import('./amortizacion')
+      const periodo = calcularPeriodoPago(new Date(credito.fecha_desembolso), fechaActual)
+      // Para vencida: primer pago en periodo 1. Para anticipada: periodo 0 es el desembolso.
+      // La causacion arranca dia+1 del desembolso, asi que nunca procesamos periodo 0 aqui.
+      if (periodo >= 1 && periodo <= credito.plazo) {
+        const capitalCuota = calcularCapitalPeriodo(
+          credito.monto_solicitado,
+          credito.tasa_nominal / 100,
+          credito.plazo,
+          periodo
+        )
+        capitalEsperado = Math.max(0, capitalEsperado - capitalCuota)
+      }
     }
 
     // 4. Obtener tasa de usura vigente

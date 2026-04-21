@@ -29,6 +29,8 @@ export interface Credito {
   fecha_ultimo_pago?: string
   fecha_proximo_pago?: string        // Próxima fecha de pago esperada
   monto_pago_esperado?: number       // Monto del pago mensual esperado
+  monto_solicitado?: number          // Principal original del credito
+  plazo?: number                     // Plazo en meses
   ultima_causacion?: string
   dias_mora_actual: number
   en_mora: boolean                   // Si está en mora actualmente
