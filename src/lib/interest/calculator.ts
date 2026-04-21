@@ -475,18 +475,18 @@ export async function procesarCausacionCredito(
     // Esto reemplaza el viejo monto_pago_esperado (que podia estar mal guardado).
     // Solo aplica para amortizacion francesa; solo_interes no baja capital hasta el vencimiento.
     if (esPagoDia && !esSoloInteres && credito.monto_solicitado && credito.plazo) {
-      const { calcularCapitalPeriodo, calcularPeriodoPago } = await import('./amortizacion')
+      const { calcularSaldoTeoricoPeriodo, calcularPeriodoPago } = await import('./amortizacion')
       const periodo = calcularPeriodoPago(new Date(credito.fecha_desembolso), fechaActual)
-      // Para vencida: primer pago en periodo 1. Para anticipada: periodo 0 es el desembolso.
-      // La causacion arranca dia+1 del desembolso, asi que nunca procesamos periodo 0 aqui.
+      // En dia de pago teorico, capital_esperado se RESETEA al saldo francesa
+      // del periodo (columna SALDO del CSV). Esto asume que el borrower pago
+      // la cuota completa (capital + interes mensual teorico).
       if (periodo >= 1 && periodo <= credito.plazo) {
-        const capitalCuota = calcularCapitalPeriodo(
+        capitalEsperado = calcularSaldoTeoricoPeriodo(
           credito.monto_solicitado,
           credito.tasa_nominal / 100,
           credito.plazo,
           periodo
         )
-        capitalEsperado = Math.max(0, capitalEsperado - capitalCuota)
       }
     }
 

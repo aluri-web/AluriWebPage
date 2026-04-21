@@ -19,6 +19,30 @@ export function calcularCuotaFrancesa(
 }
 
 /**
+ * Saldo teorico de capital DESPUES de pagar la cuota del periodo k.
+ * Formula: saldo_k = P × (1+i)^k - cuota × ((1+i)^k - 1) / i
+ *
+ * Coincide con la columna SALDO de la tabla de amortizacion del CSV.
+ * Al dia de pago, capital_esperado se resetea a este valor para
+ * reflejar que el borrower pago toda la cuota (capital + interes mensual).
+ */
+export function calcularSaldoTeoricoPeriodo(
+  principal: number,
+  tasaMensual: number,
+  plazo: number,
+  periodo: number
+): number {
+  if (periodo < 1) return principal
+  if (periodo >= plazo) return 0
+  if (tasaMensual === 0) return principal * (1 - periodo / plazo)
+
+  const cuotaFija = calcularCuotaFrancesa(principal, tasaMensual, plazo)
+  const factor = Math.pow(1 + tasaMensual, periodo)
+  const saldo = principal * factor - (cuotaFija * (factor - 1)) / tasaMensual
+  return Math.max(0, saldo)
+}
+
+/**
  * Capital del periodo k (1-indexed) en amortizacion francesa.
  * En francesa, el capital crece geometricamente: capital_k = capital_1 × (1+i)^(k-1)
  *
