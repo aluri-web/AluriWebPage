@@ -142,13 +142,26 @@ export const ESTADOS_CREDITO_EXCLUIDOS = ['pagado', 'no_colocado', 'castigado'] 
 export const DIAS_ANIO = 365    // Días base para cálculo anual (EA → diaria)
 
 // Tasas de usura oficiales SFC por mes (fallback si no hay conexión a BD)
-// Tasas EA oficiales (porcentaje)
+// Tasas EA oficiales (porcentaje) certificadas por la Superintendencia Financiera
+// Fuente: resoluciones mensuales SFC / prensa financiera
 export const TASAS_USURA_SFC: Record<string, number> = {
-  '2025-12': 25.02,  // Diciembre 2025
-  '2026-01': 24.36,  // Enero 2026
-  '2026-02': 25.23,  // Febrero 2026
-  '2026-03': 25.52,  // Marzo 2026
+  '2025-01': 24.89,
+  '2025-02': 26.30,
+  '2025-03': 24.92,
+  '2025-04': 25.62,
+  '2025-05': 25.97,
+  '2025-06': 25.55,
+  '2025-07': 24.78,
+  '2025-08': 25.17,
+  '2025-09': 25.00,
+  '2025-10': 24.36,
+  '2025-11': 24.99,
+  '2025-12': 25.02,
+  '2026-01': 24.36,
+  '2026-02': 25.23,
+  '2026-03': 25.52,
+  '2026-04': 26.76,
 }
 
-// Tasa de usura por defecto (última conocida)
-export const TASA_USURA_DEFAULT = 25.52
+// Tasa de usura por defecto (última conocida — abril 2026)
+export const TASA_USURA_DEFAULT = 26.76
