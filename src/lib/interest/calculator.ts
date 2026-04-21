@@ -12,8 +12,10 @@
  * - La causación empieza el día DESPUÉS del desembolso
  * - Int. Corriente = Capital ESPERADO × Tasa Diaria (NO sobre Capital Real)
  * - Int. Moratorio = Capital ESPERADO × Tasa Mora (SIEMPRE se calcula, incluso sin mora)
- * - Tasa Diaria = (1 + Tasa_EA/100)^(1/365) - 1 → DOUBLE PRECISION (15 dígitos como Excel)
- * - Tasa Mora = Tasa de Usura SFC vigente por mes
+ * - Tasa Diaria CORRIENTE = tasa_nominal_mensual / días_en_periodo_mensual
+ *     Distribuye el interés mensual (saldo × 1.9%) entre los días reales del periodo.
+ *     Suma exacta al final del mes = saldo × r_mensual (match Excel / francesa colombiana).
+ * - Tasa Diaria MORA = (1 + Tasa_Usura_EA/100)^(1/365) - 1 (convención SFC/365)
  *
  * PAGOS:
  * - FECHA PAGO: día del mes igual al día de desembolso
@@ -151,6 +153,43 @@ export function esDiaDePago(
 }
 
 /**
+ * Calcula los días del periodo mensual actual donde cae `fechaActual`.
+ *
+ * El periodo va desde el último día de pago (o desembolso) hasta el próximo
+ * día de pago mensual (mismo día del mes). Esto determina entre cuántos días
+ * se reparte la cuota mensual de intereses.
+ *
+ * Ejemplo: desembolso 2025-08-16, hoy 2025-09-01 → periodo 2025-08-16 a 2025-09-16 = 31 días
+ *
+ * @param fechaReferencia - Último pago o fecha de desembolso
+ * @param fechaActual - Fecha del cálculo (usualmente hoy)
+ * @returns Cantidad de días del periodo mensual que contiene `fechaActual`
+ */
+export function calcularDiasEnPeriodoMensual(
+  fechaReferencia: string,
+  fechaActual: Date
+): number {
+  const ref = new Date(fechaReferencia)
+  const diaPago = ref.getUTCDate()
+
+  // Avanzar el "inicio del periodo" hasta el último día de pago ≤ fechaActual
+  let inicio = new Date(Date.UTC(ref.getUTCFullYear(), ref.getUTCMonth(), diaPago))
+  while (true) {
+    const siguiente = new Date(inicio)
+    siguiente.setUTCMonth(siguiente.getUTCMonth() + 1)
+    if (siguiente > fechaActual) break
+    inicio = siguiente
+  }
+
+  // Fin = inicio + 1 mes
+  const fin = new Date(inicio)
+  fin.setUTCMonth(fin.getUTCMonth() + 1)
+
+  const diffMs = fin.getTime() - inicio.getTime()
+  return Math.round(diffMs / (1000 * 60 * 60 * 24))
+}
+
+/**
  * Calcula los días de mora basado en fecha de último pago y fecha de vencimiento
  *
  * @param esAnticipada - Si true, el primer pago vence en la fecha de desembolso (no un mes después)
@@ -229,10 +268,16 @@ export function calcularDiasMora(
 /**
  * Calcula el interés y mora diaria para un crédito (Lógica Excel)
  *
+ * INTERÉS CORRIENTE — lógica Excel / francesa colombiana:
+ * - El interés del mes = saldo × tasa_nominal_mensual (una vez al mes)
+ * - Distribuido linealmente entre los días reales del periodo para causación diaria:
+ *   interés_día = (saldo × tasa_nominal_mensual) / días_en_periodo
+ * - Suma exacta al final del mes = saldo × r_mensual (match Excel)
+ *
  * REGLAS DE MORA POR TIPO DE CONTRATO:
  *
  * HIPOTECARIO:
- * - Base mora = Capital Esperado × Tasa Usura Diaria
+ * - Base mora = Capital Esperado × Tasa Usura Diaria (usura SFC, EA→diaria)
  * - Solo intereses: mora = MAX(interés_acordado_diario, interés_moratorio_diario)
  *   porque la cuota en mora no puede ser menor al interés pactado.
  * - Francesa: mora = Capital Esperado × Tasa Usura Diaria (estándar)
@@ -245,8 +290,9 @@ export function calcularDiasMora(
  *
  * @param capitalEsperado - Capital si pagos a tiempo (base para Int. Corriente)
  * @param capitalReal - Capital real acumulado
- * @param tasaNominalEA - Tasa EA del crédito
- * @param tasaUsuraEA - Tasa de usura SFC vigente
+ * @param tasaNominalMensual - Tasa nominal mensual del crédito (ej: 1.9 para 1.9%)
+ * @param diasEnPeriodoMensual - Días del periodo mensual actual (ej: 30, 31, 28)
+ * @param tasaUsuraEA - Tasa de usura SFC vigente (EA)
  * @param diasMora - Días de mora actuales
  * @param enMora - Si el crédito está actualmente en mora
  * @param tipoContrato - 'hipotecario' | 'retroventa' (default: hipotecario)
@@ -256,7 +302,8 @@ export function calcularDiasMora(
 export function calcularInteresDiario(
   capitalEsperado: number,
   capitalReal: number,
-  tasaNominalEA: number,
+  tasaNominalMensual: number,
+  diasEnPeriodoMensual: number,
   tasaUsuraEA: number,
   diasMora: number,
   enMora: boolean = false,
@@ -264,10 +311,12 @@ export function calcularInteresDiario(
   esSoloInteres: boolean = false,
   canonMensual: number = 0
 ): CalculoInteresDiario {
-  // Tasa diaria corriente (del crédito)
-  const tasaDiaria = calcularTasaDiaria(tasaNominalEA)
+  // Tasa diaria corriente: reparte r_mensual entre los días del periodo
+  // Suma exacta al final del periodo = saldo × r_mensual (match Excel)
+  const diasPeriodo = Math.max(diasEnPeriodoMensual, 1)
+  const tasaDiaria = (tasaNominalMensual / 100) / diasPeriodo
 
-  // Tasa diaria de mora (usura SFC)
+  // Tasa diaria de mora (usura SFC con convención EA → 365 días)
   const tasaMoraDiaria = calcularTasaDiaria(tasaUsuraEA)
 
   // Int. Corriente: sobre CAPITAL ESPERADO (no Real) - Lógica Excel
@@ -493,16 +542,19 @@ export async function procesarCausacionCredito(
     // 4. Obtener tasa de usura vigente
     const tasaUsura = await obtenerTasaUsuraDB(supabase, fechaHoy)
 
-    // 5. Calcular interés y mora diaria (lógica Excel)
-    // Siempre derivar EA desde tasa_nominal mensual con precisión completa (15 dígitos).
-    // NO usar tasa_interes_ea de la DB porque suele estar truncada a 2 decimales
-    // (ej: 25.34 en vez de 25.341257272572...)
-    const tasaEA = (Math.pow(1 + credito.tasa_nominal / 100, 12) - 1) * 100
+    // 5. Calcular días del periodo mensual actual
+    // El interés corriente se reparte entre estos días para que la suma
+    // al final del periodo sea exactamente saldo × tasa_mensual (match Excel).
+    const fechaReferencia = credito.fecha_ultimo_pago || credito.fecha_desembolso
+    const diasPeriodo = calcularDiasEnPeriodoMensual(fechaReferencia, fechaActual)
+
+    // 6. Calcular interés y mora diaria (lógica Excel francesa)
     const calculo = calcularInteresDiario(
       capitalEsperado,              // Base para Int. Corriente
       capitalReal,                  // Capital real acumulado
-      tasaEA,                       // Tasa EA del crédito
-      tasaUsura,                    // Tasa usura SFC
+      credito.tasa_nominal,         // Tasa nominal MENSUAL (ej: 1.9)
+      diasPeriodo,                  // Días del periodo mensual actual
+      tasaUsura,                    // Tasa usura SFC (EA) para mora
       moraInfo.diasMora,
       moraInfo.enMora,
       tipoContrato,                 // 'hipotecario' | 'retroventa'
