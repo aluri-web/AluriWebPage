@@ -10,12 +10,12 @@
  *
  * CÁLCULOS:
  * - La causación empieza el día DESPUÉS del desembolso
- * - Int. Corriente = Capital ESPERADO × Tasa Diaria (NO sobre Capital Real)
- * - Int. Moratorio = Capital ESPERADO × Tasa Mora (SIEMPRE se calcula, incluso sin mora)
- * - Tasa Diaria CORRIENTE = tasa_nominal_mensual / días_en_periodo_mensual
- *     Distribuye el interés mensual (saldo × 1.9%) entre los días reales del periodo.
- *     Suma exacta al final del mes = saldo × r_mensual (match Excel / francesa colombiana).
- * - Tasa Diaria MORA = (1 + Tasa_Usura_EA/100)^(1/365) - 1 (convención SFC/365)
+ * - Int. Corriente: causación MENSUAL (solo el día de pago = día del mes del desembolso).
+ *     interés_mes = Capital_Esperado × tasa_nominal_mensual (match Excel exacto)
+ *     Entre pagos: interés_diario = 0 (no se acumula día a día).
+ * - Int. Moratorio: causación diaria mientras el crédito esté en mora.
+ *     Tasa diaria mora = (1 + Tasa_Usura_EA/100)^(1/365) - 1 (convención SFC/365)
+ *     Base = Capital Esperado (hipotecario) o Canon Mensual / 30 (retroventa).
  *
  * PAGOS:
  * - FECHA PAGO: día del mes igual al día de desembolso
@@ -266,35 +266,37 @@ export function calcularDiasMora(
 }
 
 /**
- * Calcula el interés y mora diaria para un crédito (Lógica Excel)
+ * Calcula el interés y mora de un día para un crédito (Lógica Excel)
  *
- * INTERÉS CORRIENTE — lógica Excel / francesa colombiana:
- * - El interés del mes = saldo × tasa_nominal_mensual (una vez al mes)
- * - Distribuido linealmente entre los días reales del periodo para causación diaria:
- *   interés_día = (saldo × tasa_nominal_mensual) / días_en_periodo
- * - Suma exacta al final del mes = saldo × r_mensual (match Excel)
+ * INTERÉS CORRIENTE — causación MENSUAL:
+ * - Se causa UNA VEZ al mes, en la fecha de pago (día del mes = día de desembolso)
+ * - interés_mes = capital_esperado × tasa_nominal_mensual
+ * - Entre fechas de pago: interes_diario = 0 (no se acumula día a día)
+ * - Match exacto con tabla francesa de Excel
+ *
+ * MORA — causación diaria:
+ * - Se causa cada día que el crédito está en mora
+ * - Tasa diaria = (1 + usura_EA/100)^(1/365) - 1 (convención SFC)
  *
  * REGLAS DE MORA POR TIPO DE CONTRATO:
  *
  * HIPOTECARIO:
- * - Base mora = Capital Esperado × Tasa Usura Diaria (usura SFC, EA→diaria)
- * - Solo intereses: mora = MAX(interés_acordado_diario, interés_moratorio_diario)
- *   porque la cuota en mora no puede ser menor al interés pactado.
- * - Francesa: mora = Capital Esperado × Tasa Usura Diaria (estándar)
+ * - Base mora = Capital Esperado × Tasa Usura Diaria
+ * - Solo intereses + en mora: mora_diaria = MAX(interés_acordado_prorrata_día, moratorio)
+ *   (la cuota en mora no puede ser menor al interés pactado)
  *
  * RETROVENTA:
  * - Base mora = Canon Mensual (monto_pago_esperado) × Tasa Usura Diaria
- *   El canon homologa la cuota como arriendo, por lo que la mora se calcula
- *   sobre el canon, NO sobre el capital vigente.
- * - La mora en retroventa NO afecta la siguiente cuota a pagar.
+ * - La mora en retroventa NO afecta la siguiente cuota.
  *
  * @param capitalEsperado - Capital si pagos a tiempo (base para Int. Corriente)
  * @param capitalReal - Capital real acumulado
  * @param tasaNominalMensual - Tasa nominal mensual del crédito (ej: 1.9 para 1.9%)
- * @param diasEnPeriodoMensual - Días del periodo mensual actual (ej: 30, 31, 28)
+ * @param diasEnPeriodoMensual - Días del periodo mensual actual (usado para mora solo_interes proratada)
  * @param tasaUsuraEA - Tasa de usura SFC vigente (EA)
  * @param diasMora - Días de mora actuales
  * @param enMora - Si el crédito está actualmente en mora
+ * @param esPagoDia - Si hoy es día de pago mensual (día del mes = día de desembolso)
  * @param tipoContrato - 'hipotecario' | 'retroventa' (default: hipotecario)
  * @param esSoloInteres - true si tipo_amortizacion = 'solo_interes'
  * @param canonMensual - Monto del pago/canon mensual esperado (para retroventa)
@@ -307,20 +309,25 @@ export function calcularInteresDiario(
   tasaUsuraEA: number,
   diasMora: number,
   enMora: boolean = false,
+  esPagoDia: boolean = false,
   tipoContrato: string = 'hipotecario',
   esSoloInteres: boolean = false,
   canonMensual: number = 0
 ): CalculoInteresDiario {
-  // Tasa diaria corriente: reparte r_mensual entre los días del periodo
-  // Suma exacta al final del periodo = saldo × r_mensual (match Excel)
+  // Tasa "nominal" como decimal mensual (para referencia/mora ratio)
+  const rMensual = tasaNominalMensual / 100
+
+  // Tasa diaria equivalente (informativa — sirve para mora ratio en solo_interes)
   const diasPeriodo = Math.max(diasEnPeriodoMensual, 1)
-  const tasaDiaria = (tasaNominalMensual / 100) / diasPeriodo
+  const tasaDiariaRef = rMensual / diasPeriodo
 
   // Tasa diaria de mora (usura SFC con convención EA → 365 días)
   const tasaMoraDiaria = calcularTasaDiaria(tasaUsuraEA)
 
-  // Int. Corriente: sobre CAPITAL ESPERADO (no Real) - Lógica Excel
-  const interesDiario = capitalEsperado * tasaDiaria
+  // INTERÉS CORRIENTE: solo se causa en día de pago (causación mensual)
+  // - En día de pago: saldo × r_mensual (match Excel exacto)
+  // - Otros días: 0
+  const interesDiario = esPagoDia ? capitalEsperado * rMensual : 0
 
   // Int. Moratorio según tipo de contrato
   let interesMoratorioPotencial: number
@@ -328,19 +335,18 @@ export function calcularInteresDiario(
 
   if (tipoContrato === 'retroventa') {
     // RETROVENTA: mora sobre el canon mensual diario, no sobre capital
-    // Canon diario = canon mensual / 30
     const canonDiario = canonMensual / 30
     interesMoratorioPotencial = canonDiario * tasaMoraDiaria
     moraDiaria = enMora ? interesMoratorioPotencial : 0
   } else {
-    // HIPOTECARIO: mora sobre capital esperado
+    // HIPOTECARIO: mora sobre capital esperado (diaria)
     const moraUsura = capitalEsperado * tasaMoraDiaria
     interesMoratorioPotencial = moraUsura
 
     if (esSoloInteres && enMora) {
-      // Solo intereses: la cuota en mora es la MAYOR entre
-      // el interés acordado diario y el interés moratorio
-      moraDiaria = Math.max(interesDiario, moraUsura)
+      // Solo intereses: mora diaria es MAX(interés acordado prorrata/día, moratorio)
+      const interesAcordadoDia = capitalEsperado * tasaDiariaRef
+      moraDiaria = Math.max(interesAcordadoDia, moraUsura)
     } else {
       moraDiaria = enMora ? moraUsura : 0
     }
@@ -350,7 +356,7 @@ export function calcularInteresDiario(
   const montoParaColocarse = capitalReal - capitalEsperado
 
   return {
-    tasaDiaria,
+    tasaDiaria: tasaDiariaRef,
     tasaMoraDiaria,
     interesDiario,
     moraDiaria,
@@ -548,15 +554,16 @@ export async function procesarCausacionCredito(
     const fechaReferencia = credito.fecha_ultimo_pago || credito.fecha_desembolso
     const diasPeriodo = calcularDiasEnPeriodoMensual(fechaReferencia, fechaActual)
 
-    // 6. Calcular interés y mora diaria (lógica Excel francesa)
+    // 6. Calcular interés y mora del día (causación MENSUAL para corriente)
     const calculo = calcularInteresDiario(
       capitalEsperado,              // Base para Int. Corriente
       capitalReal,                  // Capital real acumulado
       credito.tasa_nominal,         // Tasa nominal MENSUAL (ej: 1.9)
-      diasPeriodo,                  // Días del periodo mensual actual
+      diasPeriodo,                  // Días del periodo (para mora ratio)
       tasaUsura,                    // Tasa usura SFC (EA) para mora
       moraInfo.diasMora,
       moraInfo.enMora,
+      esPagoDia,                    // true solo el día de pago (corriente mensual)
       tipoContrato,                 // 'hipotecario' | 'retroventa'
       esSoloInteres,                // true si solo_interes
       canonMensual                  // Canon mensual (para retroventa)
@@ -571,13 +578,25 @@ export async function procesarCausacionCredito(
     resultado.interesCausado = interesDiarioRedondeado
     resultado.moraCausada = moraDiariaRedondeada
 
-    // 6. Actualizar capitales para el día siguiente
-    // Capital Esperado crece con interés calculado
-    const nuevoCapitalEsperado = capitalEsperado + interesDiarioRedondeado
-    // Capital Real también crece con interés
-    const nuevoCapitalReal = capitalReal + interesDiarioRedondeado
+    // 6. Actualizar capitales
+    // Corriente se cobra EN día de pago (no se capitaliza diariamente).
+    // capital_real y capital_esperado NO cambian por causación diaria.
+    const nuevoCapitalEsperado = capitalEsperado
+    const nuevoCapitalReal = capitalReal
 
-    // 7. Insertar causación diaria
+    // 7. Skip si no hay nada que registrar (no es día de pago y no hay mora).
+    //    Evita llenar causaciones_diarias con filas vacías.
+    const tieneAlgoQueRegistrar = esPagoDia || moraInfo.enMora
+    if (!tieneAlgoQueRegistrar) {
+      // Solo actualizar ultima_causacion para avanzar el cursor del cron
+      await supabase
+        .from('creditos')
+        .update({ ultima_causacion: fechaHoy, en_mora: moraInfo.enMora, dias_mora_actual: moraInfo.diasMora })
+        .eq('id', credito.id)
+      return resultado
+    }
+
+    // 8. Insertar causación diaria (solo cuando hay algo)
     const causacion: CausacionDiaria = {
       credito_id: credito.id,
       fecha_causacion: fechaHoy,
