@@ -350,14 +350,6 @@ export async function createFullLoanRecord(
     return { success: false, error: 'Maximo 5 inversionistas por credito.' }
   }
 
-  // Validate minimum investment per investor ($40M)
-  const MIN_INVESTMENT = 40_000_000
-  for (const inv of data.investors) {
-    if (inv.amount > 0 && inv.amount < MIN_INVESTMENT) {
-      return { success: false, error: `Cada inversionista debe aportar minimo $${MIN_INVESTMENT.toLocaleString('es-CO')}.` }
-    }
-  }
-
   // Calculate total investment
   const totalInvestment = data.investors.reduce((sum, inv) => sum + inv.amount, 0)
   if (totalInvestment > data.amount_requested) {
@@ -754,16 +746,11 @@ export async function addInvestmentToLoan(
 
   const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey)
 
-  const MIN_INVESTMENT = 40_000_000
   const MAX_INVESTORS = 5
 
   // Validation
   if (!data.loan_id || !data.amount || data.amount <= 0) {
     return { success: false, error: 'Datos de inversion invalidos.' }
-  }
-
-  if (data.amount < MIN_INVESTMENT) {
-    return { success: false, error: `El monto minimo de inversion es $${MIN_INVESTMENT.toLocaleString('es-CO')}.` }
   }
 
   if (!data.investor_id && !data.is_new_investor) {

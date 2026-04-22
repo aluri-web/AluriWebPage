@@ -178,10 +178,6 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
 
   const handleAddInvestor = async () => {
     if (!newInvId || newInvAmount <= 0) return
-    if (newInvAmount < 40_000_000) {
-      setError('El monto minimo de inversion es $40,000,000.')
-      return
-    }
     setAddingInvestor(true)
     setError(null)
 
@@ -248,12 +244,11 @@ export default function EditCreditModal({ creditId, isOpen, onClose }: EditCredi
 
   if (!isOpen) return null
 
-  const MIN_INVESTMENT = 40_000_000
   const MAX_INVESTORS = 5
   const totalInvestedAmount = investments.reduce((sum, i) => sum + i.monto_invertido, 0)
   const remainingForInvestors = montoSolicitado - totalInvestedAmount
   const slotsLeft = MAX_INVESTORS - investments.length
-  const canAddInvestor = slotsLeft > 0 && remainingForInvestors >= MIN_INVESTMENT
+  const canAddInvestor = slotsLeft > 0 && remainingForInvestors > 0
 
   const inputClass = 'w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent'
   const labelClass = 'block text-xs font-medium text-slate-400 mb-1'
