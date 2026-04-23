@@ -37,3 +37,9 @@ APPLY_THIS_SQL_TO_SUPABASE.sql
 .mcp.json
 *.csv
 tsconfig.tsbuildinfo
+
+# Supabase CLI state (auto-generated after link)
+supabase/.temp/
+
+# Local bucket migration backup
+backup-properties/

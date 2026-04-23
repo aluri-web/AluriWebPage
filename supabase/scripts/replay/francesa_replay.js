@@ -165,20 +165,8 @@ async function run() {
       }
       const intMoraPot = Math.round(saldoCapEsp * tasaMoraDiaria);
 
-      const causRes = await client.query(
-        "INSERT INTO causaciones_diarias (credito_id,fecha_causacion,saldo_base,capital_esperado,capital_real,tasa_nominal,tasa_diaria,tasa_mora_diaria,interes_causado,mora_causada,interes_moratorio_potencial,dias_mora,en_mora,monto_para_colocarse) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id",
-        [creditoId, dateStr, saldoCapEsp, saldoCapEsp, saldoCap, r*100, dailyRate, tasaMoraDiaria, intDia, moraDia, intMoraPot, diasMora, enMora, saldoCap - saldoCapEsp]
-      );
-      const causacionId = causRes.rows[0].id;
-      for (const p of parts) {
-        const invAtrib = Math.round(intDia * p.pct / 100);
-        const moraAtrib = Math.round(moraDia * p.pct / 100);
-        await client.query(
-          "INSERT INTO causaciones_inversionistas (causacion_id,inversion_id,inversionista_id,credito_id,fecha_causacion,porcentaje_participacion,interes_atribuido,mora_atribuida) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
-          [causacionId, p.inversion_id, p.inversionista_id, creditoId, dateStr, p.pct, invAtrib, moraAtrib]
-        );
-      }
-
+      // Apply pago BEFORE inserting causacion so the stored capital_esperado
+      // reflects the post-payment balance (matches CSV AMORT INICIAL row-by-row).
       if (pagoIdx < pagos.length && pagos[pagoIdx].fecha === dateStr) {
         const pago = pagos[pagoIdx];
         let mCap, mMora, mInt;
@@ -214,6 +202,21 @@ async function run() {
         fechaUltPago = new Date(dateStr + "T00:00:00Z");
         pagoIdx++;
       }
+
+      const causRes = await client.query(
+        "INSERT INTO causaciones_diarias (credito_id,fecha_causacion,saldo_base,capital_esperado,capital_real,tasa_nominal,tasa_diaria,tasa_mora_diaria,interes_causado,mora_causada,interes_moratorio_potencial,dias_mora,en_mora,monto_para_colocarse) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id",
+        [creditoId, dateStr, saldoCapEsp, saldoCapEsp, saldoCap, r*100, dailyRate, tasaMoraDiaria, intDia, moraDia, intMoraPot, diasMora, enMora, saldoCap - saldoCapEsp]
+      );
+      const causacionId = causRes.rows[0].id;
+      for (const p of parts) {
+        const invAtrib = Math.round(intDia * p.pct / 100);
+        const moraAtrib = Math.round(moraDia * p.pct / 100);
+        await client.query(
+          "INSERT INTO causaciones_inversionistas (causacion_id,inversion_id,inversionista_id,credito_id,fecha_causacion,porcentaje_participacion,interes_atribuido,mora_atribuida) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+          [causacionId, p.inversion_id, p.inversionista_id, creditoId, dateStr, p.pct, invAtrib, moraAtrib]
+        );
+      }
+
       currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
 
