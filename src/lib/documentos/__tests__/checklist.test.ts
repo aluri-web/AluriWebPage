@@ -92,6 +92,54 @@ async function run() {
   expect('prestamo.forma_pago', parsed.prestamo.forma_pago, 'Solo intereses')
   expect('prestamo.comision_aluri', parsed.prestamo.comision_aluri, '2.250.000')
 
+  // ── Integration: New_Check_List_Martinez_Plantilla.docx (formato v5 real) ──
+  console.log('parseChecklistText vs New_Check_List_Martinez_Plantilla.docx')
+  const docxNuevoPath = path.resolve(
+    'C:/Users/pacec/GoogleAntigravity/agentecontratosandres/Agente_Contratos/Documentacion/New_Check_List_Martinez_Plantilla.docx'
+  )
+  const rNuevo = await mammoth.extractRawText({ path: docxNuevoPath })
+  const pNuevo = parseChecklistText(rNuevo.value)
+
+  expect('nuevo tipo_contrato', pNuevo.tipo_contrato, 'Hipoteca')
+
+  // Deudor 1
+  expect('nuevo deudores.length', pNuevo.deudores.length, 1)
+  expect('nuevo deudor nombre', pNuevo.deudores[0].nombre, 'Isabella Martínez Victoria')
+  expect('nuevo deudor tipo_documento', pNuevo.deudores[0].tipo_documento, 'C.C.')
+  expect('nuevo deudor cc', pNuevo.deudores[0].cc, '1234567890')
+  expect('nuevo deudor cc_expedicion', pNuevo.deudores[0].cc_expedicion, 'Cali')
+  expect('nuevo deudor email', pNuevo.deudores[0].email, 'Globaltradeisa@gmal.com')
+  expect('nuevo deudor participacion', pNuevo.deudores[0].participacion_monto, '45.000.000')
+
+  // Codeudor 1: "Extranjería." debe normalizarse a C.E.
+  expect('nuevo codeudores.length (1 lleno, 1 vacio descartado)', pNuevo.codeudores.length, 1)
+  expect('nuevo codeudor nombre', pNuevo.codeudores[0].nombre, 'Iván Eduardo Martínez Cortes')
+  expect('nuevo codeudor Extranjeria -> C.E.', pNuevo.codeudores[0].tipo_documento, 'C.E.')
+  expect('nuevo codeudor cc', pNuevo.codeudores[0].cc, '16.788.706')
+  expect('nuevo codeudor cc_expedicion', pNuevo.codeudores[0].cc_expedicion, 'Cali')
+
+  // Acreedor 1: "Tipo de documento:" vacío debe defaultearse a C.C.
+  // (bug antes capturaba la linea siguiente "Numero Documento: ...")
+  expect('nuevo acreedores.length (1 lleno, 3 vacios descartados)', pNuevo.acreedores.length, 1)
+  expect('nuevo acreedor nombre', pNuevo.acreedores[0].nombre, 'Luis Miguel Olarte Morales')
+  expect('nuevo acreedor tipo_documento vacio -> C.C.', pNuevo.acreedores[0].tipo_documento, 'C.C.')
+  expect('nuevo acreedor cc', pNuevo.acreedores[0].cc, '79.791.521')
+  expect('nuevo acreedor cc_expedicion', pNuevo.acreedores[0].cc_expedicion, 'Bogotá')
+
+  // Inmueble con ciudades (formato nuevo)
+  expect('nuevo inmueble matricula', pNuevo.inmueble.matricula_inmobiliaria, '370-813723')
+  expect('nuevo inmueble ciudad', pNuevo.inmueble.ciudad, 'Bogotá')
+  expect('nuevo inmueble ciudad_oficina_registro', pNuevo.inmueble.ciudad_oficina_registro, 'Bogotá')
+  expect('nuevo inmueble chip', pNuevo.inmueble.chip, 'N/a')
+
+  // Prestamo
+  expect('nuevo prestamo monto', pNuevo.prestamo.monto, '45.000.000')
+  expect('nuevo prestamo plazo', pNuevo.prestamo.plazo_meses, '60')
+  expect('nuevo prestamo tasa', pNuevo.prestamo.tasa_mensual, '1.94%')
+  expect('nuevo prestamo cuota', pNuevo.prestamo.cuota_mensual, '873.000')
+  expect('nuevo prestamo forma_pago', pNuevo.prestamo.forma_pago, 'Solo intereses')
+  expect('nuevo prestamo comision', pNuevo.prestamo.comision_aluri, '2.250.000')
+
   // ── Integration: formato nuevo (Tipo de documento / Numero Documento / Ciudades) ──
   console.log('parseChecklistText formato v5 (sintetico)')
   const nuevo = [

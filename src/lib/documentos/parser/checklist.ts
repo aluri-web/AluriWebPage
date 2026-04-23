@@ -86,12 +86,12 @@ interface PersonaParseada {
 }
 
 function normalizarTipoDocumento(raw: string): string {
-  const v = (raw || '').trim()
+  const v = (raw || '').trim().replace(/\.+$/, '').trim()
   if (!v) return TIPO_DOCUMENTO_DEFAULT
   const upper = v.toUpperCase()
-  if (/^C\.?C\.?$/.test(upper) || /CEDULA DE CIUDADAN/i.test(v)) return 'C.C.'
-  if (/^C\.?E\.?$/.test(upper) || /CEDULA DE EXTRANJ/i.test(v)) return 'C.E.'
-  if (/^T\.?I\.?$/.test(upper) || /TARJETA DE IDENTIDAD/i.test(v)) return 'T.I.'
+  if (/^C\.?C\.?$/.test(upper) || /C(E|É)DULA\s+DE\s+CIUDADAN/i.test(v) || /^CIUDADAN/i.test(v)) return 'C.C.'
+  if (/^C\.?E\.?$/.test(upper) || /C(E|É)DULA\s+DE\s+EXTRANJ/i.test(v) || /^EXTRANJER/i.test(v)) return 'C.E.'
+  if (/^T\.?I\.?$/.test(upper) || /TARJETA\s+DE\s+IDENTIDAD/i.test(v)) return 'T.I.'
   if (/^NIT$/i.test(v)) return 'NIT'
   if (/PASAPORTE/i.test(v)) return 'Pasaporte'
   if (/^PPT$/i.test(v) || /PERMISO.*TEMPORAL/i.test(v)) return 'PPT'
@@ -106,11 +106,13 @@ function extraerPersonaDeBloque(bloque: string): PersonaParseada | null {
   }
 
   // Formato nuevo: "Tipo de documento: C.C." + "Numero Documento: 1.234.567"
+  // OJO: usar [^\S\n]* (solo whitespace horizontal) para no capturar la linea
+  // siguiente cuando el campo esta vacio.
   const tipoDocRaw = limpiarCampoChecklist(
-    buscar(/Tipo\s+de\s+documento\s*(?:Deudor|Acreedor)?\s*:\s*([^\n]+)/i, bloque)
+    buscar(/Tipo\s+de\s+documento\s*(?:Deudor|Acreedor)?\s*:[^\S\n]*([^\n]*)/i, bloque)
   )
   const numDocRaw = limpiarCampoChecklist(
-    buscar(/(?:N.mero|Numero|No\.?)\s+Documento\s*(?:Deudor|Acreedor)?\s*:\s*([^\n]+)/i, bloque)
+    buscar(/(?:N.mero|Numero|No\.?)\s+Documento\s*(?:Deudor|Acreedor)?\s*:[^\S\n]*([^\n]*)/i, bloque)
   )
 
   // Formato viejo (fallback): "CC. del Deudor: 1.234.567 de Bogota"
@@ -222,9 +224,9 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
     if (/^(Cedula|Direccion|Correo|Telefono|Estado|Participacion|Tipo|N.mero|Numero)/i.test(nombre)) continue
 
     // Formato nuevo primero (Tipo de documento / Numero Documento);
-    // fallback a "Cedula:" del formato viejo.
-    const tipoDocRaw = buscar(/Tipo\s+de\s+documento\s*(?:Acreedor)?\s*:\s*(.+)/i, bloque)
-    const numDocRaw = buscar(/(?:N.mero|Numero|No\.?)\s+Documento\s*(?:Acreedor)?\s*:\s*(.+)/i, bloque)
+    // fallback a "Cedula:" del formato viejo. [^\S\n]* no cruza newlines.
+    const tipoDocRaw = buscar(/Tipo\s+de\s+documento\s*(?:Acreedor)?\s*:[^\S\n]*([^\n]*)/i, bloque)
+    const numDocRaw = buscar(/(?:N.mero|Numero|No\.?)\s+Documento\s*(?:Acreedor)?\s*:[^\S\n]*([^\n]*)/i, bloque)
     const ccRaw = numDocRaw || buscar(/[Cc].dula\s*:\s*(.+)/, bloque)
     const { cc, exp: ccExp } = separarCcYExpedicion(ccRaw)
 
