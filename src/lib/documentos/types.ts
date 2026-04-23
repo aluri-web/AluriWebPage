@@ -19,7 +19,7 @@ export const TIPOS_DOCUMENTO = [
   'Pasaporte',
   'NIT',
   'T.I.',
-  'PEP',
+  'PPT',
 ] as const
 
 export const TIPO_DOCUMENTO_DEFAULT = 'C.C.'
