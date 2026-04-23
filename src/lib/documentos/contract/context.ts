@@ -48,18 +48,22 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     deudor2_nombre: deudor2?.nombre_completo || '',
     deudor2_tipo_doc: deudor2 ? (deudor2.tipo_documento || 'C.C.') : '',
     deudor2_cc: deudor2?.cc || '',
+    deudor2_direccion: deudor2?.direccion || '',
     deudor2_email: deudor2?.email || '',
     deudor2_telefono: deudor2?.telefono || '',
 
     acreedor_nombre: acr1.nombre_completo || '',
     acreedor_tipo_doc: acr1.tipo_documento || 'C.C.',
     acreedor_cc: acr1.cc || '',
+    acreedor_direccion: acr1.direccion || '',
     acreedor_email: acr1.email || '',
     acreedor_telefono: acr1.telefono || '',
 
     matricula_inmobiliaria: inm.matricula_inmobiliaria || '',
-    oficina_registro: inm.oficina_registro || 'Bogotá, Zona Sur',
+    oficina_registro: inm.oficina_registro || 'Zona Sur',
+    ciudad_oficina_registro: 'Bogotá D.C.',
     direccion_inmueble: inm.direccion_corta || '',
+    ciudad_inmueble: 'Bogotá D.C.',
 
     monto_credito_letras: numeroATexto(mt).toUpperCase(),
     monto_credito_numeros: safeNum(mt),
@@ -77,10 +81,11 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     fecha_firma_pagare: fecha,
     fecha_firma_carta: fecha,
     domicilio_contractual: 'Bogotá D.C.',
-    vereda_municipio: deudor.municipio || 'Bogotá D.C.',
 
     tipo_cuenta_deudor: 'Cuenta de ahorros',
     cuenta_deudor: '',
+    tipo_cuenta_deudor2: deudor2 ? 'Cuenta de ahorros' : '',
+    cuenta_deudor2: '',
     tipo_cuenta_acreedor: 'Cuenta de ahorros',
     cuenta_acreedor: acr1.cuenta_bancaria || '',
 

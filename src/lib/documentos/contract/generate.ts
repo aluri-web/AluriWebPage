@@ -9,7 +9,7 @@ import { limpiarFirmasVaciasV4 } from './cleanSignatures'
 
 const TEMPLATE_PATH = path.join(
   process.cwd(),
-  'src/lib/documentos/templates/Contrato_TPL_DOCXTPL_v4.docx'
+  'src/lib/documentos/templates/Contrato_TPL_DOCXTPL_v5.docx'
 )
 
 export interface GenerarContratoResult {
