@@ -58,9 +58,9 @@ function montoANumero(valor: string): number {
 
 export default function DocumentosForm() {
   const [tipoContrato, setTipoContrato] = useState<TipoContrato>('')
-  const [deudores, setDeudores] = useState<DeudorForm[]>([emptyDeudor()])
+  const [deudores, setDeudores] = useState<DeudorForm[]>([])
   const [codeudores, setCodeudores] = useState<CodeudorForm[]>([])
-  const [acreedores, setAcreedores] = useState<AcreedorForm[]>([emptyAcreedor(), emptyAcreedor()])
+  const [acreedores, setAcreedores] = useState<AcreedorForm[]>([])
   const [mostrarInmueble, setMostrarInmueble] = useState(false)
   const [inmueble, setInmueble] = useState<InmuebleForm>(emptyInmueble())
   const [mostrarPrestamo, setMostrarPrestamo] = useState(false)
@@ -160,9 +160,9 @@ export default function DocumentosForm() {
   const limpiar = () => {
     if (!window.confirm('Se borraran todos los datos del formulario. Continuar?')) return
     setTipoContrato('')
-    setDeudores([emptyDeudor()])
+    setDeudores([])
     setCodeudores([])
-    setAcreedores([emptyAcreedor(), emptyAcreedor()])
+    setAcreedores([])
     setInmueble(emptyInmueble())
     setMostrarInmueble(false)
     setPrestamo(emptyPrestamo())
@@ -185,11 +185,13 @@ export default function DocumentosForm() {
   })
 
   const validarBasico = (): string | null => {
+    if (deudores.length === 0) return 'Agregue al menos un deudor'
     const d1 = deudores[0]
-    if (!d1 || !d1.nombre.trim()) return 'Ingrese al menos el nombre del deudor principal'
+    if (!d1.nombre.trim()) return 'Ingrese al menos el nombre del deudor principal'
     if (!d1.cc.trim()) return 'No. documento del deudor principal'
+    if (acreedores.length === 0) return 'Agregue al menos un acreedor'
     const a1 = acreedores[0]
-    if (!a1 || !a1.nombre.trim()) return 'Nombre del acreedor 1'
+    if (!a1.nombre.trim()) return 'Nombre del acreedor 1'
     if (!a1.cc.trim()) return 'No. documento del acreedor 1'
     if (!montoPrestamoFmt) return 'Monto del prestamo (se calcula automaticamente desde los deudores)'
     if (!prestamo.plazo_meses) return 'Plazo en meses'
@@ -272,17 +274,9 @@ export default function DocumentosForm() {
       const d = data.datos
       setTipoContrato((d.tipo_contrato || '') as TipoContrato)
 
-      const deudoresParsed: DeudorForm[] =
-        Array.isArray(d.deudores) && d.deudores.length > 0 ? d.deudores : [emptyDeudor()]
-      setDeudores(deudoresParsed)
-
+      setDeudores(Array.isArray(d.deudores) ? d.deudores : [])
       setCodeudores(Array.isArray(d.codeudores) ? d.codeudores : [])
-
-      const acreedoresParsed: AcreedorForm[] =
-        Array.isArray(d.acreedores) && d.acreedores.length > 0
-          ? d.acreedores
-          : [emptyAcreedor(), emptyAcreedor()]
-      setAcreedores(acreedoresParsed)
+      setAcreedores(Array.isArray(d.acreedores) ? d.acreedores : [])
 
       const inm = d.inmueble || {}
       if (
@@ -374,7 +368,7 @@ export default function DocumentosForm() {
             <PersonaCard
               key={`deudor-${i}`}
               titulo={i === 0 ? 'Deudor principal' : `Deudor ${i + 1}`}
-              onRemove={i === 0 && deudores.length === 1 ? undefined : () => quitarDeudor(i)}
+              onRemove={() => quitarDeudor(i)}
             >
               <PersonaCamposBasicos
                 idPrefix={`deudor-${i}`}
