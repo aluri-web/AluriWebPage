@@ -88,8 +88,9 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
     y = seccion(doc, label, y)
     y = campos(doc, [
       { label: 'Nombre', value: d.nombre },
-      { label: 'No. Cedula', value: d.cc },
-      { label: 'Expedida en', value: d.cc_expedicion },
+      { label: 'Tipo de documento', value: d.tipo_documento || 'C.C.' },
+      { label: 'No. documento', value: d.cc },
+      { label: 'Expedido en', value: d.cc_expedicion },
       { label: 'Direccion', value: d.direccion },
       { label: 'Correo', value: d.email },
       { label: 'Telefono', value: d.telefono },
@@ -105,8 +106,9 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
     y = seccion(doc, `INFORMACION DEL CODEUDOR ${i + 1}`, y)
     y = campos(doc, [
       { label: 'Nombre', value: c.nombre },
-      { label: 'No. Cedula', value: c.cc },
-      { label: 'Expedida en', value: c.cc_expedicion },
+      { label: 'Tipo de documento', value: c.tipo_documento || 'C.C.' },
+      { label: 'No. documento', value: c.cc },
+      { label: 'Expedido en', value: c.cc_expedicion },
       { label: 'Direccion', value: c.direccion },
       { label: 'Correo', value: c.email },
       { label: 'Telefono', value: c.telefono },
@@ -120,8 +122,9 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
     y = seccion(doc, `INFORMACION DEL ACREEDOR ${i + 1}`, y)
     y = campos(doc, [
       { label: 'Nombre', value: a.nombre },
-      { label: 'No. Cedula', value: a.cc },
-      { label: 'Expedida en', value: a.cc_expedicion },
+      { label: 'Tipo de documento', value: a.tipo_documento || 'C.C.' },
+      { label: 'No. documento', value: a.cc },
+      { label: 'Expedido en', value: a.cc_expedicion },
       { label: 'Direccion', value: a.direccion },
       { label: 'Correo', value: a.email },
       { label: 'Telefono', value: a.telefono },

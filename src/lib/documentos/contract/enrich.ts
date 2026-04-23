@@ -4,6 +4,7 @@ import {
   DeudorForm,
   CodeudorForm,
   InmuebleForm,
+  TIPO_DOCUMENTO_DEFAULT,
 } from '../types'
 import {
   fechaATextoLegal,
@@ -17,6 +18,7 @@ import {
 export interface DeudorEnriched {
   nombre_completo: string
   nombre_completo_mayuscula: string
+  tipo_documento: string
   cc: string
   cc_expedicion: string
   direccion: string
@@ -29,6 +31,7 @@ export interface DeudorEnriched {
 export interface CodeudorEnriched {
   nombre_completo: string
   nombre_completo_mayuscula: string
+  tipo_documento: string
   cc: string
   cc_expedicion: string
   direccion: string
@@ -40,6 +43,7 @@ export interface CodeudorEnriched {
 export interface AcreedorEnriched {
   nombre_completo: string
   nombre_completo_mayuscula: string
+  tipo_documento: string
   cc: string
   cc_expedicion: string
   direccion: string
@@ -98,6 +102,7 @@ function enriquecerDeudor(d: DeudorForm): DeudorEnriched {
   return {
     nombre_completo: nombre,
     nombre_completo_mayuscula: nombre,
+    tipo_documento: d.tipo_documento || TIPO_DOCUMENTO_DEFAULT,
     cc: d.cc || '',
     cc_expedicion: d.cc_expedicion || '',
     direccion: d.direccion || '',
@@ -113,6 +118,7 @@ function enriquecerCodeudor(c: CodeudorForm): CodeudorEnriched {
   return {
     nombre_completo: nombre,
     nombre_completo_mayuscula: nombre,
+    tipo_documento: c.tipo_documento || TIPO_DOCUMENTO_DEFAULT,
     cc: c.cc || '',
     cc_expedicion: c.cc_expedicion || '',
     direccion: c.direccion || '',
@@ -221,6 +227,7 @@ function enriquecerAcreedor(
   return {
     nombre_completo: nombre,
     nombre_completo_mayuscula: nombre,
+    tipo_documento: acr.tipo_documento || TIPO_DOCUMENTO_DEFAULT,
     cc: acr.cc || '',
     cc_expedicion: acr.cc_expedicion || '',
     direccion: acr.direccion || '',

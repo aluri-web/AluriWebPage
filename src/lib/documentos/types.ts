@@ -13,8 +13,20 @@ export const ESTADOS_CIVILES = [
   'Viudo/a',
 ] as const
 
+export const TIPOS_DOCUMENTO = [
+  'C.C.',
+  'C.E.',
+  'Pasaporte',
+  'NIT',
+  'T.I.',
+  'PEP',
+] as const
+
+export const TIPO_DOCUMENTO_DEFAULT = 'C.C.'
+
 export interface DeudorForm {
   nombre: string
+  tipo_documento: string
   cc: string
   cc_expedicion: string
   direccion: string
@@ -27,6 +39,7 @@ export interface DeudorForm {
 
 export interface CodeudorForm {
   nombre: string
+  tipo_documento: string
   cc: string
   cc_expedicion: string
   direccion: string
@@ -37,6 +50,7 @@ export interface CodeudorForm {
 
 export interface AcreedorForm {
   nombre: string
+  tipo_documento: string
   cc: string
   cc_expedicion: string
   direccion: string
@@ -84,6 +98,7 @@ export const MAX_ACREEDORES = 4
 export function emptyDeudor(): DeudorForm {
   return {
     nombre: '',
+    tipo_documento: TIPO_DOCUMENTO_DEFAULT,
     cc: '',
     cc_expedicion: '',
     direccion: '',
@@ -98,6 +113,7 @@ export function emptyDeudor(): DeudorForm {
 export function emptyCodeudor(): CodeudorForm {
   return {
     nombre: '',
+    tipo_documento: TIPO_DOCUMENTO_DEFAULT,
     cc: '',
     cc_expedicion: '',
     direccion: '',
@@ -110,6 +126,7 @@ export function emptyCodeudor(): CodeudorForm {
 export function emptyAcreedor(): AcreedorForm {
   return {
     nombre: '',
+    tipo_documento: TIPO_DOCUMENTO_DEFAULT,
     cc: '',
     cc_expedicion: '',
     direccion: '',

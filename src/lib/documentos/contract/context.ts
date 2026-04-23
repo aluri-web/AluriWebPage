@@ -39,20 +39,20 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     nombres_deudores: nombresDeudoresStr,
 
     deudor_nombre: deudor.nombre_completo || '',
-    deudor_tipo_doc: 'C.C.',
+    deudor_tipo_doc: deudor.tipo_documento || 'C.C.',
     deudor_cc: deudor.cc || '',
     deudor_direccion: deudor.direccion || '',
     deudor_email: deudor.email || '',
     deudor_telefono: deudor.telefono || '',
 
     deudor2_nombre: deudor2?.nombre_completo || '',
-    deudor2_tipo_doc: deudor2 ? 'C.C.' : '',
+    deudor2_tipo_doc: deudor2 ? (deudor2.tipo_documento || 'C.C.') : '',
     deudor2_cc: deudor2?.cc || '',
     deudor2_email: deudor2?.email || '',
     deudor2_telefono: deudor2?.telefono || '',
 
     acreedor_nombre: acr1.nombre_completo || '',
-    acreedor_tipo_doc: 'C.C.',
+    acreedor_tipo_doc: acr1.tipo_documento || 'C.C.',
     acreedor_cc: acr1.cc || '',
     acreedor_email: acr1.email || '',
     acreedor_telefono: acr1.telefono || '',
@@ -132,6 +132,7 @@ function emptyDeudor() {
   return {
     nombre_completo: '',
     nombre_completo_mayuscula: '',
+    tipo_documento: 'C.C.',
     cc: '',
     cc_expedicion: '',
     direccion: '',
@@ -146,6 +147,7 @@ function emptyAcreedor() {
   return {
     nombre_completo: '',
     nombre_completo_mayuscula: '',
+    tipo_documento: 'C.C.',
     cc: '',
     cc_expedicion: '',
     direccion: '',

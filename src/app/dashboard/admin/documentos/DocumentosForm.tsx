@@ -27,6 +27,8 @@ import {
   TipoContrato,
   ChecklistPayload,
   ESTADOS_CIVILES,
+  TIPOS_DOCUMENTO,
+  TIPO_DOCUMENTO_DEFAULT,
   MAX_ACREEDORES,
   MAX_CODEUDORES,
   MAX_DEUDORES,
@@ -185,10 +187,10 @@ export default function DocumentosForm() {
   const validarBasico = (): string | null => {
     const d1 = deudores[0]
     if (!d1 || !d1.nombre.trim()) return 'Ingrese al menos el nombre del deudor principal'
-    if (!d1.cc.trim()) return 'Cedula del deudor principal'
+    if (!d1.cc.trim()) return 'No. documento del deudor principal'
     const a1 = acreedores[0]
     if (!a1 || !a1.nombre.trim()) return 'Nombre del acreedor 1'
-    if (!a1.cc.trim()) return 'Cedula del acreedor 1'
+    if (!a1.cc.trim()) return 'No. documento del acreedor 1'
     if (!montoPrestamoFmt) return 'Monto del prestamo (se calcula automaticamente desde los deudores)'
     if (!prestamo.plazo_meses) return 'Plazo en meses'
     if (!prestamo.tasa_mensual) return 'Tasa mensual'
@@ -808,6 +810,7 @@ function PersonaCard({
 
 interface CamposBasicosPersona {
   nombre: string
+  tipo_documento: string
   cc: string
   cc_expedicion: string
   direccion: string
@@ -835,7 +838,20 @@ function PersonaCamposBasicos({
           className={inputCls}
         />
       </Campo>
-      <Campo label="No. cedula" requerido>
+      <Campo label="Tipo de documento" requerido>
+        <select
+          value={persona.tipo_documento || TIPO_DOCUMENTO_DEFAULT}
+          onChange={(e) => onChange('tipo_documento', e.target.value)}
+          className={inputCls}
+        >
+          {TIPOS_DOCUMENTO.map((td) => (
+            <option key={td} value={td}>
+              {td}
+            </option>
+          ))}
+        </select>
+      </Campo>
+      <Campo label="No. documento" requerido>
         <input
           type="text"
           value={persona.cc}
@@ -844,7 +860,7 @@ function PersonaCamposBasicos({
           className={inputCls}
         />
       </Campo>
-      <Campo label="Expedida en">
+      <Campo label="Expedido en">
         <input
           type="text"
           value={persona.cc_expedicion}

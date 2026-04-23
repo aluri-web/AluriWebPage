@@ -1,12 +1,13 @@
-import type {
-  ChecklistPayload,
-  DeudorForm,
-  CodeudorForm,
-  AcreedorForm,
-  InmuebleForm,
-  PrestamoForm,
-  TipoContrato,
-  FormaPago,
+import {
+  TIPO_DOCUMENTO_DEFAULT,
+  type ChecklistPayload,
+  type DeudorForm,
+  type CodeudorForm,
+  type AcreedorForm,
+  type InmuebleForm,
+  type PrestamoForm,
+  type TipoContrato,
+  type FormaPago,
 } from '../types'
 
 function buscarCampo(etiqueta: string, texto: string): string {
@@ -73,6 +74,7 @@ function formatearMontoDisplay(valor: string): string {
 
 interface PersonaParseada {
   nombre: string
+  tipo_documento: string
   cc: string
   cc_expedicion: string
   direccion: string
@@ -100,6 +102,7 @@ function extraerPersonaDeBloque(bloque: string): PersonaParseada | null {
 
   return {
     nombre,
+    tipo_documento: TIPO_DOCUMENTO_DEFAULT,
     cc,
     cc_expedicion: ccExp,
     direccion,
@@ -170,6 +173,7 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
   if (deudores.length === 0) {
     deudores.push({
       nombre: '',
+      tipo_documento: TIPO_DOCUMENTO_DEFAULT,
       cc: '',
       cc_expedicion: '',
       direccion: '',
@@ -204,6 +208,7 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
 
     acreedores.push({
       nombre,
+      tipo_documento: TIPO_DOCUMENTO_DEFAULT,
       cc,
       cc_expedicion: ccExp,
       direccion,
