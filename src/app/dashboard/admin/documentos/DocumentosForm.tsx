@@ -205,14 +205,10 @@ export default function DocumentosForm() {
     try {
       const datos = recopilar()
 
-      if (formato === 'pdf') {
-        // Fase 5
-        console.log('[Fase 5 pending] Generar PDF:', datos)
-        mostrarToast('Generacion de PDF llega en Fase 5', 'info')
-        return
-      }
+      const endpoint =
+        formato === 'pdf' ? '/api/documentos/generar-pdf' : '/api/documentos/generar-contrato'
 
-      const res = await fetch('/api/documentos/generar-contrato', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(datos),
@@ -226,7 +222,8 @@ export default function DocumentosForm() {
       const blob = await res.blob()
       const cd = res.headers.get('Content-Disposition') || ''
       const m = cd.match(/filename="?([^";]+)"?/i)
-      const filename = m?.[1] || 'Contrato.docx'
+      const fallback = formato === 'pdf' ? 'Formulario.pdf' : 'Contrato.docx'
+      const filename = m?.[1] || fallback
 
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -237,7 +234,10 @@ export default function DocumentosForm() {
       a.remove()
       URL.revokeObjectURL(url)
 
-      mostrarToast('Contrato DOCX descargado', 'success')
+      mostrarToast(
+        formato === 'pdf' ? 'Formulario PDF descargado' : 'Contrato DOCX descargado',
+        'success'
+      )
     } catch (e) {
       mostrarToast(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
     } finally {
