@@ -6,6 +6,7 @@ import { ChecklistPayload } from '../types'
 import { enriquecerDatos, EnrichedData } from './enrich'
 import { buildContext } from './context'
 import { limpiarFirmasVaciasV4 } from './cleanSignatures'
+import { insertarPageBreakAntesDe } from './pageBreaks'
 
 const TEMPLATE_PATH = path.join(
   process.cwd(),
@@ -55,14 +56,16 @@ export function generarContrato(form: ChecklistPayload, today: Date = new Date()
 
   doc.render(context)
 
-  const rawBuffer: Buffer = doc.getZip().generate({ type: 'nodebuffer' })
+  const rawBuffer: Buffer = doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' })
   const cleanedBuffer = limpiarFirmasVaciasV4(rawBuffer)
+  // La CARTA DE INSTRUCCIONES del pagare debe empezar siempre en pagina nueva.
+  const withBreaks = insertarPageBreakAntesDe(cleanedBuffer, 'CARTA DE INSTRUCCIONES ABIERTA DEL PAGARÉ')
 
   const primerDeudor = enriched.deudores[0]
   const nombreArchivo = `Contrato_${sanitizarNombreArchivo(primerDeudor?.nombre_completo || '')}_${tsNow(today)}.docx`
 
   return {
-    buffer: cleanedBuffer,
+    buffer: withBreaks,
     filename: nombreArchivo,
     enriched,
   }

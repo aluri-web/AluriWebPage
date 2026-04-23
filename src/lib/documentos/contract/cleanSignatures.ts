@@ -74,5 +74,5 @@ export function limpiarFirmasVaciasV4(docxBuffer: Buffer): Buffer {
   const serialized = new XMLSerializer().serializeToString(doc)
   zip.file('word/document.xml', serialized)
 
-  return zip.generate({ type: 'nodebuffer' })
+  return zip.generate({ type: 'nodebuffer', compression: 'DEFLATE' })
 }
