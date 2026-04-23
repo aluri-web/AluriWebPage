@@ -204,9 +204,40 @@ export default function DocumentosForm() {
     setBusy(true)
     try {
       const datos = recopilar()
-      // TODO Fase 3-5: POST a /api/documentos/generar-contrato o /generar-pdf
-      console.log(`[Fase 2 placeholder] Generar ${formato}:`, datos)
-      mostrarToast(`Payload listo (${formato.toUpperCase()}) — API llegara en Fase 3-5`, 'info')
+
+      if (formato === 'pdf') {
+        // Fase 5
+        console.log('[Fase 5 pending] Generar PDF:', datos)
+        mostrarToast('Generacion de PDF llega en Fase 5', 'info')
+        return
+      }
+
+      const res = await fetch('/api/documentos/generar-contrato', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datos),
+      })
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}))
+        throw new Error(errBody.error || `HTTP ${res.status}`)
+      }
+
+      const blob = await res.blob()
+      const cd = res.headers.get('Content-Disposition') || ''
+      const m = cd.match(/filename="?([^";]+)"?/i)
+      const filename = m?.[1] || 'Contrato.docx'
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+
+      mostrarToast('Contrato DOCX descargado', 'success')
     } catch (e) {
       mostrarToast(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
     } finally {
