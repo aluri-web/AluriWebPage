@@ -60,7 +60,7 @@ async function run() {
   const parsed = parseChecklistText(result.value)
 
   expect('tipo_contrato', parsed.tipo_contrato, 'Hipoteca')
-  expect('deudores.length', parsed.deudores.length, 1)
+  expect('deudores.length (1 deudor + 1 CODEUDOR -> 2 deudores)', parsed.deudores.length, 2)
   expect('deudor[0].nombre', parsed.deudores[0].nombre, 'Isabella Martinez Victoria')
   expect('deudor[0].cc', parsed.deudores[0].cc, '1.005.870.855')
   expect('deudor[0].cc_expedicion', parsed.deudores[0].cc_expedicion, 'Cali')
@@ -70,10 +70,11 @@ async function run() {
   expect('deudor[0].estado_civil', parsed.deudores[0].estado_civil, 'Soltera')
   expect('deudor[0].participacion_monto', parsed.deudores[0].participacion_monto, '45.000.000')
 
-  expect('codeudores.length', parsed.codeudores.length, 1)
-  expect('codeudor[0].nombre', parsed.codeudores[0].nombre, 'Ivan Eduardo Martinez Cortes')
-  expect('codeudor[0].cc', parsed.codeudores[0].cc, '16.788.706')
-  expect('codeudor[0].cc_expedicion', parsed.codeudores[0].cc_expedicion, 'Cali')
+  // Antes codeudor, ahora deudor 2
+  expect('deudor[1].nombre', parsed.deudores[1].nombre, 'Ivan Eduardo Martinez Cortes')
+  expect('deudor[1].cc', parsed.deudores[1].cc, '16.788.706')
+  expect('deudor[1].cc_expedicion', parsed.deudores[1].cc_expedicion, 'Cali')
+  expect('codeudores.length (parser no genera codeudores)', parsed.codeudores.length, 0)
 
   expect('acreedores.length', parsed.acreedores.length, 1)
   expect('acreedor[0].nombre', parsed.acreedores[0].nombre, 'Luis Miguel Olarte Morales')
@@ -103,20 +104,20 @@ async function run() {
   expect('nuevo tipo_contrato', pNuevo.tipo_contrato, 'Hipoteca')
 
   // Deudor 1
-  expect('nuevo deudores.length', pNuevo.deudores.length, 1)
-  expect('nuevo deudor nombre', pNuevo.deudores[0].nombre, 'Isabella Martínez Victoria')
+  expect('nuevo deudor[0] nombre', pNuevo.deudores[0].nombre, 'Isabella Martínez Victoria')
   expect('nuevo deudor tipo_documento', pNuevo.deudores[0].tipo_documento, 'C.C.')
   expect('nuevo deudor cc', pNuevo.deudores[0].cc, '1234567890')
   expect('nuevo deudor cc_expedicion', pNuevo.deudores[0].cc_expedicion, 'Cali')
   expect('nuevo deudor email', pNuevo.deudores[0].email, 'Globaltradeisa@gmal.com')
   expect('nuevo deudor participacion', pNuevo.deudores[0].participacion_monto, '45.000.000')
 
-  // Codeudor 1: "Extranjería." debe normalizarse a C.E.
-  expect('nuevo codeudores.length (1 lleno, 1 vacio descartado)', pNuevo.codeudores.length, 1)
-  expect('nuevo codeudor nombre', pNuevo.codeudores[0].nombre, 'Iván Eduardo Martínez Cortes')
-  expect('nuevo codeudor Extranjeria -> C.E.', pNuevo.codeudores[0].tipo_documento, 'C.E.')
-  expect('nuevo codeudor cc', pNuevo.codeudores[0].cc, '16.788.706')
-  expect('nuevo codeudor cc_expedicion', pNuevo.codeudores[0].cc_expedicion, 'Cali')
+  // "CODEUDOR 1" del checklist se mapea a deudor[1]; codeudores queda vacio.
+  expect('nuevo deudores total (1 DEUDOR + 1 CODEUDOR relleno)', pNuevo.deudores.length, 2)
+  expect('nuevo deudor[1] nombre', pNuevo.deudores[1].nombre, 'Iván Eduardo Martínez Cortes')
+  expect('nuevo deudor[1] Extranjeria -> C.E.', pNuevo.deudores[1].tipo_documento, 'C.E.')
+  expect('nuevo deudor[1] cc', pNuevo.deudores[1].cc, '16.788.706')
+  expect('nuevo deudor[1] cc_expedicion', pNuevo.deudores[1].cc_expedicion, 'Cali')
+  expect('nuevo codeudores.length (parser no genera codeudores)', pNuevo.codeudores.length, 0)
 
   // Acreedor 1: "Tipo de documento:" vacío debe defaultearse a C.C.
   // (bug antes capturaba la linea siguiente "Numero Documento: ...")
@@ -197,11 +198,14 @@ async function run() {
   const parsedNuevo = parseChecklistText(nuevo)
 
   expect('v5 tipo_contrato', parsedNuevo.tipo_contrato, 'Compraventa con Pacto de Retroventa')
-  expect('v5 deudor tipo_documento', parsedNuevo.deudores[0].tipo_documento, 'C.E.')
-  expect('v5 deudor cc', parsedNuevo.deudores[0].cc, '12345678')
-  expect('v5 deudor cc_expedicion vacio', parsedNuevo.deudores[0].cc_expedicion, '')
-  expect('v5 codeudor tipo_documento', parsedNuevo.codeudores[0].tipo_documento, 'PPT')
-  expect('v5 codeudor cc', parsedNuevo.codeudores[0].cc, '99887766')
+  // DEUDOR + CODEUDOR -> ambos deudores
+  expect('v5 deudores.length (DEUDOR + CODEUDOR -> 2)', parsedNuevo.deudores.length, 2)
+  expect('v5 deudor[0] tipo_documento', parsedNuevo.deudores[0].tipo_documento, 'C.E.')
+  expect('v5 deudor[0] cc', parsedNuevo.deudores[0].cc, '12345678')
+  expect('v5 deudor[0] cc_expedicion vacio', parsedNuevo.deudores[0].cc_expedicion, '')
+  expect('v5 deudor[1] tipo_documento (antes codeudor)', parsedNuevo.deudores[1].tipo_documento, 'PPT')
+  expect('v5 deudor[1] cc', parsedNuevo.deudores[1].cc, '99887766')
+  expect('v5 codeudores.length parser = 0', parsedNuevo.codeudores.length, 0)
   expect('v5 acreedor tipo_documento', parsedNuevo.acreedores[0].tipo_documento, 'NIT')
   expect('v5 acreedor cc', parsedNuevo.acreedores[0].cc, '900123456')
   expect('v5 ciudad inmueble', parsedNuevo.inmueble.ciudad, 'Medellin')

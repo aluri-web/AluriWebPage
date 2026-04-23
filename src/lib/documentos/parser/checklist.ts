@@ -176,6 +176,10 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
     encabezados.push({ start: m.index, text: m[0] })
   }
 
+  // NOTA: en los contratos de Aluri, los encabezados "CODEUDOR N" del
+  // checklist se mapean a deudores adicionales (deudor 2, deudor 3, ...)
+  // — todos firman como deudores. La sección "Codeudores" del formulario
+  // queda disponible para capturar manualmente casos excepcionales.
   const deudores: DeudorForm[] = []
   const codeudores: CodeudorForm[] = []
 
@@ -185,15 +189,7 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
     const bloque = zonaPersonas.slice(ini, fin)
     const persona = extraerPersonaDeBloque(bloque)
     if (!persona) continue
-    const esCodeudor = /^CODEUDOR/i.test(encabezados[i].text.trim())
-    if (esCodeudor) {
-      const { participacion_monto, participacion_porcentaje, ...rest } = persona
-      void participacion_monto
-      void participacion_porcentaje
-      codeudores.push(rest)
-    } else {
-      deudores.push(persona)
-    }
+    deudores.push(persona)
   }
 
   if (deudores.length === 0) {
