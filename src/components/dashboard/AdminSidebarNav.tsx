@@ -18,6 +18,7 @@ import {
   Activity,
   KeyRound,
   BarChart3,
+  FileSignature,
 } from 'lucide-react'
 
 const mainNavItems = [
@@ -32,6 +33,7 @@ const mainNavItems = [
   { href: '/dashboard/admin/sesiones', label: 'Sesiones', icon: Activity },
   { href: '/dashboard/admin/actividad', label: 'Actividad', icon: BarChart3 },
   { href: '/dashboard/admin/demo-access', label: 'Credenciales', icon: KeyRound },
+  { href: '/dashboard/admin/documentos', label: 'Documentos', icon: FileSignature },
 ]
 
 const configNavItems = [
