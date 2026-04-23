@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Loader2,
   Download,
+  ArrowRight,
 } from 'lucide-react'
 import { updateEstadoSolicitud, type SolicitudRow } from './actions'
 
@@ -456,6 +457,24 @@ export default function SolicitudesTable({ solicitudes }: { solicitudes: Solicit
                                     Faltan {5 - docCount} documento(s) y {5 - photoCount} foto(s) para aprobar
                                   </p>
                                 )}
+                              </div>
+                            )}
+
+                            {sol.estado === 'aprobada' && (
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    router.push(`/dashboard/admin/colocaciones/nueva-colocacion?solicitud=${sol.id}`)
+                                  }}
+                                  className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 text-teal-400 border border-teal-500/30 rounded-lg text-sm font-medium hover:bg-teal-500/20 transition-colors"
+                                >
+                                  <ArrowRight size={14} />
+                                  Crear credito en marketplace
+                                </button>
+                                <p className="text-xs text-slate-500">
+                                  Pre-carga los datos de la solicitud en el formulario de nueva colocacion.
+                                </p>
                               </div>
                             )}
                           </div>

@@ -29,6 +29,7 @@ import {
   DebtorSearchResult
 } from './actions'
 import PropertyPhotoUpload from './PropertyPhotoUpload'
+import type { PrefillData } from './form-types'
 
 interface InvestorRow {
   investor_id: string
@@ -104,9 +105,10 @@ interface FormData {
 interface UniversalCreditFormProps {
   investors: InvestorOption[]
   nextCode: string
+  prefill?: PrefillData
 }
 
-export default function UniversalCreditForm({ investors, nextCode }: UniversalCreditFormProps) {
+export default function UniversalCreditForm({ investors, nextCode, prefill }: UniversalCreditFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [searchingDebtor, setSearchingDebtor] = useState(false)
@@ -128,15 +130,15 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
   } = useForm<FormData>({
     defaultValues: {
       code: nextCode,
-      estado: 'publicado', // Default workflow state
-      debtor_cedula: '',
-      debtor_id: '',
-      debtor_name: '',
-      debtor_email: '',
+      estado: prefill ? 'en_firma' : 'publicado', // Marketplace-ready when from solicitud
+      debtor_cedula: prefill?.debtor_cedula ?? '',
+      debtor_id: prefill?.debtor_id ?? '',
+      debtor_name: prefill?.debtor_name ?? '',
+      debtor_email: prefill?.debtor_email ?? '',
       debtor_phone: '',
       debtor_address: '',
       debtor_city: '',
-      is_new_debtor: false,
+      is_new_debtor: prefill?.is_new_debtor ?? false,
       has_co_debtor: false,
       co_debtor_cedula: '',
       co_debtor_id: '',
@@ -146,17 +148,17 @@ export default function UniversalCreditForm({ investors, nextCode }: UniversalCr
       co_debtor_address: '',
       co_debtor_city: '',
       is_new_co_debtor: false,
-      amount_requested: 0,
+      amount_requested: prefill?.amount_requested ?? 0,
       interest_rate_nm: 1.5,
       interest_rate_ea: 19.56,
       term_months: 12,
       debtor_commission: 0,
       aluri_commission_pct: 0,
-      property_address: '',
-      property_city: '',
+      property_address: prefill?.property_address ?? '',
+      property_city: prefill?.property_city ?? '',
       property_type: 'casa',
-      commercial_value: 0,
-      property_photos: [],
+      commercial_value: prefill?.commercial_value ?? 0,
+      property_photos: prefill?.property_photos ?? [],
       investors: [],
       // New fields defaults
       debtor_monthly_income: 0,

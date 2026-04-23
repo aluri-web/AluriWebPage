@@ -45,7 +45,7 @@ export async function getActiveLoans(): Promise<{ data: MarketplaceCredito[]; er
         estado
       )
     `)
-    .eq('estado', 'publicado')
+    .in('estado', ['publicado', 'en_firma'])
     .order('created_at', { ascending: false })
 
   if (error) {
