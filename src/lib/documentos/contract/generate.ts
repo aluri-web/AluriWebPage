@@ -7,6 +7,7 @@ import { enriquecerDatos, EnrichedData } from './enrich'
 import { buildContext } from './context'
 import { limpiarFirmasVaciasV4 } from './cleanSignatures'
 import { insertarPageBreaksAntesDe } from './pageBreaks'
+import { aplicarPiePaginaDinamico } from './updateFooter'
 
 const MARCADORES_PAGE_BREAK = [
   'CARTA DE INSTRUCCIONES ABIERTA DEL PAGARÉ',
@@ -67,12 +68,16 @@ export function generarContrato(form: ChecklistPayload, today: Date = new Date()
   // Secciones que siempre deben iniciar en pagina nueva (carta de
   // instrucciones + anexos 2 y 3).
   const withBreaks = insertarPageBreaksAntesDe(cleanedBuffer, MARCADORES_PAGE_BREAK)
+  // Pie de pagina "Pagina X de Y" con campos dinamicos (el template v5
+  // tenia NUMPAGES hardcoded a "19"; aqui lo reemplazamos por un field
+  // que Word recalcula al abrir el documento).
+  const withFooter = aplicarPiePaginaDinamico(withBreaks)
 
   const primerDeudor = enriched.deudores[0]
   const nombreArchivo = `Contrato_${sanitizarNombreArchivo(primerDeudor?.nombre_completo || '')}_${tsNow(today)}.docx`
 
   return {
-    buffer: withBreaks,
+    buffer: withFooter,
     filename: nombreArchivo,
     enriched,
   }
