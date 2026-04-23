@@ -275,10 +275,10 @@
         </section>
         <!-- Floating CTA Buttons -->
         <div id="floating-cta" class="fixed bottom-8 left-8 z-50 flex flex-col gap-4">
-            <a href="/login" class="flex items-center justify-center px-8 h-12 bg-primary hover:bg-primary-dark text-text-main text-base font-bold rounded-full shadow-lg shadow-primary/20 transition-all hover:scale-105 btn-credito">
+            <a href="propietarios.html#solicitar-credito" class="flex items-center justify-center px-8 h-12 bg-primary hover:bg-primary-dark text-text-main text-base font-bold rounded-full shadow-lg shadow-primary/20 transition-all hover:scale-105 btn-credito">
                 Necesito un crédito
             </a>
-            <a href="/login" class="flex items-center justify-center px-8 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary text-text-main dark:text-white text-base font-bold rounded-full transition-all hover:bg-slate-50 dark:hover:bg-slate-700 btn-simular">
+            <a href="inversionistas.html#formulario-contacto" class="flex items-center justify-center px-8 h-12 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-primary text-text-main dark:text-white text-base font-bold rounded-full transition-all hover:bg-slate-50 dark:hover:bg-slate-700 btn-simular">
                 Quiero Invertir
             </a>
         </div>
@@ -377,13 +377,19 @@
                 btnIngresar.addEventListener('click', () => navigateTo('ingresar'));
             }
             
-            // Hero section buttons
+            // Hero section buttons -- llevan directo al formulario anclado
             document.querySelectorAll('.btn-credito').forEach(btn => {
-                btn.addEventListener('click', () => navigateTo('propietarios'));
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.location.href = 'propietarios.html#solicitar-credito';
+                });
             });
-            
+
             document.querySelectorAll('.btn-simular, .btn-invertir').forEach(btn => {
-                btn.addEventListener('click', () => navigateTo('inversionistas'));
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.location.href = 'inversionistas.html#formulario-contacto';
+                });
             });
             
             // Property owners section
