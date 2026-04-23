@@ -187,7 +187,6 @@ export default function AgentesPanel({
   const [manualPropertyValue, setManualPropertyValue] = useState<number | ''>('')
   const [personaType, setPersonaType] = useState<'persona_natural' | 'persona_juridica'>('persona_natural')
   const [declaredIncome, setDeclaredIncome] = useState<number | ''>('')
-  const [declaredAppraisal, setDeclaredAppraisal] = useState<number | ''>('')
   const [adminNotes, setAdminNotes] = useState('')
   // Codeudor
   const [hasCodeudor, setHasCodeudor] = useState(false)
@@ -431,7 +430,6 @@ export default function AgentesPanel({
         property_address: selectedSolicitud?.direccion_inmueble || '',
         // Admin-declared values for contrast
         ...(declaredIncome ? { declared_income_cop: declaredIncome } : {}),
-        ...(declaredAppraisal ? { declared_appraisal_cop: declaredAppraisal } : {}),
         persona_type: personaType,
         // Codeudor
         ...(hasCodeudor ? {
@@ -991,21 +989,6 @@ export default function AgentesPanel({
               value={declaredIncome === '' ? '' : declaredIncome / 1_000_000}
               onChange={e => setDeclaredIncome(e.target.value ? Math.round(Number(e.target.value) * 1_000_000) : '')}
               placeholder="Ej: 13"
-              disabled={isProcessing}
-              className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
-            />
-          </div>
-
-          {/* Avalúo indicado */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">Avalúo indicado (millones COP)</label>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              value={declaredAppraisal === '' ? '' : declaredAppraisal / 1_000_000}
-              onChange={e => setDeclaredAppraisal(e.target.value ? Math.round(Number(e.target.value) * 1_000_000) : '')}
-              placeholder="Ej: 450"
               disabled={isProcessing}
               className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-amber-500 disabled:opacity-50 placeholder-slate-500"
             />

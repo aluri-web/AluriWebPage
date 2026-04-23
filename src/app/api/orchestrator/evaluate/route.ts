@@ -31,7 +31,6 @@ const evaluateSchema = z.object({
     property_address: z.string().max(300).optional(),
     // Admin-declared values for contrast
     declared_income_cop: z.number().positive().optional(),
-    declared_appraisal_cop: z.number().positive().optional(),
     persona_type: z.enum(['persona_natural', 'persona_juridica']).optional(),
   }),
   documents: z.record(
