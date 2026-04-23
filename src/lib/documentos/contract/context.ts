@@ -73,7 +73,9 @@ export function buildContext(data: EnrichedData): Record<string, string> {
 
     monto_credito_letras: numeroATexto(mt).toUpperCase(),
     monto_credito_numeros: safeNum(mt),
-    tasa_interes: `${prest.tasa_mensual} mensual anticipado`,
+    // El template v5 ya incluye "% mensual anticipado" despues del placeholder;
+    // solo pasamos el numero (sin % ni sufijo) para no duplicar.
+    tasa_interes: (prest.tasa_mensual || '').replace(/%/g, '').trim(),
     plazo_letras: capitalizar(numeroATexto(prest.plazo_meses || 0)),
     plazo_numeros: String(prest.plazo_meses || ''),
     cuota_mensual_letras: capitalizar(numeroATexto(prest.cuota_mensual_total)),
