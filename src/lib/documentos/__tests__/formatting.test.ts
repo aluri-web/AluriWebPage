@@ -86,17 +86,17 @@ for (const { input, expected } of limpiarCases) {
 console.log('fechaATextoLegal')
 check(
   'fechaATextoLegal(2026-04-08)',
-  fechaATextoLegal(new Date(2026, 3, 8)),
+  fechaATextoLegal(new Date(Date.UTC(2026, 3, 8, 12))),
   'Ocho (8) de abril de dos mil veintiséis (2026)'
 )
 check(
   'fechaATextoLegal(2026-04-16)',
-  fechaATextoLegal(new Date(2026, 3, 16)),
+  fechaATextoLegal(new Date(Date.UTC(2026, 3, 16, 12))),
   'Dieciséis (16) de abril de dos mil veintiséis (2026)'
 )
 check(
   'fechaATextoLegal(2026-02-03)',
-  fechaATextoLegal(new Date(2026, 1, 3)),
+  fechaATextoLegal(new Date(Date.UTC(2026, 1, 3, 12))),
   'Tres (3) de febrero de dos mil veintiséis (2026)'
 )
 

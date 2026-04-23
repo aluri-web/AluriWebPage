@@ -6,6 +6,7 @@ import { ChecklistPayload } from '../types'
 import { enriquecerDatos, EnrichedData } from './enrich'
 import { buildContext } from './context'
 import { limpiarFirmasVaciasV4 } from './cleanSignatures'
+import { colombiaDateParts } from '../utils/formatting'
 import { insertarPageBreaksAntesDe } from './pageBreaks'
 import { aplicarPiePaginaDinamico } from './updateFooter'
 
@@ -33,9 +34,10 @@ function sanitizarNombreArchivo(nombre: string): string {
 
 function tsNow(date: Date = new Date()): string {
   const pad = (n: number) => n.toString().padStart(2, '0')
+  const c = colombiaDateParts(date)
   return (
-    `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
-    `_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+    `${c.year}${pad(c.month)}${pad(c.day)}` +
+    `_${pad(c.hour)}${pad(c.minute)}${pad(c.second)}`
   )
 }
 

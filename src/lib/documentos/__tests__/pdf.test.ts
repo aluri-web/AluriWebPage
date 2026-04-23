@@ -23,7 +23,8 @@ async function main() {
     fecha_creacion: new Date().toISOString(),
   }
 
-  const fecha = new Date(2026, 3, 21, 12, 0, 0)
+  // 17:00 UTC = 12:00 Colombia, 21 abril en ambos
+  const fecha = new Date(Date.UTC(2026, 3, 21, 17, 0, 0))
   const buffer = generateFormPdf(payload)
   const filename = pdfFilename(payload, fecha)
 

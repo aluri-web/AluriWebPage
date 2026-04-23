@@ -22,7 +22,8 @@ async function main() {
     fecha_creacion: new Date().toISOString(),
   }
 
-  const fechaFija = new Date(2026, 3, 21)
+  // UTC mediodia garantiza que sigue siendo 21 abril en cualquier timezone razonable
+  const fechaFija = new Date(Date.UTC(2026, 3, 21, 12))
   const { buffer, filename, enriched } = generarContrato(payload, fechaFija)
 
   const outDir = path.join(require('os').tmpdir(), 'aluri-contratos-test')

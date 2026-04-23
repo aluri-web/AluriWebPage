@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { ChecklistPayload } from '../types'
-import { limpiarMonto } from '../utils/formatting'
+import { colombiaDateParts, limpiarMonto } from '../utils/formatting'
 
 const BUCKET = 'contratos-generados'
 
@@ -21,9 +21,8 @@ function slug(nombre: string): string {
 }
 
 function datePath(d: Date = new Date()): string {
-  const y = d.getFullYear()
-  const m = (d.getMonth() + 1).toString().padStart(2, '0')
-  return `${y}/${m}`
+  const { year, month } = colombiaDateParts(d)
+  return `${year}/${month.toString().padStart(2, '0')}`
 }
 
 export interface SaveContratoInput {

@@ -21,6 +21,43 @@ function capitalizar(texto: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1)
 }
 
+/**
+ * Devuelve los componentes de la fecha en zona horaria Colombia (America/Bogota).
+ * Los nombres de archivo, fechas legales y paths de storage siempre deben
+ * usar hora Colombia independiente de donde corra el server (Vercel = UTC/Europa).
+ */
+export function colombiaDateParts(date: Date = new Date()): {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+} {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  const parts: Record<string, string> = {}
+  for (const p of fmt.formatToParts(date)) {
+    parts[p.type] = p.value
+  }
+  return {
+    year: parseInt(parts.year, 10),
+    month: parseInt(parts.month, 10),
+    day: parseInt(parts.day, 10),
+    hour: parseInt(parts.hour, 10) % 24,
+    minute: parseInt(parts.minute, 10),
+    second: parseInt(parts.second, 10),
+  }
+}
+
 export function numeroATexto(n: number): string {
   const texto = toCardinal(Math.trunc(n))
   return texto.replace(/dieciseis/g, 'dieciséis')
@@ -63,12 +100,11 @@ export function limpiarMonto(valor: string | number | null | undefined): number 
 }
 
 export function fechaATextoLegal(fecha: Date): string {
-  const dia = fecha.getDate()
-  const mes = fecha.getMonth() + 1
-  const anio = fecha.getFullYear()
-  const diaTexto = capitalizar(numeroATexto(dia))
-  const anioTexto = numeroATexto(anio)
-  return `${diaTexto} (${dia}) de ${MESES[mes]} de ${anioTexto} (${anio})`
+  // Usar zona Colombia para que la fecha legal no dependa del timezone del server.
+  const { year, month, day } = colombiaDateParts(fecha)
+  const diaTexto = capitalizar(numeroATexto(day))
+  const anioTexto = numeroATexto(year)
+  return `${diaTexto} (${day}) de ${MESES[month]} de ${anioTexto} (${year})`
 }
 
 export function plazoATexto(meses: number): string {

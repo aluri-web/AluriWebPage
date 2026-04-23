@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { ChecklistPayload } from '../types'
+import { colombiaDateParts } from '../utils/formatting'
 
 type RGB = [number, number, number]
 
@@ -193,7 +194,7 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
     doc.setTextColor(...GREY_500)
     doc.setFontSize(8)
     doc.text(
-      `${new Date().toLocaleDateString('es-CO')} · Pagina ${i} de ${pageCount}`,
+      `${new Date().toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })} · Pagina ${i} de ${pageCount}`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 8,
       { align: 'center' }
@@ -209,8 +210,7 @@ export function pdfFilename(form: ChecklistPayload, today: Date = new Date()): s
   const upper = primerDeudor.toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_\-]/g, '')
   const nombre = (upper || 'SIN_NOMBRE').slice(0, 30)
   const pad = (n: number) => n.toString().padStart(2, '0')
-  const ts =
-    `${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}` +
-    `_${pad(today.getHours())}${pad(today.getMinutes())}${pad(today.getSeconds())}`
+  const c = colombiaDateParts(today)
+  const ts = `${c.year}${pad(c.month)}${pad(c.day)}_${pad(c.hour)}${pad(c.minute)}${pad(c.second)}`
   return `Formulario_${nombre}_${ts}.pdf`
 }
