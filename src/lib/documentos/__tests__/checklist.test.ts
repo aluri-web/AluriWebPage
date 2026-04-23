@@ -108,7 +108,7 @@ async function run() {
   expect('nuevo deudor tipo_documento', pNuevo.deudores[0].tipo_documento, 'C.C.')
   expect('nuevo deudor cc', pNuevo.deudores[0].cc, '1234567890')
   expect('nuevo deudor cc_expedicion', pNuevo.deudores[0].cc_expedicion, 'Cali')
-  expect('nuevo deudor email', pNuevo.deudores[0].email, 'Globaltradeisa@gmal.com')
+  expect('nuevo deudor email', pNuevo.deudores[0].email, 'Globaltradeisa@gmail.com')
   expect('nuevo deudor participacion', pNuevo.deudores[0].participacion_monto, '45.000.000')
 
   // "CODEUDOR 1" del checklist se mapea a deudor[1]; codeudores queda vacio.

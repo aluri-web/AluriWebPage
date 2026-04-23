@@ -259,11 +259,26 @@ export default function DocumentosForm() {
 
     setBusy(true)
     try {
-      const fd = new FormData()
-      fd.append('archivo', file)
+      if (!file.name.toLowerCase().endsWith('.docx')) {
+        mostrarToast('Solo se aceptan archivos .docx', 'error')
+        return
+      }
+      // Parseo del binario en el cliente con mammoth (browser build). Asi
+      // evitamos el limite de ~4.5 MB de Vercel para bodies multipart.
+      const arrayBuffer = await file.arrayBuffer()
+      const mammoth = (await import('mammoth/mammoth.browser')).default
+      const extracted = await mammoth.extractRawText({ arrayBuffer })
+      const texto = extracted?.value || ''
+
+      if (!texto.trim()) {
+        mostrarToast('El documento no contiene texto extraible', 'error')
+        return
+      }
+
       const res = await fetch('/api/documentos/cargar-checklist', {
         method: 'POST',
-        body: fd,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texto }),
       })
       const data = await res.json()
       if (!res.ok || !data.ok) {

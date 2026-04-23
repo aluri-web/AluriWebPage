@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as mammoth from 'mammoth'
 import { createClient } from '@/utils/supabase/server'
 import { parseChecklistText } from '@/lib/documentos/parser/checklist'
 
@@ -19,41 +18,25 @@ async function verifyAdmin() {
   return profile?.role === 'admin'
 }
 
+/**
+ * POST /api/documentos/cargar-checklist
+ * Body (JSON): { texto: string } — texto plano ya extraido del .docx en el cliente.
+ *
+ * Antes este endpoint recibia el .docx binario como multipart/form-data, pero
+ * Vercel tiene un limite de ~4.5 MB para request bodies y con multipart overhead
+ * los .docx de ~2.5 MB disparan "Request Entity Too Large". Ahora el cliente
+ * extrae el texto con mammoth (browser build) y solo envia ~20 KB de texto.
+ */
 export async function POST(request: NextRequest) {
   if (!(await verifyAdmin())) {
     return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 403 })
   }
 
   try {
-    const formData = await request.formData()
-    const archivo = formData.get('archivo')
+    const body = await request.json().catch(() => null)
+    const texto = body?.texto
 
-    if (!(archivo instanceof File)) {
-      return NextResponse.json(
-        { ok: false, error: 'Archivo no recibido (campo "archivo" requerido)' },
-        { status: 400 }
-      )
-    }
-
-    if (!archivo.name.toLowerCase().endsWith('.docx')) {
-      return NextResponse.json(
-        { ok: false, error: 'El archivo debe ser .docx' },
-        { status: 400 }
-      )
-    }
-
-    const maxBytes = 20 * 1024 * 1024
-    if (archivo.size > maxBytes) {
-      return NextResponse.json(
-        { ok: false, error: 'Archivo supera 20 MB' },
-        { status: 400 }
-      )
-    }
-
-    const buffer = Buffer.from(await archivo.arrayBuffer())
-    const { value: texto } = await mammoth.extractRawText({ buffer })
-
-    if (!texto || texto.trim().length === 0) {
+    if (typeof texto !== 'string' || texto.trim().length === 0) {
       return NextResponse.json(
         { ok: false, error: 'El documento no contiene texto extraible' },
         { status: 400 }
