@@ -427,6 +427,21 @@
             const mobileMenu = document.getElementById('mobile-menu');
             mobileMenu.classList.toggle('hidden');
         });
+
+        // Si la URL trae #formulario-contacto (desde home, login, nav, etc),
+        // hacer scroll al formulario cuando el iframe GHL termine de renderizarse.
+        // El anchor nativo dispara scroll antes de que el iframe crezca y el usuario
+        // queda en el punto equivocado.
+        (function scrollToHashAfterIframeLoad() {
+            if (!window.location.hash) return;
+            const target = document.getElementById(window.location.hash.slice(1));
+            if (!target) return;
+            const reScroll = () => target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Intento inicial + re-scroll a 400ms y 1.2s para compensar crecimiento del iframe
+            window.addEventListener('load', reScroll);
+            setTimeout(reScroll, 400);
+            setTimeout(reScroll, 1200);
+        })();
     </script>
 </body>
 </html>
