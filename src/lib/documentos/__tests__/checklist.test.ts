@@ -92,6 +92,73 @@ async function run() {
   expect('prestamo.forma_pago', parsed.prestamo.forma_pago, 'Solo intereses')
   expect('prestamo.comision_aluri', parsed.prestamo.comision_aluri, '2.250.000')
 
+  // ── Integration: formato nuevo (Tipo de documento / Numero Documento / Ciudades) ──
+  console.log('parseChecklistText formato v5 (sintetico)')
+  const nuevo = [
+    'TIPO DE CONTRATO: Compraventa con Pacto de Retroventa',
+    '',
+    'DEUDOR:',
+    'Nombre: Juan Perez Gomez',
+    'Tipo de documento: C.E.',
+    'Numero Documento: 12345678',
+    'Direccion de notificacion Deudor: Cra 1 # 2-3',
+    'Correo electronico Deudor: jp@test.co',
+    'Telefono Deudor: 3001234567',
+    'Estado civil Deudor: Soltero',
+    'Participacion $: $100.000.000',
+    'Participacion %: 100%',
+    '',
+    'CODEUDOR 1:',
+    'Nombre: Maria Rodriguez',
+    'Tipo de documento: PPT',
+    'Numero Documento: 99887766',
+    'Direccion de notificacion Deudor: Cll 4 # 5-6',
+    'Correo electronico Deudor: mr@test.co',
+    'Telefono Deudor: 3109876543',
+    'Estado civil Deudor: Casada',
+    '',
+    'Acreedor 1:',
+    'Nombre: Acme Inversiones SAS',
+    'Tipo de documento: NIT',
+    'Numero Documento: 900123456',
+    'Direccion notificacion: Cra 7 # 8-9',
+    'Correo: acme@test.co',
+    'Telefono: 6012223344',
+    'Estado civil: N/A',
+    'Participacion $: $100.000.000',
+    'Participacion %: 100%',
+    '',
+    'Inmueble:',
+    'Numero de matricula inmobiliaria: 001-12345',
+    'Cedula catastral: CAT123',
+    'CHIP: CHIP123',
+    'Direccion del Inmueble: Cra 50 # 60-70',
+    'Ciudad del Inmueble: Medellin',
+    'Ciudad Oficina de Registro: Medellin Centro',
+    'Descripcion del Inmueble: Apartamento 301',
+    'Linderos: Por el norte con apartamento 302',
+    '',
+    'Condiciones del prestamo:',
+    'Monto del prestamo: $100.000.000',
+    'Plazo (meses): 60',
+    'Tasa (mes anticipado): 1.80%',
+    'Valor de la cuota mensual: $2.000.000',
+    'Forma de pago: Solo intereses',
+    'Comision Aluri: $5.000.000',
+  ].join('\n')
+  const parsedNuevo = parseChecklistText(nuevo)
+
+  expect('v5 tipo_contrato', parsedNuevo.tipo_contrato, 'Compraventa con Pacto de Retroventa')
+  expect('v5 deudor tipo_documento', parsedNuevo.deudores[0].tipo_documento, 'C.E.')
+  expect('v5 deudor cc', parsedNuevo.deudores[0].cc, '12345678')
+  expect('v5 deudor cc_expedicion vacio', parsedNuevo.deudores[0].cc_expedicion, '')
+  expect('v5 codeudor tipo_documento', parsedNuevo.codeudores[0].tipo_documento, 'PPT')
+  expect('v5 codeudor cc', parsedNuevo.codeudores[0].cc, '99887766')
+  expect('v5 acreedor tipo_documento', parsedNuevo.acreedores[0].tipo_documento, 'NIT')
+  expect('v5 acreedor cc', parsedNuevo.acreedores[0].cc, '900123456')
+  expect('v5 ciudad inmueble', parsedNuevo.inmueble.ciudad, 'Medellin')
+  expect('v5 ciudad oficina registro', parsedNuevo.inmueble.ciudad_oficina_registro, 'Medellin Centro')
+
   console.log()
   console.log(`passed: ${passed}  failed: ${failed}`)
   if (failed > 0) process.exit(1)

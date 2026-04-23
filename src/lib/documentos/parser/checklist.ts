@@ -85,24 +85,48 @@ interface PersonaParseada {
   participacion_porcentaje: string
 }
 
+function normalizarTipoDocumento(raw: string): string {
+  const v = (raw || '').trim()
+  if (!v) return TIPO_DOCUMENTO_DEFAULT
+  const upper = v.toUpperCase()
+  if (/^C\.?C\.?$/.test(upper) || /CEDULA DE CIUDADAN/i.test(v)) return 'C.C.'
+  if (/^C\.?E\.?$/.test(upper) || /CEDULA DE EXTRANJ/i.test(v)) return 'C.E.'
+  if (/^T\.?I\.?$/.test(upper) || /TARJETA DE IDENTIDAD/i.test(v)) return 'T.I.'
+  if (/^NIT$/i.test(v)) return 'NIT'
+  if (/PASAPORTE/i.test(v)) return 'Pasaporte'
+  if (/^PPT$/i.test(v) || /PERMISO.*TEMPORAL/i.test(v)) return 'PPT'
+  if (/^PEP$/i.test(v) || /PERMISO.*PERMANENCIA/i.test(v)) return 'PPT' // PEP legacy -> PPT
+  return v
+}
+
 function extraerPersonaDeBloque(bloque: string): PersonaParseada | null {
   const nombre = buscarCampo('Nombre', bloque)
-  if (!nombre || /^(CC|Cedula|Direcci|Correo|Tel|Estado|Participaci)/i.test(nombre)) {
+  if (!nombre || /^(CC|Cedula|Direcci|Correo|Tel|Estado|Participaci|Tipo|N.mero|Numero)/i.test(nombre)) {
     return null
   }
 
-  const ccRaw = buscar(/CC\.?\s*(?:del\s*Deudor)?\s*:\s*([^\n]+)/i, bloque)
+  // Formato nuevo: "Tipo de documento: C.C." + "Numero Documento: 1.234.567"
+  const tipoDocRaw = limpiarCampoChecklist(
+    buscar(/Tipo\s+de\s+documento\s*(?:Deudor|Acreedor)?\s*:\s*([^\n]+)/i, bloque)
+  )
+  const numDocRaw = limpiarCampoChecklist(
+    buscar(/(?:N.mero|Numero|No\.?)\s+Documento\s*(?:Deudor|Acreedor)?\s*:\s*([^\n]+)/i, bloque)
+  )
+
+  // Formato viejo (fallback): "CC. del Deudor: 1.234.567 de Bogota"
+  const ccRaw = numDocRaw || buscar(/CC\.?\s*(?:del\s*Deudor)?\s*:\s*([^\n]+)/i, bloque)
   const { cc, exp: ccExp } = separarCcYExpedicion(limpiarCampoChecklist(ccRaw))
-  const direccion = limpiarCampoChecklist(buscar(/Direcci.n\s*(?:de\s*)?notificaci.n\s*(?:Deudor)?\s*:\s*([^\n]+)/i, bloque))
-  const email = limpiarCampoChecklist(buscar(/Correo\s*(?:electr.nico)?\s*(?:Deudor)?\s*:\s*([^\n]+)/i, bloque))
-  const telefono = limpiarCampoChecklist(buscar(/Tel.fono\s*(?:Deudor)?\s*:\s*([^\n]+)/i, bloque))
-  const civil = limpiarCampoChecklist(buscar(/Estado\s*civil\s*(?:Deudor)?\s*:\s*([^\n]+)/i, bloque))
+
+  const direccion = limpiarCampoChecklist(buscar(/Direcci.n\s*(?:de\s*)?notificaci.n\s*(?:Deudor|Acreedor)?\s*:\s*([^\n]+)/i, bloque))
+  const email = limpiarCampoChecklist(buscar(/Correo\s*(?:electr.nico)?\s*(?:Deudor|Acreedor)?\s*:\s*([^\n]+)/i, bloque))
+  const telefono = limpiarCampoChecklist(buscar(/Tel.fono\s*(?:Deudor|Acreedor)?\s*:\s*([^\n]+)/i, bloque))
+  const civil = limpiarCampoChecklist(buscar(/Estado\s*civil\s*(?:Deudor|Acreedor)?\s*:\s*([^\n]+)/i, bloque))
   const partMontoRaw = buscar(/Participaci.n\s*\$+\s*:\s*([^\n]+)/i, bloque)
   const partPct = buscar(/Participaci.n\s*%\s*:\s*([^\n]+)/i, bloque)
 
   return {
     nombre,
-    tipo_documento: TIPO_DOCUMENTO_DEFAULT,
+    tipo_documento: tipoDocRaw ? normalizarTipoDocumento(tipoDocRaw) : TIPO_DOCUMENTO_DEFAULT,
     cc,
     cc_expedicion: ccExp,
     direccion,
@@ -195,10 +219,15 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
 
     const nombre = buscarCampo('Nombre', bloque)
     if (!nombre) continue
-    if (/^(Cedula|Direccion|Correo|Telefono|Estado|Participacion)/i.test(nombre)) continue
+    if (/^(Cedula|Direccion|Correo|Telefono|Estado|Participacion|Tipo|N.mero|Numero)/i.test(nombre)) continue
 
-    const ccRaw = buscar(/[Cc].dula\s*:\s*(.+)/, bloque)
+    // Formato nuevo primero (Tipo de documento / Numero Documento);
+    // fallback a "Cedula:" del formato viejo.
+    const tipoDocRaw = buscar(/Tipo\s+de\s+documento\s*(?:Acreedor)?\s*:\s*(.+)/i, bloque)
+    const numDocRaw = buscar(/(?:N.mero|Numero|No\.?)\s+Documento\s*(?:Acreedor)?\s*:\s*(.+)/i, bloque)
+    const ccRaw = numDocRaw || buscar(/[Cc].dula\s*:\s*(.+)/, bloque)
     const { cc, exp: ccExp } = separarCcYExpedicion(ccRaw)
+
     const direccion = buscar(/[Dd]irecci.n\s*notificaci?o?n\s*:\s*(.+)/, bloque)
     const email = buscar(/[Cc]orreo\s*:\s*(.+)/, bloque)
     const telefono = buscar(/[Tt]el.fono\s*:\s*(.+)/, bloque)
@@ -208,7 +237,7 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
 
     acreedores.push({
       nombre,
-      tipo_documento: TIPO_DOCUMENTO_DEFAULT,
+      tipo_documento: tipoDocRaw ? normalizarTipoDocumento(tipoDocRaw) : TIPO_DOCUMENTO_DEFAULT,
       cc,
       cc_expedicion: ccExp,
       direccion,
@@ -229,6 +258,8 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
   const cedulaCatastral = buscar(/[Cc].dula catastral.*?:\s*(.+)/, bloqueInmueble).replace(/[.\s]+$/, '')
   const chip = buscar(/CHIP\s*:\s*(.+)/i, bloqueInmueble)
   const inmuebleDir = buscar(/Direcci.n del [Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble)
+  const ciudadOficinaRegistro = buscar(/Ciudad\s+Oficina\s+de\s+Registro\s*:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
+  const ciudadInmueble = buscar(/Ciudad\s+del\s+[Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
   const inmuebleDesc = buscar(/Descripci.n del [Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble)
   let inmuebleLinderos = buscar(/Linderos\s*:\s*(.+)/i, bloqueInmueble)
 
@@ -282,9 +313,9 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
       cedula_catastral: cedulaCatastral,
       chip,
       direccion: inmuebleDir,
-      ciudad: '',
+      ciudad: ciudadInmueble,
       oficina_registro: '',
-      ciudad_oficina_registro: '',
+      ciudad_oficina_registro: ciudadOficinaRegistro,
       descripcion: inmuebleDesc,
       linderos: inmuebleLinderos,
     },
