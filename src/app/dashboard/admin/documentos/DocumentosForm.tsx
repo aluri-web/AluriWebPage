@@ -77,9 +77,12 @@ export default function DocumentosForm() {
     [deudores]
   )
 
+  // Participacion %: si el admin escribio un valor manual en state lo respetamos;
+  // si esta vacio, calculamos automaticamente a partir de los montos.
   const deudoresConPct = useMemo(() => {
     const total = montoTotalDeudores
     return deudores.map((d) => {
+      if (d.participacion_porcentaje && d.participacion_porcentaje.trim()) return d
       const monto = montoANumero(d.participacion_monto)
       let pct = ''
       if (deudores.length === 1 && monto > 0) pct = '100%'
@@ -90,6 +93,7 @@ export default function DocumentosForm() {
 
   const acreedoresConPct = useMemo(() => {
     return acreedores.map((a) => {
+      if (a.participacion_porcentaje && a.participacion_porcentaje.trim()) return a
       const monto = montoANumero(a.participacion_monto)
       let pct = ''
       if (montoTotalDeudores > 0 && monto > 0) {
@@ -405,8 +409,9 @@ export default function DocumentosForm() {
                 <input
                   type="text"
                   value={d.participacion_porcentaje}
-                  readOnly
-                  className={`${inputCls} bg-slate-900/50`}
+                  onChange={(e) => updateDeudor(i, 'participacion_porcentaje', e.target.value)}
+                  placeholder="100%"
+                  className={inputCls}
                 />
               </Campo>
             </PersonaCard>
@@ -476,8 +481,9 @@ export default function DocumentosForm() {
                 <input
                   type="text"
                   value={a.participacion_porcentaje}
-                  readOnly
-                  className={`${inputCls} bg-slate-900/50`}
+                  onChange={(e) => updateAcreedor(i, 'participacion_porcentaje', e.target.value)}
+                  placeholder="100%"
+                  className={inputCls}
                 />
               </Campo>
             </PersonaCard>
