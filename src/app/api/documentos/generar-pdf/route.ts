@@ -1,26 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { generateFormPdf, pdfFilename } from '@/lib/documentos/pdf/generateFormPdf'
+import { savePdfOnly } from '@/lib/documentos/storage/saveContrato'
 import type { ChecklistPayload } from '@/lib/documentos/types'
 
 export const runtime = 'nodejs'
 
-async function verifyAdmin() {
+async function getAdminContext() {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return false
+  if (!user) return { ok: false as const, userId: null }
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single()
-  return profile?.role === 'admin'
+  return { ok: profile?.role === 'admin', userId: user.id }
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await verifyAdmin())) {
+  const { ok, userId } = await getAdminContext()
+  if (!ok) {
     return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 403 })
   }
 
@@ -33,12 +35,21 @@ export async function POST(request: NextRequest) {
     const buffer = generateFormPdf(body)
     const filename = pdfFilename(body)
 
+    let savedId: string | null = null
+    try {
+      const saved = await savePdfOnly(body, buffer, filename, userId)
+      savedId = saved.id
+    } catch (saveErr) {
+      console.error('[generar-pdf] fallo guardado en storage:', saveErr)
+    }
+
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,
         'Content-Length': String(buffer.length),
+        ...(savedId ? { 'X-Contrato-Id': savedId } : {}),
       },
     })
   } catch (error) {

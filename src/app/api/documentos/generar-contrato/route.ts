@@ -1,26 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { generarContrato } from '@/lib/documentos/contract/generate'
+import { saveContrato } from '@/lib/documentos/storage/saveContrato'
 import type { ChecklistPayload } from '@/lib/documentos/types'
 
 export const runtime = 'nodejs'
 
-async function verifyAdmin() {
+async function getAdminContext() {
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return false
+  if (!user) return { ok: false as const, userId: null }
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single()
-  return profile?.role === 'admin'
+  return { ok: profile?.role === 'admin', userId: user.id }
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await verifyAdmin())) {
+  const { ok, userId } = await getAdminContext()
+  if (!ok) {
     return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 403 })
   }
 
@@ -36,6 +38,20 @@ export async function POST(request: NextRequest) {
 
     const { buffer, filename } = generarContrato(body)
 
+    // Persistencia best-effort: no bloqueamos la descarga si falla
+    let savedId: string | null = null
+    try {
+      const saved = await saveContrato({
+        payload: body,
+        createdBy: userId,
+        docxBuffer: buffer,
+        docxFilename: filename,
+      })
+      savedId = saved.id
+    } catch (saveErr) {
+      console.error('[generar-contrato] fallo guardado en storage:', saveErr)
+    }
+
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
@@ -43,6 +59,7 @@ export async function POST(request: NextRequest) {
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'Content-Disposition': `attachment; filename="${filename}"`,
         'Content-Length': String(buffer.length),
+        ...(savedId ? { 'X-Contrato-Id': savedId } : {}),
       },
     })
   } catch (error) {
