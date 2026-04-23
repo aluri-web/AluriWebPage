@@ -67,6 +67,9 @@ export interface InmuebleForm {
   cedula_catastral: string
   chip: string
   direccion: string
+  ciudad: string
+  oficina_registro: string
+  ciudad_oficina_registro: string
   descripcion: string
   linderos: string
 }
@@ -145,6 +148,9 @@ export function emptyInmueble(): InmuebleForm {
     cedula_catastral: '',
     chip: '',
     direccion: '',
+    ciudad: '',
+    oficina_registro: '',
+    ciudad_oficina_registro: '',
     descripcion: '',
     linderos: '',
   }

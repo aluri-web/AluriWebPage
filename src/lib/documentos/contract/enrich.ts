@@ -64,9 +64,11 @@ export interface AcreedorEnriched {
 export interface InmuebleEnriched {
   matricula_inmobiliaria: string
   oficina_registro: string
+  ciudad_oficina_registro: string
   cedula_catastral: string
   chip: string
   direccion_corta: string
+  ciudad: string
   descripcion_completa: string
   linderos: string
 }
@@ -131,10 +133,12 @@ function enriquecerCodeudor(c: CodeudorForm): CodeudorEnriched {
 function enriquecerInmueble(i: InmuebleForm): InmuebleEnriched {
   return {
     matricula_inmobiliaria: i.matricula_inmobiliaria || '',
-    oficina_registro: '',
+    oficina_registro: i.oficina_registro || '',
+    ciudad_oficina_registro: i.ciudad_oficina_registro || '',
     cedula_catastral: i.cedula_catastral || '',
     chip: i.chip || '',
     direccion_corta: i.direccion || '',
+    ciudad: i.ciudad || '',
     descripcion_completa: i.descripcion || '',
     linderos: i.linderos || '',
   }

@@ -141,6 +141,9 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
     cedula_catastral: '',
     chip: '',
     direccion: '',
+    ciudad: '',
+    oficina_registro: '',
+    ciudad_oficina_registro: '',
     descripcion: '',
     linderos: '',
   }
@@ -150,6 +153,9 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
     { label: 'Cedula catastral', value: inm.cedula_catastral },
     { label: 'Codigo CHIP', value: inm.chip },
     { label: 'Direccion', value: inm.direccion },
+    { label: 'Ciudad', value: inm.ciudad },
+    { label: 'Oficina de Registro', value: inm.oficina_registro },
+    { label: 'Ciudad oficina', value: inm.ciudad_oficina_registro },
     { label: 'Descripcion', value: inm.descripcion },
     { label: 'Linderos', value: inm.linderos },
   ], y)

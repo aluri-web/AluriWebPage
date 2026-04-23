@@ -61,9 +61,9 @@ export function buildContext(data: EnrichedData): Record<string, string> {
 
     matricula_inmobiliaria: inm.matricula_inmobiliaria || '',
     oficina_registro: inm.oficina_registro || 'Zona Sur',
-    ciudad_oficina_registro: 'Bogotá D.C.',
+    ciudad_oficina_registro: inm.ciudad_oficina_registro || 'Bogotá D.C.',
     direccion_inmueble: inm.direccion_corta || '',
-    ciudad_inmueble: 'Bogotá D.C.',
+    ciudad_inmueble: inm.ciudad || 'Bogotá D.C.',
 
     monto_credito_letras: numeroATexto(mt).toUpperCase(),
     monto_credito_numeros: safeNum(mt),

@@ -298,6 +298,9 @@ export default function DocumentosForm() {
           cedula_catastral: inm.cedula_catastral || '',
           chip: inm.chip || '',
           direccion: inm.direccion || '',
+          ciudad: inm.ciudad || '',
+          oficina_registro: inm.oficina_registro || '',
+          ciudad_oficina_registro: inm.ciudad_oficina_registro || '',
           descripcion: inm.descripcion || '',
           linderos: inm.linderos || '',
         })
@@ -527,6 +530,33 @@ export default function DocumentosForm() {
               value={inmueble.direccion}
               onChange={(e) => setInmueble({ ...inmueble, direccion: e.target.value })}
               placeholder="Direccion completa del inmueble"
+              className={inputCls}
+            />
+          </Campo>
+          <Campo label="Ciudad del inmueble" requerido>
+            <input
+              type="text"
+              value={inmueble.ciudad}
+              onChange={(e) => setInmueble({ ...inmueble, ciudad: e.target.value })}
+              placeholder="Bogota D.C."
+              className={inputCls}
+            />
+          </Campo>
+          <Campo label="Oficina de Registro (zona)" requerido>
+            <input
+              type="text"
+              value={inmueble.oficina_registro}
+              onChange={(e) => setInmueble({ ...inmueble, oficina_registro: e.target.value })}
+              placeholder="Zona Sur"
+              className={inputCls}
+            />
+          </Campo>
+          <Campo label="Ciudad de la Oficina de Registro" requerido>
+            <input
+              type="text"
+              value={inmueble.ciudad_oficina_registro}
+              onChange={(e) => setInmueble({ ...inmueble, ciudad_oficina_registro: e.target.value })}
+              placeholder="Bogota D.C."
               className={inputCls}
             />
           </Campo>
