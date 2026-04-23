@@ -93,9 +93,9 @@ export default function UnifiedLoginPage() {
             </form>
             <div className="mt-8 text-center text-sm text-slate-400">
               <div className="mb-2">¿Nuevo inversor?</div>
-              <Link href="/inversionistas" className="text-primary font-semibold hover:underline">Regístrate aquí para comenzar a invertir</Link>
+              <Link href="/inversionistas#formulario-contacto" className="text-primary font-semibold hover:underline">Regístrate aquí para comenzar a invertir</Link>
               <div className="mt-4">¿Buscas un préstamo?</div>
-              <Link href="/propietarios" className="text-primary font-semibold hover:underline">Regístrate para conseguir un préstamo</Link>
+              <Link href="/propietarios#solicitar-credito" className="text-primary font-semibold hover:underline">Regístrate para conseguir un préstamo</Link>
             </div>
           </div>
         </div>
