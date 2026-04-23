@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:documentos": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\",\\\"target\\\":\\\"ES2020\\\"}\" src/lib/documentos/__tests__/formatting.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.985.0",
@@ -18,12 +19,16 @@
     "@upstash/redis": "^1.37.0",
     "csv-parser": "^3.2.0",
     "date-fns": "^4.1.0",
+    "docxtemplater": "^3.68.5",
     "dotenv": "^17.3.1",
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.562.0",
+    "mammoth": "^1.12.0",
+    "n2words": "^4.0.0",
     "next": "^15.1.6",
     "pdf-lib": "^1.17.1",
+    "pizzip": "^3.2.0",
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.71.1",
