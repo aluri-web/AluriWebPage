@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   Plus,
   Trash2,
@@ -65,6 +65,7 @@ export default function DocumentosForm() {
   const [prestamo, setPrestamo] = useState<PrestamoForm>(emptyPrestamo())
   const [toast, setToast] = useState<ToastState | null>(null)
   const [busy, setBusy] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   // ── Derivados ───────────────────────────────────────────────
   const montoTotalDeudores = useMemo(
@@ -214,7 +215,93 @@ export default function DocumentosForm() {
   }
 
   const cargarChecklist = () => {
-    mostrarToast('Cargar checklist .docx — llega en Fase 3', 'info')
+    fileInputRef.current?.click()
+  }
+
+  const onArchivoSeleccionado = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('archivo', file)
+      const res = await fetch('/api/documentos/cargar-checklist', {
+        method: 'POST',
+        body: fd,
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) {
+        mostrarToast(`Error: ${data.error || 'No se pudo procesar el checklist'}`, 'error')
+        return
+      }
+
+      const d = data.datos
+      setTipoContrato((d.tipo_contrato || '') as TipoContrato)
+
+      const deudoresParsed: DeudorForm[] =
+        Array.isArray(d.deudores) && d.deudores.length > 0 ? d.deudores : [emptyDeudor()]
+      setDeudores(deudoresParsed)
+
+      setCodeudores(Array.isArray(d.codeudores) ? d.codeudores : [])
+
+      const acreedoresParsed: AcreedorForm[] =
+        Array.isArray(d.acreedores) && d.acreedores.length > 0
+          ? d.acreedores
+          : [emptyAcreedor(), emptyAcreedor()]
+      setAcreedores(acreedoresParsed)
+
+      const inm = d.inmueble || {}
+      if (
+        inm.matricula_inmobiliaria ||
+        inm.cedula_catastral ||
+        inm.chip ||
+        inm.direccion ||
+        inm.descripcion ||
+        inm.linderos
+      ) {
+        setInmueble({
+          matricula_inmobiliaria: inm.matricula_inmobiliaria || '',
+          cedula_catastral: inm.cedula_catastral || '',
+          chip: inm.chip || '',
+          direccion: inm.direccion || '',
+          descripcion: inm.descripcion || '',
+          linderos: inm.linderos || '',
+        })
+        setMostrarInmueble(true)
+      }
+
+      const p = d.prestamo || {}
+      if (
+        p.plazo_meses ||
+        p.tasa_mensual ||
+        p.cuota_mensual ||
+        p.forma_pago ||
+        p.observaciones ||
+        p.monto
+      ) {
+        setPrestamo({
+          monto: p.monto || '',
+          plazo_meses: p.plazo_meses || '',
+          tasa_mensual: p.tasa_mensual || '',
+          cuota_mensual: p.cuota_mensual || '',
+          forma_pago: (p.forma_pago || '') as PrestamoForm['forma_pago'],
+          comision_aluri: p.comision_aluri || '',
+          observaciones: p.observaciones || '',
+        })
+        setMostrarPrestamo(true)
+      }
+
+      mostrarToast('Check List cargado exitosamente', 'success')
+    } catch (err) {
+      mostrarToast(
+        `Error de conexion: ${err instanceof Error ? err.message : String(err)}`,
+        'error'
+      )
+    } finally {
+      setBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   // ── Render ──────────────────────────────────────────────────
@@ -549,6 +636,15 @@ export default function DocumentosForm() {
           </button>
         </div>
       </div>
+
+      {/* Input oculto para cargar .docx */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".docx"
+        style={{ display: 'none' }}
+        onChange={onArchivoSeleccionado}
+      />
 
       {/* Toast */}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}

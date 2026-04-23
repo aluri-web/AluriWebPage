@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:documentos": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\",\\\"target\\\":\\\"ES2020\\\"}\" src/lib/documentos/__tests__/formatting.test.ts"
+    "test:documentos": "ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\",\\\"target\\\":\\\"ES2020\\\",\\\"esModuleInterop\\\":true}\" src/lib/documentos/__tests__/formatting.test.ts && ts-node --transpile-only --compiler-options \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\",\\\"target\\\":\\\"ES2020\\\",\\\"esModuleInterop\\\":true}\" src/lib/documentos/__tests__/checklist.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.985.0",
