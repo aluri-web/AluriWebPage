@@ -97,6 +97,8 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
       { label: 'Estado civil', value: d.estado_civil },
       { label: 'Participacion $', value: d.participacion_monto },
       { label: 'Participacion %', value: d.participacion_porcentaje },
+      { label: 'Tipo de cuenta', value: d.tipo_cuenta || 'Ahorros' },
+      { label: 'No. cuenta', value: d.numero_cuenta },
     ], y)
   })
 
@@ -113,6 +115,8 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
       { label: 'Correo', value: c.email },
       { label: 'Telefono', value: c.telefono },
       { label: 'Estado civil', value: c.estado_civil },
+      { label: 'Tipo de cuenta', value: c.tipo_cuenta || 'Ahorros' },
+      { label: 'No. cuenta', value: c.numero_cuenta },
     ], y)
   })
 
@@ -131,7 +135,8 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
       { label: 'Estado civil', value: a.estado_civil },
       { label: 'Participacion $', value: a.participacion_monto },
       { label: 'Participacion %', value: a.participacion_porcentaje },
-      { label: 'Cuenta bancaria', value: a.cuenta_bancaria },
+      { label: 'Tipo de cuenta', value: a.tipo_cuenta || 'Ahorros' },
+      { label: 'No. cuenta', value: a.numero_cuenta },
     ], y)
   })
 

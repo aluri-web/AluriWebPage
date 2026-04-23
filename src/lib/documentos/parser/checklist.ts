@@ -1,5 +1,6 @@
 import {
   TIPO_DOCUMENTO_DEFAULT,
+  TIPO_CUENTA_DEFAULT,
   type ChecklistPayload,
   type DeudorForm,
   type CodeudorForm,
@@ -83,6 +84,16 @@ interface PersonaParseada {
   estado_civil: string
   participacion_monto: string
   participacion_porcentaje: string
+  tipo_cuenta: string
+  numero_cuenta: string
+}
+
+function normalizarTipoCuenta(raw: string): string {
+  const v = (raw || '').trim().replace(/\.+$/, '').trim()
+  if (!v) return TIPO_CUENTA_DEFAULT
+  if (/ahorro/i.test(v)) return 'Ahorros'
+  if (/corriente/i.test(v)) return 'Corriente'
+  return v
 }
 
 function normalizarTipoDocumento(raw: string): string {
@@ -125,6 +136,12 @@ function extraerPersonaDeBloque(bloque: string): PersonaParseada | null {
   const civil = limpiarCampoChecklist(buscar(/Estado\s*civil\s*(?:Deudor|Acreedor)?\s*:\s*([^\n]+)/i, bloque))
   const partMontoRaw = buscar(/Participaci.n\s*\$+\s*:\s*([^\n]+)/i, bloque)
   const partPct = buscar(/Participaci.n\s*%\s*:\s*([^\n]+)/i, bloque)
+  const tipoCuentaRaw = limpiarCampoChecklist(
+    buscar(/Tipo\s+de\s+cuenta\s*:[^\S\n]*([^\n]*)/i, bloque)
+  )
+  const numeroCuentaRaw = limpiarCampoChecklist(
+    buscar(/N.mero\s+de\s+cuenta\s*:[^\S\n]*([^\n]*)/i, bloque)
+  )
 
   return {
     nombre,
@@ -137,6 +154,8 @@ function extraerPersonaDeBloque(bloque: string): PersonaParseada | null {
     estado_civil: civil,
     participacion_monto: formatearMontoDisplay(limpiarCampoChecklist(partMontoRaw).replace(/\$/g, '').trim()),
     participacion_porcentaje: limpiarCampoChecklist(partPct),
+    tipo_cuenta: normalizarTipoCuenta(tipoCuentaRaw),
+    numero_cuenta: numeroCuentaRaw,
   }
 }
 
@@ -204,6 +223,8 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
       estado_civil: '',
       participacion_monto: '',
       participacion_porcentaje: '',
+      tipo_cuenta: TIPO_CUENTA_DEFAULT,
+      numero_cuenta: '',
     })
   }
 
@@ -232,6 +253,8 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
     const civil = buscar(/[Ee]stado [Cc]ivil\s*:\s*(.+)/, bloque).trim()
     const partMonto = buscar(/[Pp]articipaci.n\s*\$+\s*:\s*(.+)/, bloque).replace(/\$/g, '').replace(/\s/g, '').trim()
     const partPct = buscar(/[Pp]articipaci.n\s*%\s*:\s*(.+)/, bloque)
+    const tipoCuentaRaw = buscar(/Tipo\s+de\s+cuenta\s*:[^\S\n]*([^\n]*)/i, bloque)
+    const numeroCuentaRaw = buscar(/N.mero\s+de\s+cuenta\s*:[^\S\n]*([^\n]*)/i, bloque)
 
     acreedores.push({
       nombre,
@@ -244,7 +267,8 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
       estado_civil: civil,
       participacion_monto: formatearMontoDisplay(partMonto),
       participacion_porcentaje: partPct,
-      cuenta_bancaria: '',
+      tipo_cuenta: normalizarTipoCuenta(tipoCuentaRaw),
+      numero_cuenta: numeroCuentaRaw,
     })
   }
 

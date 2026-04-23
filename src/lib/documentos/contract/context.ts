@@ -6,6 +6,12 @@ function capitalizar(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+function tipoCuentaToLabel(tc: string): string {
+  if (!tc) return 'Cuenta de ahorros'
+  if (/corriente/i.test(tc)) return 'Cuenta corriente'
+  return 'Cuenta de ahorros'
+}
+
 function safeNum(n: number): string {
   return formatoPesos(n).replace(/^\$/, '')
 }
@@ -82,12 +88,12 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     fecha_firma_carta: fecha,
     domicilio_contractual: 'Bogotá D.C.',
 
-    tipo_cuenta_deudor: 'Cuenta de ahorros',
-    cuenta_deudor: '',
-    tipo_cuenta_deudor2: deudor2 ? 'Cuenta de ahorros' : '',
-    cuenta_deudor2: '',
-    tipo_cuenta_acreedor: 'Cuenta de ahorros',
-    cuenta_acreedor: acr1.cuenta_bancaria || '',
+    tipo_cuenta_deudor: tipoCuentaToLabel(deudor.tipo_cuenta),
+    cuenta_deudor: deudor.numero_cuenta || '',
+    tipo_cuenta_deudor2: deudor2 ? tipoCuentaToLabel(deudor2.tipo_cuenta) : '',
+    cuenta_deudor2: deudor2?.numero_cuenta || '',
+    tipo_cuenta_acreedor: tipoCuentaToLabel(acr1.tipo_cuenta),
+    cuenta_acreedor: acr1.numero_cuenta || '',
 
     // ── legacy (compat) ──
     fecha_firma: fecha,
@@ -100,7 +106,7 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     acr1_direccion: acr1.direccion || '',
     acr1_email: acr1.email || '',
     acr1_telefono: acr1.telefono || '',
-    acr1_cuenta: acr1.cuenta_bancaria || '',
+    acr1_cuenta: acr1.numero_cuenta || '',
     acr1_pct: `${acr1.participacion_porcentaje || ''}%`.replace(/%%/g, '%'),
     acr1_aporte: formatoPesos(acr1.participacion_monto || 0),
     acr2_nombre: acr2?.nombre_completo || '',
@@ -109,7 +115,7 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     acr2_direccion: acr2?.direccion || '',
     acr2_email: acr2?.email || '',
     acr2_telefono: acr2?.telefono || '',
-    acr2_cuenta: acr2?.cuenta_bancaria || '',
+    acr2_cuenta: acr2?.numero_cuenta || '',
     acr2_pct: acr2 ? `${acr2.participacion_porcentaje || ''}%`.replace(/%%/g, '%') : '',
     acr2_aporte: acr2 ? formatoPesos(acr2.participacion_monto || 0) : '',
     monto_total_texto: prest.monto_total_texto,
@@ -145,6 +151,8 @@ function emptyDeudor() {
     telefono: '',
     estado_civil: '',
     municipio: '',
+    tipo_cuenta: 'Ahorros',
+    numero_cuenta: '',
   }
 }
 
@@ -162,7 +170,8 @@ function emptyAcreedor() {
     participacion_porcentaje: '',
     participacion_monto: 0,
     participacion_texto: '',
-    cuenta_bancaria: '',
+    tipo_cuenta: 'Ahorros',
+    numero_cuenta: '',
     cuota_mensual_individual: 0,
     cuota_mensual_texto: '',
     comision_aluri_individual: 0,

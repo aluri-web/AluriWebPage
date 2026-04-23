@@ -24,6 +24,10 @@ export const TIPOS_DOCUMENTO = [
 
 export const TIPO_DOCUMENTO_DEFAULT = 'C.C.'
 
+export const TIPOS_CUENTA = ['Ahorros', 'Corriente'] as const
+
+export const TIPO_CUENTA_DEFAULT = 'Ahorros'
+
 export interface DeudorForm {
   nombre: string
   tipo_documento: string
@@ -35,6 +39,8 @@ export interface DeudorForm {
   estado_civil: string
   participacion_monto: string
   participacion_porcentaje: string
+  tipo_cuenta: string
+  numero_cuenta: string
 }
 
 export interface CodeudorForm {
@@ -46,6 +52,8 @@ export interface CodeudorForm {
   email: string
   telefono: string
   estado_civil: string
+  tipo_cuenta: string
+  numero_cuenta: string
 }
 
 export interface AcreedorForm {
@@ -59,7 +67,8 @@ export interface AcreedorForm {
   estado_civil: string
   participacion_monto: string
   participacion_porcentaje: string
-  cuenta_bancaria: string
+  tipo_cuenta: string
+  numero_cuenta: string
 }
 
 export interface InmuebleForm {
@@ -110,6 +119,8 @@ export function emptyDeudor(): DeudorForm {
     estado_civil: '',
     participacion_monto: '',
     participacion_porcentaje: '',
+    tipo_cuenta: TIPO_CUENTA_DEFAULT,
+    numero_cuenta: '',
   }
 }
 
@@ -123,6 +134,8 @@ export function emptyCodeudor(): CodeudorForm {
     email: '',
     telefono: '',
     estado_civil: '',
+    tipo_cuenta: TIPO_CUENTA_DEFAULT,
+    numero_cuenta: '',
   }
 }
 
@@ -138,7 +151,8 @@ export function emptyAcreedor(): AcreedorForm {
     estado_civil: '',
     participacion_monto: '',
     participacion_porcentaje: '',
-    cuenta_bancaria: '',
+    tipo_cuenta: TIPO_CUENTA_DEFAULT,
+    numero_cuenta: '',
   }
 }
 

@@ -29,6 +29,8 @@ import {
   ESTADOS_CIVILES,
   TIPOS_DOCUMENTO,
   TIPO_DOCUMENTO_DEFAULT,
+  TIPOS_CUENTA,
+  TIPO_CUENTA_DEFAULT,
   MAX_ACREEDORES,
   MAX_CODEUDORES,
   MAX_DEUDORES,
@@ -478,15 +480,6 @@ export default function DocumentosForm() {
                   className={`${inputCls} bg-slate-900/50`}
                 />
               </Campo>
-              <Campo label="Cuenta bancaria" full>
-                <input
-                  type="text"
-                  value={a.cuenta_bancaria}
-                  onChange={(e) => updateAcreedor(i, 'cuenta_bancaria', e.target.value)}
-                  placeholder="Cuenta de ahorros No. XXXXX de Bancolombia"
-                  className={inputCls}
-                />
-              </Campo>
             </PersonaCard>
           ))}
           <BotonAgregar onClick={agregarAcreedor} disabled={acreedores.length >= MAX_ACREEDORES}>
@@ -856,6 +849,8 @@ interface CamposBasicosPersona {
   email: string
   telefono: string
   estado_civil: string
+  tipo_cuenta: string
+  numero_cuenta: string
 }
 
 function PersonaCamposBasicos({
@@ -942,6 +937,28 @@ function PersonaCamposBasicos({
           value={persona.estado_civil}
           onChange={(e) => onChange('estado_civil', e.target.value)}
           placeholder="Escriba o seleccione..."
+          className={inputCls}
+        />
+      </Campo>
+      <Campo label="Tipo de cuenta">
+        <select
+          value={persona.tipo_cuenta || TIPO_CUENTA_DEFAULT}
+          onChange={(e) => onChange('tipo_cuenta', e.target.value)}
+          className={inputCls}
+        >
+          {TIPOS_CUENTA.map((tc) => (
+            <option key={tc} value={tc}>
+              {tc}
+            </option>
+          ))}
+        </select>
+      </Campo>
+      <Campo label="No. cuenta bancaria">
+        <input
+          type="text"
+          value={persona.numero_cuenta}
+          onChange={(e) => onChange('numero_cuenta', e.target.value)}
+          placeholder="XXXXXXXXX"
           className={inputCls}
         />
       </Campo>

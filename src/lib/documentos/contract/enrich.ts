@@ -5,6 +5,7 @@ import {
   CodeudorForm,
   InmuebleForm,
   TIPO_DOCUMENTO_DEFAULT,
+  TIPO_CUENTA_DEFAULT,
 } from '../types'
 import {
   fechaATextoLegal,
@@ -26,6 +27,8 @@ export interface DeudorEnriched {
   telefono: string
   estado_civil: string
   municipio: string
+  tipo_cuenta: string
+  numero_cuenta: string
 }
 
 export interface CodeudorEnriched {
@@ -38,6 +41,8 @@ export interface CodeudorEnriched {
   email: string
   telefono: string
   estado_civil: string
+  tipo_cuenta: string
+  numero_cuenta: string
 }
 
 export interface AcreedorEnriched {
@@ -53,7 +58,8 @@ export interface AcreedorEnriched {
   participacion_porcentaje: string
   participacion_monto: number
   participacion_texto: string
-  cuenta_bancaria: string
+  tipo_cuenta: string
+  numero_cuenta: string
   cuota_mensual_individual: number
   cuota_mensual_texto: string
   comision_aluri_individual: number
@@ -112,6 +118,8 @@ function enriquecerDeudor(d: DeudorForm): DeudorEnriched {
     telefono: d.telefono || '',
     estado_civil: d.estado_civil || '',
     municipio: d.cc_expedicion || '',
+    tipo_cuenta: d.tipo_cuenta || TIPO_CUENTA_DEFAULT,
+    numero_cuenta: d.numero_cuenta || '',
   }
 }
 
@@ -127,6 +135,8 @@ function enriquecerCodeudor(c: CodeudorForm): CodeudorEnriched {
     email: c.email || '',
     telefono: c.telefono || '',
     estado_civil: c.estado_civil || '',
+    tipo_cuenta: c.tipo_cuenta || TIPO_CUENTA_DEFAULT,
+    numero_cuenta: c.numero_cuenta || '',
   }
 }
 
@@ -241,7 +251,8 @@ function enriquecerAcreedor(
     participacion_porcentaje: acr.participacion_porcentaje || '',
     participacion_monto: montoPart,
     participacion_texto: montoATextoLegal(montoPart),
-    cuenta_bancaria: acr.cuenta_bancaria || '',
+    tipo_cuenta: acr.tipo_cuenta || TIPO_CUENTA_DEFAULT,
+    numero_cuenta: acr.numero_cuenta || '',
     cuota_mensual_individual: cuotaInd,
     cuota_mensual_texto: montoATextoLegalMin(cuotaInd),
     comision_aluri_individual: comisionInd,
