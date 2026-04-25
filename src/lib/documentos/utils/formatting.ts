@@ -63,6 +63,37 @@ export function numeroATexto(n: number): string {
   return texto.replace(/dieciseis/g, 'dieciséis')
 }
 
+/**
+ * Convierte un porcentaje (string como "2", "1.80", "1,5") a su forma en letras
+ * para uso legal: "Dos por ciento", "Uno coma ochenta por ciento", etc.
+ * Si la parte decimal es solo ceros, los omite ("2.00" → "Dos por ciento").
+ */
+export function porcentajeATexto(pct: string): string {
+  if (!pct) return ''
+  const limpio = pct.replace(',', '.').replace(/[^\d.]/g, '').trim()
+  if (!limpio) return ''
+  const parteEntera = Math.trunc(parseFloat(limpio) || 0)
+  const enteroTexto = capitalizar(numeroATexto(parteEntera))
+
+  const dot = limpio.indexOf('.')
+  if (dot === -1) return `${enteroTexto} por ciento`
+  const decStr = limpio.slice(dot + 1)
+  if (!decStr || /^0+$/.test(decStr)) return `${enteroTexto} por ciento`
+
+  let i = 0
+  let prefijoCeros = ''
+  while (i < decStr.length && decStr[i] === '0') {
+    prefijoCeros += 'cero '
+    i++
+  }
+  const resto = decStr.slice(i)
+  const restoNum = resto ? parseInt(resto, 10) : 0
+  const restoTexto = restoNum > 0 ? numeroATexto(restoNum) : ''
+  const decimalTexto = `${prefijoCeros}${restoTexto}`.trim()
+
+  return `${enteroTexto} coma ${decimalTexto} por ciento`
+}
+
 export function formatoPesos(n: number): string {
   const rounded = Math.round(n)
   const abs = Math.abs(rounded)

@@ -22,6 +22,37 @@ function buscar(patron: RegExp, texto: string): string {
   return m && m[1] ? m[1].trim() : ''
 }
 
+/**
+ * Cuando un campo del inmueble viene como "header en una línea + bullets en
+ * las siguientes" (ej. "Número de matrícula inmobiliaria del inmueble" seguido
+ * por "Apartamento 603: 50C-1754048" / "Parqueadero 59: 50C-1754493"),
+ * concatena los bullets como "Apartamento 603: 50C-1754048; Parqueadero 59: 50C-1754493".
+ * Devuelve string vacío si no encuentra el header o no hay bullets.
+ */
+function parsearBulletsInmueble(headerRe: RegExp, texto: string, stopRe: RegExp): string {
+  const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0)
+  let i = 0
+  while (i < lineas.length && !headerRe.test(lineas[i])) i++
+  if (i >= lineas.length) return ''
+  // Si la línea del header ya tiene ":" con valor, no es formato bullet
+  if (/:\s*\S/.test(lineas[i])) return ''
+  i++
+
+  const bullets: string[] = []
+  while (i < lineas.length) {
+    const linea = lineas[i]
+    if (stopRe.test(linea)) break
+    const m = linea.match(/^(.+?):\s*(.+)$/)
+    if (m && m[2].trim()) {
+      bullets.push(linea)
+    } else if (bullets.length > 0) {
+      break
+    }
+    i++
+  }
+  return bullets.join('; ')
+}
+
 function limpiarCampoChecklist(valor: string): string {
   if (!valor) return ''
   const v = valor.trim()
@@ -244,7 +275,10 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
     // fallback a "Cedula:" del formato viejo. [^\S\n]* no cruza newlines.
     const tipoDocRaw = buscar(/Tipo\s+de\s+documento\s*(?:Acreedor)?\s*:[^\S\n]*([^\n]*)/i, bloque)
     const numDocRaw = buscar(/(?:N.mero|Numero|No\.?)\s+Documento\s*(?:Acreedor)?\s*:[^\S\n]*([^\n]*)/i, bloque)
-    const ccRaw = numDocRaw || buscar(/[Cc].dula\s*:\s*(.+)/, bloque)
+    const ccRaw =
+      numDocRaw ||
+      buscar(/[Cc].dula\s*:\s*(.+)/, bloque) ||
+      buscar(/CC\.?\s*(?:del\s*Acreedor)?\s*:\s*([^\n]+)/i, bloque)
     const { cc, exp: ccExp } = separarCcYExpedicion(ccRaw)
 
     const direccion = buscar(/[Dd]irecci.n\s*notificaci?o?n\s*:\s*(.+)/, bloque)
@@ -276,13 +310,26 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
   const mInm = texto.match(/Inmueble\s*:?\s*\n?([\s\S]*?)(?=Condiciones|$)/i)
   const bloqueInmueble = mInm ? mInm[0] : ''
 
-  const matricula = buscar(/matr.cula inmobiliaria.*?:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
-  const cedulaCatastral = buscar(/[Cc].dula catastral.*?:\s*(.+)/, bloqueInmueble).replace(/[.\s]+$/, '')
+  // Stop pattern para los parsers tipo bullet del inmueble. Cualquiera de estos
+  // headers en una línea posterior detiene la captura.
+  const stopInmueble = /^(C.dula catastral|C.digo CHIP|CHIP\s*:|Direcci.n del [Ii]nmueble|Descripci.n del [Ii]nmueble|Linderos|Ciudad|Oficina|Condiciones|Monto|N.mero de matr.cula)/i
+
+  let matricula = buscar(/matr.cula inmobiliaria.*?:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
+  if (!matricula) {
+    matricula = parsearBulletsInmueble(/matr.cula inmobiliaria/i, bloqueInmueble, stopInmueble)
+  }
+  let cedulaCatastral = buscar(/[Cc].dula catastral.*?:\s*(.+)/, bloqueInmueble).replace(/[.\s]+$/, '')
+  if (!cedulaCatastral) {
+    cedulaCatastral = parsearBulletsInmueble(/[Cc].dula catastral/i, bloqueInmueble, stopInmueble)
+  }
   const chip = buscar(/CHIP\s*:\s*(.+)/i, bloqueInmueble)
   const inmuebleDir = buscar(/Direcci.n del [Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble)
   const ciudadOficinaRegistro = buscar(/Ciudad\s+Oficina\s+de\s+Registro\s*:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
   const ciudadInmueble = buscar(/Ciudad\s+del\s+[Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
-  const inmuebleDesc = buscar(/Descripci.n del [Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble)
+  let inmuebleDesc = buscar(/Descripci.n del [Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble)
+  if (!inmuebleDesc) {
+    inmuebleDesc = parsearBulletsInmueble(/Descripci.n del [Ii]nmueble/i, bloqueInmueble, stopInmueble)
+  }
   let inmuebleLinderos = buscar(/Linderos\s*:\s*(.+)/i, bloqueInmueble)
 
   const linderosLineas: string[] = []

@@ -34,6 +34,7 @@ export interface DeudorForm {
   cc: string
   cc_expedicion: string
   direccion: string
+  ciudad_notificacion: string
   email: string
   telefono: string
   estado_civil: string
@@ -49,6 +50,7 @@ export interface CodeudorForm {
   cc: string
   cc_expedicion: string
   direccion: string
+  ciudad_notificacion: string
   email: string
   telefono: string
   estado_civil: string
@@ -114,6 +116,7 @@ export function emptyDeudor(): DeudorForm {
     cc: '',
     cc_expedicion: '',
     direccion: '',
+    ciudad_notificacion: '',
     email: '',
     telefono: '',
     estado_civil: '',
@@ -131,6 +134,7 @@ export function emptyCodeudor(): CodeudorForm {
     cc: '',
     cc_expedicion: '',
     direccion: '',
+    ciudad_notificacion: '',
     email: '',
     telefono: '',
     estado_civil: '',

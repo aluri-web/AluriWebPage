@@ -23,6 +23,7 @@ export interface DeudorEnriched {
   cc: string
   cc_expedicion: string
   direccion: string
+  ciudad_notificacion: string
   email: string
   telefono: string
   estado_civil: string
@@ -38,6 +39,7 @@ export interface CodeudorEnriched {
   cc: string
   cc_expedicion: string
   direccion: string
+  ciudad_notificacion: string
   email: string
   telefono: string
   estado_civil: string
@@ -114,6 +116,7 @@ function enriquecerDeudor(d: DeudorForm): DeudorEnriched {
     cc: d.cc || '',
     cc_expedicion: d.cc_expedicion || '',
     direccion: d.direccion || '',
+    ciudad_notificacion: d.ciudad_notificacion || '',
     email: d.email || '',
     telefono: d.telefono || '',
     estado_civil: d.estado_civil || '',
@@ -132,6 +135,7 @@ function enriquecerCodeudor(c: CodeudorForm): CodeudorEnriched {
     cc: c.cc || '',
     cc_expedicion: c.cc_expedicion || '',
     direccion: c.direccion || '',
+    ciudad_notificacion: c.ciudad_notificacion || '',
     email: c.email || '',
     telefono: c.telefono || '',
     estado_civil: c.estado_civil || '',

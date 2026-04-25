@@ -852,6 +852,7 @@ interface CamposBasicosPersona {
   cc: string
   cc_expedicion: string
   direccion: string
+  ciudad_notificacion: string
   email: string
   telefono: string
   estado_civil: string
@@ -915,6 +916,15 @@ function PersonaCamposBasicos({
           value={persona.direccion}
           onChange={(e) => onChange('direccion', e.target.value)}
           placeholder="Direccion completa"
+          className={inputCls}
+        />
+      </Campo>
+      <Campo label="Ciudad de notificacion">
+        <input
+          type="text"
+          value={persona.ciudad_notificacion}
+          onChange={(e) => onChange('ciudad_notificacion', e.target.value)}
+          placeholder="Bogota D.C."
           className={inputCls}
         />
       </Campo>

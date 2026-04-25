@@ -1,9 +1,22 @@
 import { EnrichedData } from './enrich'
-import { formatoPesos, numeroATexto, montoATextoLegal, montoATextoLegalMin } from '../utils/formatting'
+import { formatoPesos, numeroATexto, montoATextoLegal, montoATextoLegalMin, porcentajeATexto } from '../utils/formatting'
 
 function capitalizar(s: string): string {
   if (!s) return s
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/**
+ * Extrae la ciudad de una dirección colombiana cuando la dirección incluye
+ * sufijo " en CIUDAD" o termina con la ciudad después de una coma.
+ * Devuelve string vacío si no logra inferirla.
+ */
+function inferirCiudad(direccion: string): string {
+  if (!direccion) return ''
+  const m = direccion.match(/\ben\s+([^,]+?)\s*\.?\s*$/i)
+  if (m) return m[1].trim()
+  const partes = direccion.split(',').map((p) => p.trim()).filter(Boolean)
+  return partes.length > 1 ? partes[partes.length - 1] : ''
 }
 
 function tipoCuentaToLabel(tc: string): string {
@@ -40,7 +53,20 @@ export function buildContext(data: EnrichedData): Record<string, string> {
   const nombresDeudoresLista = deudores.map((d) => d.nombre_completo).filter((n) => n)
   const nombresDeudoresStr = nombresDeudoresLista.join(' Y ')
 
+  const esUnicoDeudor = deudores.length === 1
+  const hayDeudor2 = !!deudor2
+
   return {
+    // ── Banderas condicionales (Grupo C) ──
+    hay_deudor2: hayDeudor2 ? 'true' : '',
+    es_unico_deudor: esUnicoDeudor ? 'true' : '',
+    yo_nosotros: esUnicoDeudor ? 'Yo' : 'Nosotros',
+    yo_nosotros_min: esUnicoDeudor ? 'yo' : 'nosotros',
+    el_los_deudores: esUnicoDeudor ? 'el "DEUDOR"' : 'los "DEUDOR(ES)"',
+    me_obligo_obligamos: esUnicoDeudor ? 'me obligo' : 'nos obligamos',
+    autorizo_autorizamos: esUnicoDeudor ? 'autorizo' : 'autorizamos',
+    mi_nuestra_firma: esUnicoDeudor ? 'mi firma' : 'nuestras firmas',
+
     // ── v4 nuevas ──
     nombres_deudores: nombresDeudoresStr,
 
@@ -48,6 +74,7 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     deudor_tipo_doc: deudor.tipo_documento || 'C.C.',
     deudor_cc: deudor.cc || '',
     deudor_direccion: deudor.direccion || '',
+    deudor_ciudad: deudor.ciudad_notificacion || inferirCiudad(deudor.direccion) || '',
     deudor_email: deudor.email || '',
     deudor_telefono: deudor.telefono || '',
 
@@ -55,6 +82,7 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     deudor2_tipo_doc: deudor2 ? (deudor2.tipo_documento || 'C.C.') : '',
     deudor2_cc: deudor2?.cc || '',
     deudor2_direccion: deudor2?.direccion || '',
+    deudor2_ciudad: deudor2 ? (deudor2.ciudad_notificacion || inferirCiudad(deudor2.direccion) || '') : '',
     deudor2_email: deudor2?.email || '',
     deudor2_telefono: deudor2?.telefono || '',
 
@@ -76,6 +104,7 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     // El template v5 ya incluye "% mensual anticipado" despues del placeholder;
     // solo pasamos el numero (sin % ni sufijo) para no duplicar.
     tasa_interes: (prest.tasa_mensual || '').replace(/%/g, '').trim(),
+    tasa_interes_letras: porcentajeATexto(prest.tasa_mensual || ''),
     plazo_letras: capitalizar(numeroATexto(prest.plazo_meses || 0)),
     plazo_numeros: String(prest.plazo_meses || ''),
     cuota_mensual_letras: capitalizar(numeroATexto(prest.cuota_mensual_total)),
@@ -149,6 +178,7 @@ function emptyDeudor() {
     cc: '',
     cc_expedicion: '',
     direccion: '',
+    ciudad_notificacion: '',
     email: '',
     telefono: '',
     estado_civil: '',

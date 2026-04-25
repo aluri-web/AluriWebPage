@@ -18,7 +18,7 @@ const MARCADORES_PAGE_BREAK = [
 
 const TEMPLATE_PATH = path.join(
   process.cwd(),
-  'src/lib/documentos/templates/Contrato_TPL_DOCXTPL_v5.docx'
+  'src/lib/documentos/templates/Contrato_TPL_DOCXTPL_v6.docx'
 )
 
 export interface GenerarContratoResult {
