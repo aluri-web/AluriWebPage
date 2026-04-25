@@ -1353,6 +1353,29 @@ export default function AgentesPanel({
                       </button>
                     )}
                   </div>
+                  {/* Anexos (uso interno admin/CRO) */}
+                  {(viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId) && (
+                    <div className="mt-3 pt-3 border-t border-slate-700">
+                      <div className="text-xs text-slate-400 mb-2 font-semibold">Estudios detallados (uso interno)</div>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { type: 'anexo_juridico', label: 'Estudio Juridico' },
+                          { type: 'anexo_credito',  label: 'Estudio de Credito' },
+                          { type: 'anexo_kyc',      label: 'Verificacion KYC / SARLAFT' },
+                        ].map(a => (
+                          <a
+                            key={a.type}
+                            href={`/api/orchestrator/pdf?id=${viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId || ''}&type=${a.type}`}
+                            download
+                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors text-xs"
+                          >
+                            <Download size={12} />
+                            {a.label}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {lastEvaluationId && !isProcessing && Object.values(agents).some(a => a.status === 'error') && (
                     <button
                       onClick={handleRetryFailed}
