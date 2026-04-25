@@ -64,6 +64,7 @@ export interface AcreedorForm {
   cc: string
   cc_expedicion: string
   direccion: string
+  ciudad_notificacion: string
   email: string
   telefono: string
   estado_civil: string
@@ -74,6 +75,7 @@ export interface AcreedorForm {
 }
 
 export interface InmuebleForm {
+  etiqueta: string
   matricula_inmobiliaria: string
   cedula_catastral: string
   chip: string
@@ -100,7 +102,7 @@ export interface ChecklistPayload {
   deudores: DeudorForm[]
   codeudores: CodeudorForm[]
   acreedores: AcreedorForm[]
-  inmueble: InmuebleForm
+  inmuebles: InmuebleForm[]
   prestamo: PrestamoForm
   fecha_creacion: string
 }
@@ -108,6 +110,7 @@ export interface ChecklistPayload {
 export const MAX_DEUDORES = 4
 export const MAX_CODEUDORES = 4
 export const MAX_ACREEDORES = 4
+export const MAX_INMUEBLES = 6
 
 export function emptyDeudor(): DeudorForm {
   return {
@@ -150,6 +153,7 @@ export function emptyAcreedor(): AcreedorForm {
     cc: '',
     cc_expedicion: '',
     direccion: '',
+    ciudad_notificacion: '',
     email: '',
     telefono: '',
     estado_civil: '',
@@ -162,6 +166,7 @@ export function emptyAcreedor(): AcreedorForm {
 
 export function emptyInmueble(): InmuebleForm {
   return {
+    etiqueta: '',
     matricula_inmobiliaria: '',
     cedula_catastral: '',
     chip: '',

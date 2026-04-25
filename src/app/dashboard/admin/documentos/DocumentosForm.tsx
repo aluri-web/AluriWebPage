@@ -34,6 +34,7 @@ import {
   MAX_ACREEDORES,
   MAX_CODEUDORES,
   MAX_DEUDORES,
+  MAX_INMUEBLES,
   emptyAcreedor,
   emptyCodeudor,
   emptyDeudor,
@@ -64,7 +65,7 @@ export default function DocumentosForm() {
   const [codeudores, setCodeudores] = useState<CodeudorForm[]>([])
   const [acreedores, setAcreedores] = useState<AcreedorForm[]>([])
   const [mostrarInmueble, setMostrarInmueble] = useState(false)
-  const [inmueble, setInmueble] = useState<InmuebleForm>(emptyInmueble())
+  const [inmuebles, setInmuebles] = useState<InmuebleForm[]>([emptyInmueble()])
   const [mostrarPrestamo, setMostrarPrestamo] = useState(false)
   const [prestamo, setPrestamo] = useState<PrestamoForm>(emptyPrestamo())
   const [toast, setToast] = useState<ToastState | null>(null)
@@ -162,6 +163,24 @@ export default function DocumentosForm() {
     setAcreedores(next)
   }
 
+  // ── Inmuebles handlers ──────────────────────────────────────
+  const agregarInmueble = () => {
+    if (inmuebles.length >= MAX_INMUEBLES) {
+      mostrarToast(`Maximo ${MAX_INMUEBLES} inmuebles permitidos`, 'error')
+      return
+    }
+    setInmuebles([...inmuebles, emptyInmueble()])
+  }
+  const quitarInmueble = (i: number) => {
+    if (inmuebles.length <= 1) return
+    setInmuebles(inmuebles.filter((_, idx) => idx !== i))
+  }
+  const updateInmueble = (i: number, field: keyof InmuebleForm, value: string) => {
+    const next = [...inmuebles]
+    next[i] = { ...next[i], [field]: value }
+    setInmuebles(next)
+  }
+
   // ── Acciones ────────────────────────────────────────────────
   const limpiar = () => {
     if (!window.confirm('Se borraran todos los datos del formulario. Continuar?')) return
@@ -169,7 +188,7 @@ export default function DocumentosForm() {
     setDeudores([])
     setCodeudores([])
     setAcreedores([])
-    setInmueble(emptyInmueble())
+    setInmuebles([emptyInmueble()])
     setMostrarInmueble(false)
     setPrestamo(emptyPrestamo())
     setMostrarPrestamo(false)
@@ -181,7 +200,7 @@ export default function DocumentosForm() {
     deudores: deudoresConPct,
     codeudores,
     acreedores: acreedoresConPct,
-    inmueble,
+    inmuebles,
     prestamo: {
       ...prestamo,
       monto: montoPrestamoFmt,
@@ -299,26 +318,22 @@ export default function DocumentosForm() {
       setCodeudores(Array.isArray(d.codeudores) ? d.codeudores : [])
       setAcreedores(Array.isArray(d.acreedores) ? d.acreedores : [])
 
-      const inm = d.inmueble || {}
-      if (
-        inm.matricula_inmobiliaria ||
-        inm.cedula_catastral ||
-        inm.chip ||
-        inm.direccion ||
-        inm.descripcion ||
-        inm.linderos
-      ) {
-        setInmueble({
-          matricula_inmobiliaria: inm.matricula_inmobiliaria || '',
-          cedula_catastral: inm.cedula_catastral || '',
-          chip: inm.chip || '',
-          direccion: inm.direccion || '',
-          ciudad: inm.ciudad || '',
-          oficina_registro: inm.oficina_registro || '',
-          ciudad_oficina_registro: inm.ciudad_oficina_registro || '',
-          descripcion: inm.descripcion || '',
-          linderos: inm.linderos || '',
-        })
+      const inmueblesParsed = Array.isArray(d.inmuebles) ? d.inmuebles : []
+      if (inmueblesParsed.length > 0) {
+        setInmuebles(
+          inmueblesParsed.map((inm: Partial<InmuebleForm>) => ({
+            etiqueta: inm.etiqueta || '',
+            matricula_inmobiliaria: inm.matricula_inmobiliaria || '',
+            cedula_catastral: inm.cedula_catastral || '',
+            chip: inm.chip || '',
+            direccion: inm.direccion || '',
+            ciudad: inm.ciudad || '',
+            oficina_registro: inm.oficina_registro || '',
+            ciudad_oficina_registro: inm.ciudad_oficina_registro || '',
+            descripcion: inm.descripcion || '',
+            linderos: inm.linderos || '',
+          }))
+        )
         setMostrarInmueble(true)
       }
 
@@ -494,9 +509,9 @@ export default function DocumentosForm() {
         </div>
       </Seccion>
 
-      {/* Inmueble */}
+      {/* Inmueble(s) */}
       <Seccion
-        titulo="Informacion del inmueble"
+        titulo="Informacion del(los) inmueble(s)"
         badge="OBLIGATORIO"
         badgeColor="amber"
         icon={Home}
@@ -504,88 +519,108 @@ export default function DocumentosForm() {
         isOpen={mostrarInmueble}
         onToggle={() => setMostrarInmueble(!mostrarInmueble)}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Campo label="No. matricula inmobiliaria" requerido>
-            <input
-              type="text"
-              value={inmueble.matricula_inmobiliaria}
-              onChange={(e) => setInmueble({ ...inmueble, matricula_inmobiliaria: e.target.value })}
-              placeholder="50S-XXXXXX"
-              className={inputCls}
-            />
-          </Campo>
-          <Campo label="Cedula catastral">
-            <input
-              type="text"
-              value={inmueble.cedula_catastral}
-              onChange={(e) => setInmueble({ ...inmueble, cedula_catastral: e.target.value })}
-              placeholder="BS 23S 61 44 2"
-              className={inputCls}
-            />
-          </Campo>
-          <Campo label="Codigo CHIP">
-            <input
-              type="text"
-              value={inmueble.chip}
-              onChange={(e) => setInmueble({ ...inmueble, chip: e.target.value })}
-              placeholder="AAA0000XXXX"
-              className={inputCls}
-            />
-          </Campo>
-          <Campo label="Direccion del inmueble" full requerido>
-            <input
-              type="text"
-              value={inmueble.direccion}
-              onChange={(e) => setInmueble({ ...inmueble, direccion: e.target.value })}
-              placeholder="Direccion completa del inmueble"
-              className={inputCls}
-            />
-          </Campo>
-          <Campo label="Ciudad del inmueble" requerido>
-            <input
-              type="text"
-              value={inmueble.ciudad}
-              onChange={(e) => setInmueble({ ...inmueble, ciudad: e.target.value })}
-              placeholder="Bogota D.C."
-              className={inputCls}
-            />
-          </Campo>
-          <Campo label="Oficina de Registro (zona)" requerido>
-            <input
-              type="text"
-              value={inmueble.oficina_registro}
-              onChange={(e) => setInmueble({ ...inmueble, oficina_registro: e.target.value })}
-              placeholder="Zona Sur"
-              className={inputCls}
-            />
-          </Campo>
-          <Campo label="Ciudad de la Oficina de Registro" requerido>
-            <input
-              type="text"
-              value={inmueble.ciudad_oficina_registro}
-              onChange={(e) => setInmueble({ ...inmueble, ciudad_oficina_registro: e.target.value })}
-              placeholder="Bogota D.C."
-              className={inputCls}
-            />
-          </Campo>
-          <Campo label="Descripcion del inmueble" full>
-            <textarea
-              value={inmueble.descripcion}
-              onChange={(e) => setInmueble({ ...inmueble, descripcion: e.target.value })}
-              rows={4}
-              placeholder="Area, numero de pisos, distribucion, etc."
-              className={inputCls}
-            />
-          </Campo>
-          <Campo label="Linderos" full>
-            <textarea
-              value={inmueble.linderos}
-              onChange={(e) => setInmueble({ ...inmueble, linderos: e.target.value })}
-              rows={4}
-              placeholder="Linderos del inmueble segun escritura"
-              className={inputCls}
-            />
-          </Campo>
+        <div className="space-y-4">
+          {inmuebles.map((inm, i) => (
+            <PersonaCard
+              key={`inmueble-${i}`}
+              titulo={inmuebles.length === 1 ? 'Inmueble' : `Inmueble ${i + 1}${inm.etiqueta ? ` — ${inm.etiqueta}` : ''}`}
+              onRemove={inmuebles.length > 1 ? () => quitarInmueble(i) : undefined}
+            >
+              <Campo label="Etiqueta (ej. Apartamento 603)" full>
+                <input
+                  type="text"
+                  value={inm.etiqueta}
+                  onChange={(e) => updateInmueble(i, 'etiqueta', e.target.value)}
+                  placeholder="Apartamento 603, Parqueadero 59, etc."
+                  className={inputCls}
+                />
+              </Campo>
+              <Campo label="No. matricula inmobiliaria" requerido>
+                <input
+                  type="text"
+                  value={inm.matricula_inmobiliaria}
+                  onChange={(e) => updateInmueble(i, 'matricula_inmobiliaria', e.target.value)}
+                  placeholder="50S-XXXXXX"
+                  className={inputCls}
+                />
+              </Campo>
+              <Campo label="Cedula catastral">
+                <input
+                  type="text"
+                  value={inm.cedula_catastral}
+                  onChange={(e) => updateInmueble(i, 'cedula_catastral', e.target.value)}
+                  placeholder="BS 23S 61 44 2"
+                  className={inputCls}
+                />
+              </Campo>
+              <Campo label="Codigo CHIP">
+                <input
+                  type="text"
+                  value={inm.chip}
+                  onChange={(e) => updateInmueble(i, 'chip', e.target.value)}
+                  placeholder="AAA0000XXXX"
+                  className={inputCls}
+                />
+              </Campo>
+              <Campo label={i === 0 ? 'Direccion del inmueble' : 'Direccion del inmueble (opcional, si difiere)'} full requerido={i === 0}>
+                <input
+                  type="text"
+                  value={inm.direccion}
+                  onChange={(e) => updateInmueble(i, 'direccion', e.target.value)}
+                  placeholder="Direccion completa del inmueble"
+                  className={inputCls}
+                />
+              </Campo>
+              <Campo label="Ciudad del inmueble" requerido={i === 0}>
+                <input
+                  type="text"
+                  value={inm.ciudad}
+                  onChange={(e) => updateInmueble(i, 'ciudad', e.target.value)}
+                  placeholder="Bogota D.C."
+                  className={inputCls}
+                />
+              </Campo>
+              <Campo label="Oficina de Registro (zona)" requerido={i === 0}>
+                <input
+                  type="text"
+                  value={inm.oficina_registro}
+                  onChange={(e) => updateInmueble(i, 'oficina_registro', e.target.value)}
+                  placeholder="Zona Sur"
+                  className={inputCls}
+                />
+              </Campo>
+              <Campo label="Ciudad de la Oficina de Registro" requerido={i === 0}>
+                <input
+                  type="text"
+                  value={inm.ciudad_oficina_registro}
+                  onChange={(e) => updateInmueble(i, 'ciudad_oficina_registro', e.target.value)}
+                  placeholder="Bogota D.C."
+                  className={inputCls}
+                />
+              </Campo>
+              <Campo label="Descripcion del inmueble" full>
+                <textarea
+                  value={inm.descripcion}
+                  onChange={(e) => updateInmueble(i, 'descripcion', e.target.value)}
+                  rows={4}
+                  placeholder="Area, numero de pisos, distribucion, etc."
+                  className={inputCls}
+                />
+              </Campo>
+              <Campo label="Linderos" full>
+                <textarea
+                  value={inm.linderos}
+                  onChange={(e) => updateInmueble(i, 'linderos', e.target.value)}
+                  rows={4}
+                  placeholder="Linderos del inmueble segun escritura"
+                  className={inputCls}
+                />
+              </Campo>
+            </PersonaCard>
+          ))}
+          <BotonAgregar onClick={agregarInmueble} disabled={inmuebles.length >= MAX_INMUEBLES}>
+            Agregar inmueble
+          </BotonAgregar>
         </div>
       </Seccion>
 

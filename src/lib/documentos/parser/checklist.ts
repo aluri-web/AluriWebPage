@@ -23,34 +23,64 @@ function buscar(patron: RegExp, texto: string): string {
 }
 
 /**
- * Cuando un campo del inmueble viene como "header en una línea + bullets en
- * las siguientes" (ej. "Número de matrícula inmobiliaria del inmueble" seguido
- * por "Apartamento 603: 50C-1754048" / "Parqueadero 59: 50C-1754493"),
- * concatena los bullets como "Apartamento 603: 50C-1754048; Parqueadero 59: 50C-1754493".
- * Devuelve string vacío si no encuentra el header o no hay bullets.
+ * Cuando un campo del inmueble viene como "header sin ':' + bullets en
+ * las siguientes líneas" (ej. "Número de matrícula inmobiliaria del inmueble"
+ * seguido por "Apartamento 603: 50C-1754048" / "Parqueadero 59: 50C-1754493"),
+ * devuelve los items como pares { etiqueta, valor }. Soporta valores que
+ * abarcan varias líneas (ej. linderos largos).
+ *
+ * Devuelve [] si no encuentra el header o si el header trae el valor inline.
  */
-function parsearBulletsInmueble(headerRe: RegExp, texto: string, stopRe: RegExp): string {
+function parsearBulletsInmuebleItems(
+  headerRe: RegExp,
+  texto: string,
+  stopRe: RegExp
+): Array<{ etiqueta: string; valor: string }> {
   const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0)
   let i = 0
-  while (i < lineas.length && !headerRe.test(lineas[i])) i++
-  if (i >= lineas.length) return ''
-  // Si la línea del header ya tiene ":" con valor, no es formato bullet
-  if (/:\s*\S/.test(lineas[i])) return ''
-  i++
-
-  const bullets: string[] = []
   while (i < lineas.length) {
-    const linea = lineas[i]
-    if (stopRe.test(linea)) break
-    const m = linea.match(/^(.+?):\s*(.+)$/)
-    if (m && m[2].trim()) {
-      bullets.push(linea)
-    } else if (bullets.length > 0) {
-      break
+    const m = lineas[i].match(headerRe)
+    if (m) {
+      // Validar que el header NO tenga valor inline pegado (ej. "Matrícula: VALOR").
+      // Permitimos que el header aparezca al final de una línea que trae otro texto
+      // antes (caso típico del .docx donde "Linderos" se concatenó al final de la
+      // descripción del último inmueble).
+      const tail = lineas[i].slice(m.index! + m[0].length).trim().replace(/^\.+/, '').trim()
+      if (!tail.startsWith(':')) break
     }
     i++
   }
-  return bullets.join('; ')
+  if (i >= lineas.length) return []
+  i++ // saltar la línea del header
+
+  const items: Array<{ etiqueta: string; valor: string }> = []
+  let actual: { etiqueta: string; piezas: string[] } | null = null
+  const etiquetasVistas = new Set<string>()
+
+  while (i < lineas.length) {
+    const linea = lineas[i]
+    if (stopRe.test(linea)) break
+    const m = linea.match(/^([^:]+?):\s*(.+)$/)
+    if (m && m[2].trim()) {
+      const etiqueta = m[1].trim()
+      // Si la etiqueta se repite, asumimos que cambió la sección (ej. la
+      // descripción terminó y comenzó linderos sin un header explícito).
+      if (etiquetasVistas.has(etiqueta)) break
+      etiquetasVistas.add(etiqueta)
+      if (actual) items.push({ etiqueta: actual.etiqueta, valor: actual.piezas.join(' ') })
+      actual = { etiqueta, piezas: [m[2].trim()] }
+    } else if (actual) {
+      actual.piezas.push(linea)
+    }
+    i++
+  }
+  if (actual) items.push({ etiqueta: actual.etiqueta, valor: actual.piezas.join(' ') })
+  return items
+}
+
+/** Concatena items de bullets como "Apartamento 603: VALOR; Parqueadero 59: VALOR". */
+function joinBullets(items: Array<{ etiqueta: string; valor: string }>): string {
+  return items.map((i) => `${i.etiqueta}: ${i.valor}`).join('; ')
 }
 
 function limpiarCampoChecklist(valor: string): string {
@@ -110,6 +140,7 @@ interface PersonaParseada {
   cc: string
   cc_expedicion: string
   direccion: string
+  ciudad_notificacion: string
   email: string
   telefono: string
   estado_civil: string
@@ -180,6 +211,7 @@ function extraerPersonaDeBloque(bloque: string): PersonaParseada | null {
     cc,
     cc_expedicion: ccExp,
     direccion,
+    ciudad_notificacion: '',
     email,
     telefono,
     estado_civil: civil,
@@ -195,7 +227,7 @@ export interface ParsedChecklist {
   deudores: DeudorForm[]
   codeudores: CodeudorForm[]
   acreedores: AcreedorForm[]
-  inmueble: InmuebleForm
+  inmuebles: InmuebleForm[]
   prestamo: PrestamoForm
 }
 
@@ -248,6 +280,7 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
       tipo_documento: TIPO_DOCUMENTO_DEFAULT,
       cc: '',
       cc_expedicion: '',
+      ciudad_notificacion: '',
       direccion: '',
       email: '',
       telefono: '',
@@ -296,6 +329,7 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
       cc,
       cc_expedicion: ccExp,
       direccion,
+      ciudad_notificacion: '',
       email,
       telefono,
       estado_civil: civil,
@@ -310,27 +344,32 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
   const mInm = texto.match(/Inmueble\s*:?\s*\n?([\s\S]*?)(?=Condiciones|$)/i)
   const bloqueInmueble = mInm ? mInm[0] : ''
 
-  // Stop pattern para los parsers tipo bullet del inmueble. Cualquiera de estos
-  // headers en una línea posterior detiene la captura.
+  // Stop pattern para los parsers tipo bullet del inmueble.
   const stopInmueble = /^(C.dula catastral|C.digo CHIP|CHIP\s*:|Direcci.n del [Ii]nmueble|Descripci.n del [Ii]nmueble|Linderos|Ciudad|Oficina|Condiciones|Monto|N.mero de matr.cula)/i
 
-  let matricula = buscar(/matr.cula inmobiliaria.*?:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
-  if (!matricula) {
-    matricula = parsearBulletsInmueble(/matr.cula inmobiliaria/i, bloqueInmueble, stopInmueble)
-  }
-  let cedulaCatastral = buscar(/[Cc].dula catastral.*?:\s*(.+)/, bloqueInmueble).replace(/[.\s]+$/, '')
-  if (!cedulaCatastral) {
-    cedulaCatastral = parsearBulletsInmueble(/[Cc].dula catastral/i, bloqueInmueble, stopInmueble)
-  }
+  // Intento "single-line" primero (formato legacy con ':' inline).
+  const matriculaSingle = buscar(/matr.cula inmobiliaria.*?:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
+  const cedulaSingle = buscar(/[Cc].dula catastral.*?:\s*(.+)/, bloqueInmueble).replace(/[.\s]+$/, '')
+  const descSingle = buscar(/Descripci.n del [Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble)
+
+  // Si los single-line vinieron vacíos, probamos formato bullet (multi-inmueble).
+  const matriculaItems = matriculaSingle
+    ? []
+    : parsearBulletsInmuebleItems(/matr.cula inmobiliaria/i, bloqueInmueble, stopInmueble)
+  const cedulaItems = cedulaSingle
+    ? []
+    : parsearBulletsInmuebleItems(/[Cc].dula catastral/i, bloqueInmueble, stopInmueble)
+  const descItems = descSingle
+    ? []
+    : parsearBulletsInmuebleItems(/Descripci.n del [Ii]nmueble/i, bloqueInmueble, stopInmueble)
+  const linderosItems = parsearBulletsInmuebleItems(/Linderos/i, bloqueInmueble, stopInmueble)
+
   const chip = buscar(/CHIP\s*:\s*(.+)/i, bloqueInmueble)
   const inmuebleDir = buscar(/Direcci.n del [Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble)
   const ciudadOficinaRegistro = buscar(/Ciudad\s+Oficina\s+de\s+Registro\s*:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
   const ciudadInmueble = buscar(/Ciudad\s+del\s+[Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble).replace(/[.\s]+$/, '')
-  let inmuebleDesc = buscar(/Descripci.n del [Ii]nmueble\s*:\s*(.+)/i, bloqueInmueble)
-  if (!inmuebleDesc) {
-    inmuebleDesc = parsearBulletsInmueble(/Descripci.n del [Ii]nmueble/i, bloqueInmueble, stopInmueble)
-  }
-  let inmuebleLinderos = buscar(/Linderos\s*:\s*(.+)/i, bloqueInmueble)
+  // Linderos legacy (bloque de texto multilinea sin etiquetas).
+  let inmuebleLinderosSingle = buscar(/Linderos\s*:\s*(.+)/i, bloqueInmueble)
 
   const linderosLineas: string[] = []
   let capturando = false
@@ -350,7 +389,58 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
       }
     }
   }
-  if (linderosLineas.length > 0) inmuebleLinderos = linderosLineas.join(' ')
+  if (linderosLineas.length > 0) inmuebleLinderosSingle = linderosLineas.join(' ')
+
+  // ── Construir array de inmuebles ──
+  // Multi-inmueble: si encontramos bullets en matrícula/cédula/descripción/linderos,
+  // creamos un InmuebleForm por cada etiqueta. Si no hay bullets, creamos un único
+  // InmuebleForm con los valores legacy (single-line) o las concatenaciones.
+  const etiquetasMulti = new Set<string>()
+  for (const arr of [matriculaItems, cedulaItems, descItems, linderosItems]) {
+    for (const it of arr) etiquetasMulti.add(it.etiqueta)
+  }
+  const tieneBullets = etiquetasMulti.size > 0
+
+  let inmuebles: InmuebleForm[]
+  if (tieneBullets) {
+    // Preservar el orden de matriculaItems si existe; si no, orden de descubrimiento.
+    const orden = matriculaItems.length > 0
+      ? matriculaItems.map((i) => i.etiqueta)
+      : Array.from(etiquetasMulti)
+    inmuebles = orden.map((etiqueta, idx) => {
+      const matricula = matriculaItems.find((i) => i.etiqueta === etiqueta)?.valor || ''
+      const cedula = cedulaItems.find((i) => i.etiqueta === etiqueta)?.valor || ''
+      const descripcion = descItems.find((i) => i.etiqueta === etiqueta)?.valor || ''
+      const linderos = linderosItems.find((i) => i.etiqueta === etiqueta)?.valor || ''
+      return {
+        etiqueta,
+        matricula_inmobiliaria: matricula,
+        cedula_catastral: cedula,
+        chip: idx === 0 ? chip : '',
+        direccion: idx === 0 ? inmuebleDir : '',
+        ciudad: idx === 0 ? ciudadInmueble : '',
+        oficina_registro: '',
+        ciudad_oficina_registro: idx === 0 ? ciudadOficinaRegistro : '',
+        descripcion,
+        linderos,
+      }
+    })
+  } else {
+    inmuebles = [
+      {
+        etiqueta: '',
+        matricula_inmobiliaria: matriculaSingle || joinBullets(matriculaItems),
+        cedula_catastral: cedulaSingle || joinBullets(cedulaItems),
+        chip,
+        direccion: inmuebleDir,
+        ciudad: ciudadInmueble,
+        oficina_registro: '',
+        ciudad_oficina_registro: ciudadOficinaRegistro,
+        descripcion: descSingle || joinBullets(descItems),
+        linderos: inmuebleLinderosSingle,
+      },
+    ]
+  }
 
   // ── Condiciones del prestamo ──
   const mPrest = texto.match(/Condiciones del pr.stamo\s*:?\s*\n?([\s\S]*?)(?=Observaci.n|$)/i)
@@ -377,17 +467,7 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
     deudores,
     codeudores,
     acreedores,
-    inmueble: {
-      matricula_inmobiliaria: matricula,
-      cedula_catastral: cedulaCatastral,
-      chip,
-      direccion: inmuebleDir,
-      ciudad: ciudadInmueble,
-      oficina_registro: '',
-      ciudad_oficina_registro: ciudadOficinaRegistro,
-      descripcion: inmuebleDesc,
-      linderos: inmuebleLinderos,
-    },
+    inmuebles,
     prestamo: {
       monto: formatearMontoDisplay(monto),
       plazo_meses: plazo,
@@ -406,7 +486,7 @@ export function toChecklistPayload(parsed: ParsedChecklist): Omit<ChecklistPaylo
     deudores: parsed.deudores,
     codeudores: parsed.codeudores,
     acreedores: parsed.acreedores,
-    inmueble: parsed.inmueble,
+    inmuebles: parsed.inmuebles,
     prestamo: parsed.prestamo,
   }
 }

@@ -1,4 +1,4 @@
-import { EnrichedData } from './enrich'
+import { EnrichedData, InmuebleEnriched } from './enrich'
 import { formatoPesos, numeroATexto, montoATextoLegal, montoATextoLegalMin, porcentajeATexto } from '../utils/formatting'
 
 function capitalizar(s: string): string {
@@ -29,13 +29,28 @@ function safeNum(n: number): string {
   return formatoPesos(n).replace(/^\$/, '')
 }
 
-export function buildContext(data: EnrichedData): Record<string, string> {
+export function buildContext(data: EnrichedData): Record<string, unknown> {
   const deudores = data.deudores
   const deudor = deudores[0] || emptyDeudor()
   const deudor2 = deudores[1]
   const acr1 = data.acreedores[0] || emptyAcreedor()
   const acr2 = data.acreedores[1]
-  const inm = data.inmueble
+  const inmuebles = data.inmuebles.length > 0 ? data.inmuebles : [emptyInmueble()]
+  const inm = inmuebles[0]
+  // Para los placeholders simples del template (matricula_inmobiliaria, etc.)
+  // concatenamos los valores de todos los inmuebles cuando son varios. Cuando
+  // hay uno solo, se usa el valor tal cual.
+  const concatField = (key: keyof InmuebleEnriched): string => {
+    if (inmuebles.length <= 1) return String(inmuebles[0]?.[key] ?? '')
+    return inmuebles
+      .map((i) => {
+        const valor = String(i[key] ?? '')
+        if (!valor) return ''
+        return i.etiqueta ? `${i.etiqueta}: ${valor}` : valor
+      })
+      .filter(Boolean)
+      .join('; ')
+  }
   const prest = data.prestamo
   const fecha = data.fecha_firma
 
@@ -93,11 +108,22 @@ export function buildContext(data: EnrichedData): Record<string, string> {
     acreedor_email: acr1.email || '',
     acreedor_telefono: acr1.telefono || '',
 
-    matricula_inmobiliaria: inm.matricula_inmobiliaria || '',
+    matricula_inmobiliaria: concatField('matricula_inmobiliaria'),
     oficina_registro: inm.oficina_registro || 'Zona Sur',
     ciudad_oficina_registro: inm.ciudad_oficina_registro || 'Bogotá D.C.',
     direccion_inmueble: inm.direccion_corta || '',
     ciudad_inmueble: inm.ciudad || 'Bogotá D.C.',
+    // Array completo expuesto para futuros loops {{#inmuebles}}...{{/inmuebles}}
+    inmuebles: inmuebles.map((i) => ({
+      etiqueta: i.etiqueta,
+      matricula_inmobiliaria: i.matricula_inmobiliaria,
+      cedula_catastral: i.cedula_catastral,
+      chip: i.chip,
+      direccion: i.direccion_corta,
+      ciudad: i.ciudad,
+      descripcion: i.descripcion_completa,
+      linderos: i.linderos,
+    })),
 
     monto_credito_letras: numeroATexto(mt).toUpperCase(),
     monto_credito_numeros: safeNum(mt),
@@ -209,5 +235,20 @@ function emptyAcreedor() {
     comision_aluri_individual: 0,
     monto_inicial: 0,
     monto_restante: 0,
+  }
+}
+
+function emptyInmueble(): InmuebleEnriched {
+  return {
+    etiqueta: '',
+    matricula_inmobiliaria: '',
+    oficina_registro: '',
+    ciudad_oficina_registro: '',
+    cedula_catastral: '',
+    chip: '',
+    direccion_corta: '',
+    ciudad: '',
+    descripcion_completa: '',
+    linderos: '',
   }
 }

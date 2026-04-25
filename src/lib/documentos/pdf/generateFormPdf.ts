@@ -141,30 +141,26 @@ export function generateFormPdf(form: ChecklistPayload): Buffer {
     ], y)
   })
 
-  // ── Inmueble ──
-  const inm = form.inmueble || {
-    matricula_inmobiliaria: '',
-    cedula_catastral: '',
-    chip: '',
-    direccion: '',
-    ciudad: '',
-    oficina_registro: '',
-    ciudad_oficina_registro: '',
-    descripcion: '',
-    linderos: '',
-  }
-  y = seccion(doc, 'INFORMACION DEL INMUEBLE', y)
-  y = campos(doc, [
-    { label: 'Matricula inmobiliaria', value: inm.matricula_inmobiliaria },
-    { label: 'Cedula catastral', value: inm.cedula_catastral },
-    { label: 'Codigo CHIP', value: inm.chip },
-    { label: 'Direccion', value: inm.direccion },
-    { label: 'Ciudad', value: inm.ciudad },
-    { label: 'Oficina de Registro', value: inm.oficina_registro },
-    { label: 'Ciudad oficina', value: inm.ciudad_oficina_registro },
-    { label: 'Descripcion', value: inm.descripcion },
-    { label: 'Linderos', value: inm.linderos },
-  ], y)
+  // ── Inmueble(s) ──
+  const inmuebles = form.inmuebles || []
+  inmuebles.forEach((inm, i) => {
+    const titulo = inmuebles.length > 1
+      ? `INFORMACION DEL INMUEBLE ${i + 1}${inm.etiqueta ? ` — ${inm.etiqueta}` : ''}`
+      : 'INFORMACION DEL INMUEBLE'
+    y = seccion(doc, titulo, y)
+    y = campos(doc, [
+      ...(inm.etiqueta ? [{ label: 'Etiqueta', value: inm.etiqueta }] : []),
+      { label: 'Matricula inmobiliaria', value: inm.matricula_inmobiliaria },
+      { label: 'Cedula catastral', value: inm.cedula_catastral },
+      { label: 'Codigo CHIP', value: inm.chip },
+      { label: 'Direccion', value: inm.direccion },
+      { label: 'Ciudad', value: inm.ciudad },
+      { label: 'Oficina de Registro', value: inm.oficina_registro },
+      { label: 'Ciudad oficina', value: inm.ciudad_oficina_registro },
+      { label: 'Descripcion', value: inm.descripcion },
+      { label: 'Linderos', value: inm.linderos },
+    ], y)
+  })
 
   // ── Prestamo ──
   const p = form.prestamo || {

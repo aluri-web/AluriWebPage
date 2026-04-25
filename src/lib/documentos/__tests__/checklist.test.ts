@@ -82,9 +82,9 @@ async function run() {
   expect('acreedor[0].cc_expedicion', parsed.acreedores[0].cc_expedicion, 'Bogotá')
   expect('acreedor[0].participacion_monto', parsed.acreedores[0].participacion_monto, '45.000.000')
 
-  expect('inmueble.matricula_inmobiliaria', parsed.inmueble.matricula_inmobiliaria, '370-813723')
-  expect('inmueble.cedula_catastral', parsed.inmueble.cedula_catastral, 'K006005470000 E ID PREDIO 0000843135 APARTAMENTO 0824')
-  expect('inmueble.chip', parsed.inmueble.chip, 'N/a')
+  expect('inmueble.matricula_inmobiliaria', parsed.inmuebles[0].matricula_inmobiliaria, '370-813723')
+  expect('inmueble.cedula_catastral', parsed.inmuebles[0].cedula_catastral, 'K006005470000 E ID PREDIO 0000843135 APARTAMENTO 0824')
+  expect('inmueble.chip', parsed.inmuebles[0].chip, 'N/a')
 
   expect('prestamo.monto', parsed.prestamo.monto, '45.000.000')
   expect('prestamo.plazo_meses', parsed.prestamo.plazo_meses, '60')
@@ -128,10 +128,10 @@ async function run() {
   expect('nuevo acreedor cc_expedicion', pNuevo.acreedores[0].cc_expedicion, 'Bogotá')
 
   // Inmueble con ciudades (formato nuevo)
-  expect('nuevo inmueble matricula', pNuevo.inmueble.matricula_inmobiliaria, '370-813723')
-  expect('nuevo inmueble ciudad', pNuevo.inmueble.ciudad, 'Bogotá')
-  expect('nuevo inmueble ciudad_oficina_registro', pNuevo.inmueble.ciudad_oficina_registro, 'Bogotá')
-  expect('nuevo inmueble chip', pNuevo.inmueble.chip, 'N/a')
+  expect('nuevo inmueble matricula', pNuevo.inmuebles[0].matricula_inmobiliaria, '370-813723')
+  expect('nuevo inmueble ciudad', pNuevo.inmuebles[0].ciudad, 'Bogotá')
+  expect('nuevo inmueble ciudad_oficina_registro', pNuevo.inmuebles[0].ciudad_oficina_registro, 'Bogotá')
+  expect('nuevo inmueble chip', pNuevo.inmuebles[0].chip, 'N/a')
 
   // Prestamo
   expect('nuevo prestamo monto', pNuevo.prestamo.monto, '45.000.000')
@@ -208,8 +208,8 @@ async function run() {
   expect('v5 codeudores.length parser = 0', parsedNuevo.codeudores.length, 0)
   expect('v5 acreedor tipo_documento', parsedNuevo.acreedores[0].tipo_documento, 'NIT')
   expect('v5 acreedor cc', parsedNuevo.acreedores[0].cc, '900123456')
-  expect('v5 ciudad inmueble', parsedNuevo.inmueble.ciudad, 'Medellin')
-  expect('v5 ciudad oficina registro', parsedNuevo.inmueble.ciudad_oficina_registro, 'Medellin Centro')
+  expect('v5 ciudad inmueble', parsedNuevo.inmuebles[0].ciudad, 'Medellin')
+  expect('v5 ciudad oficina registro', parsedNuevo.inmuebles[0].ciudad_oficina_registro, 'Medellin Centro')
 
   console.log()
   console.log(`passed: ${passed}  failed: ${failed}`)

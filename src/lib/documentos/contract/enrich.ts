@@ -70,6 +70,7 @@ export interface AcreedorEnriched {
 }
 
 export interface InmuebleEnriched {
+  etiqueta: string
   matricula_inmobiliaria: string
   oficina_registro: string
   ciudad_oficina_registro: string
@@ -103,7 +104,7 @@ export interface EnrichedData {
   deudores: DeudorEnriched[]
   codeudores: CodeudorEnriched[]
   acreedores: AcreedorEnriched[]
-  inmueble: InmuebleEnriched
+  inmuebles: InmuebleEnriched[]
   prestamo: PrestamoEnriched
 }
 
@@ -146,6 +147,7 @@ function enriquecerCodeudor(c: CodeudorForm): CodeudorEnriched {
 
 function enriquecerInmueble(i: InmuebleForm): InmuebleEnriched {
   return {
+    etiqueta: i.etiqueta || '',
     matricula_inmobiliaria: i.matricula_inmobiliaria || '',
     oficina_registro: i.oficina_registro || '',
     ciudad_oficina_registro: i.ciudad_oficina_registro || '',
@@ -185,7 +187,12 @@ export function enriquecerDatos(form: ChecklistPayload, today: Date = new Date()
 
   const deudores = deudoresRaw.map(enriquecerDeudor)
   const codeudores = codeudoresRaw.map(enriquecerCodeudor)
-  const inmueble = enriquecerInmueble(form.inmueble || ({} as InmuebleForm))
+  const inmueblesRaw = (form.inmuebles || []).filter(
+    (i) => i && (i.matricula_inmobiliaria || i.direccion || i.descripcion || i.etiqueta)
+  )
+  const inmuebles = (inmueblesRaw.length > 0 ? inmueblesRaw : [({} as InmuebleForm)]).map(
+    enriquecerInmueble
+  )
 
   const comisionPorAcreedor =
     numAcreedores > 0 ? Math.trunc(comisionTotal / numAcreedores) : comisionTotal
@@ -212,7 +219,7 @@ export function enriquecerDatos(form: ChecklistPayload, today: Date = new Date()
     deudores,
     codeudores,
     acreedores,
-    inmueble,
+    inmuebles,
     prestamo,
   }
 }

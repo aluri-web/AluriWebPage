@@ -17,7 +17,7 @@ async function main() {
     deudores: parsed.deudores,
     codeudores: parsed.codeudores,
     acreedores: parsed.acreedores,
-    inmueble: parsed.inmueble,
+    inmuebles: parsed.inmuebles,
     prestamo: parsed.prestamo,
     fecha_creacion: new Date().toISOString(),
   }
