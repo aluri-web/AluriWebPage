@@ -62,7 +62,7 @@ const AGENT_CONFIGS = [
     key: 'credito',
     label: 'Fase 2: Estudio de Crédito',
     icon: CreditCard,
-    docs: ['extractos', 'extractos_2', 'extractos_3', 'declaracion_renta', 'certificado_ingresos', 'certificado_ingresos_2', 'certificado_ingresos_3', 'estados_financieros', 'impuesto_predial', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_estados_financieros', 'codeudor_camara_comercio'],
+    docs: ['extractos', 'extractos_2', 'extractos_3', 'declaracion_renta', 'certificado_ingresos', 'certificado_ingresos_2', 'certificado_ingresos_3', 'contrato_arriendo', 'contrato_arriendo_2', 'contrato_arriendo_3', 'estados_financieros', 'impuesto_predial', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_contrato_arriendo', 'codeudor_estados_financieros', 'codeudor_camara_comercio'],
     color: 'emerald',
     phase: 2,
     description: 'Análisis de capacidad de pago',
@@ -80,10 +80,10 @@ const AGENT_CONFIGS = [
 
 // Docs to hide based on persona type
 // Docs that are optional (not required for agent readiness)
-const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'certificado_ingresos_2', 'certificado_ingresos_3', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3', 'camara_comercio', 'rut', 'composicion_accionaria', 'impuesto_predial',
-  'codeudor_cedula', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
+const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'certificado_ingresos_2', 'certificado_ingresos_3', 'contrato_arriendo', 'contrato_arriendo_2', 'contrato_arriendo_3', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3', 'camara_comercio', 'rut', 'composicion_accionaria', 'impuesto_predial',
+  'codeudor_cedula', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_contrato_arriendo', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
 
-const CODEUDOR_DOCS = ['codeudor_cedula', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
+const CODEUDOR_DOCS = ['codeudor_cedula', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_contrato_arriendo', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
 
 const PERSONA_HIDDEN_DOCS: Record<string, string[]> = {
   persona_natural: ['estados_financieros', 'camara_comercio', 'rut', 'composicion_accionaria'],  // PN no necesita docs PJ
@@ -104,6 +104,9 @@ const DOC_LABELS: Record<string, string> = {
   certificado_ingresos: 'Certificado laboral / de ingresos (1)',
   certificado_ingresos_2: 'Soporte de ingresos adicional (2)',
   certificado_ingresos_3: 'Soporte de ingresos adicional (3)',
+  contrato_arriendo: 'Contrato de arrendamiento (titular = arrendador)',
+  contrato_arriendo_2: 'Contrato de arrendamiento adicional (2)',
+  contrato_arriendo_3: 'Contrato de arrendamiento adicional (3)',
   // PJ specific
   estados_financieros: 'Estados financieros',
   camara_comercio: 'Camara de Comercio (< 30 dias)',
@@ -120,6 +123,7 @@ const DOC_LABELS: Record<string, string> = {
   codeudor_certificado_ingresos: 'Certificado ingresos codeudor (1)',
   codeudor_certificado_ingresos_2: 'Soporte ingresos codeudor (2)',
   codeudor_certificado_ingresos_3: 'Soporte ingresos codeudor (3)',
+  codeudor_contrato_arriendo: 'Contrato de arrendamiento codeudor',
   codeudor_estados_financieros: 'Estados financieros codeudor',
   codeudor_camara_comercio: 'Camara de Comercio codeudor',
 }
