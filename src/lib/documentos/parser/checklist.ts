@@ -476,6 +476,7 @@ export function parseChecklistText(textoCompleto: string): ParsedChecklist {
       forma_pago: formaPago,
       comision_aluri: formatearMontoDisplay(comision),
       observaciones,
+      con_fianza: false,
     },
   }
 }

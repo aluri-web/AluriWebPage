@@ -224,6 +224,30 @@ export default function DocumentosForm() {
     return null
   }
 
+  const descargarDoc = async (endpoint: string, body: unknown, fallbackName: string) => {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}))
+      throw new Error(errBody.error || `HTTP ${res.status}`)
+    }
+    const blob = await res.blob()
+    const cd = res.headers.get('Content-Disposition') || ''
+    const m = cd.match(/filename="?([^";]+)"?/i)
+    const filename = m?.[1] || fallbackName
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
   const generar = async (formato: 'docx' | 'pdf') => {
     const err = validarBasico()
     if (err) {
@@ -233,40 +257,80 @@ export default function DocumentosForm() {
     setBusy(true)
     try {
       const datos = recopilar()
-
-      const endpoint =
-        formato === 'pdf' ? '/api/documentos/generar-pdf' : '/api/documentos/generar-contrato'
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(datos),
-      })
-
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}))
-        throw new Error(errBody.error || `HTTP ${res.status}`)
-      }
-
-      const blob = await res.blob()
-      const cd = res.headers.get('Content-Disposition') || ''
-      const m = cd.match(/filename="?([^";]+)"?/i)
+      const endpoint = formato === 'pdf'
+        ? '/api/documentos/generar-pdf'
+        : '/api/documentos/generar-contrato'
       const fallback = formato === 'pdf' ? 'Formulario.pdf' : 'Contrato.docx'
-      const filename = m?.[1] || fallback
-
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-
+      await descargarDoc(endpoint, datos, fallback)
       mostrarToast(
         formato === 'pdf' ? 'Formulario PDF descargado' : 'Contrato DOCX descargado',
         'success'
       )
+    } catch (e) {
+      mostrarToast(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const generarAutorizaciones = async () => {
+    const err = validarBasico()
+    if (err) { mostrarToast(err, 'error'); return }
+    setBusy(true)
+    try {
+      const datos = recopilar()
+      let count = 0
+      for (let i = 0; i < datos.deudores.length; i++) {
+        await descargarDoc(
+          '/api/documentos/generar-autorizacion',
+          { payload: datos, deudor_index: i },
+          `Autorizacion_Deudor_${i + 1}.docx`
+        )
+        count++
+      }
+      mostrarToast(`${count} autorizaci${count === 1 ? 'ón descargada' : 'ones descargadas'}`, 'success')
+    } catch (e) {
+      mostrarToast(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const generarInfoInversionistas = async () => {
+    const err = validarBasico()
+    if (err) { mostrarToast(err, 'error'); return }
+    setBusy(true)
+    try {
+      const datos = recopilar()
+      let count = 0
+      for (let i = 0; i < datos.acreedores.length; i++) {
+        await descargarDoc(
+          '/api/documentos/generar-info-inversionista',
+          { payload: datos, acreedor_index: i },
+          `Informacion_Inversionista_${i + 1}.docx`
+        )
+        count++
+      }
+      mostrarToast(`${count} documento${count === 1 ? '' : 's'} de info inversionista descargado${count === 1 ? '' : 's'}`, 'success')
+    } catch (e) {
+      mostrarToast(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const generarCorretaje = async () => {
+    const err = validarBasico()
+    if (err) { mostrarToast(err, 'error'); return }
+    setBusy(true)
+    try {
+      const datos = recopilar()
+      await descargarDoc(
+        '/api/documentos/generar-corretaje',
+        { payload: datos },
+        'Contrato_Corretaje.docx'
+      )
+      mostrarToast('Contrato de corretaje descargado', 'success')
     } catch (e) {
       mostrarToast(`Error: ${e instanceof Error ? e.message : String(e)}`, 'error')
     } finally {
@@ -354,6 +418,7 @@ export default function DocumentosForm() {
           forma_pago: (p.forma_pago || '') as PrestamoForm['forma_pago'],
           comision_aluri: p.comision_aluri || '',
           observaciones: p.observaciones || '',
+          con_fianza: !!p.con_fianza,
         })
         setMostrarPrestamo(true)
       }
@@ -702,6 +767,19 @@ export default function DocumentosForm() {
               className={inputCls}
             />
           </Campo>
+          {tipoContrato === 'Hipoteca' && (
+            <Campo label="Fianza limitada (Aluri responde por incendio/terremoto)" full>
+              <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={prestamo.con_fianza}
+                  onChange={(e) => setPrestamo({ ...prestamo, con_fianza: e.target.checked })}
+                  className="w-4 h-4 accent-amber-500"
+                />
+                Aluri otorga fianza limitada (corretaje CON FIANZA)
+              </label>
+            </Campo>
+          )}
         </div>
       </Seccion>
 
@@ -739,6 +817,35 @@ export default function DocumentosForm() {
           >
             {busy ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
             Descargar formulario (.pdf)
+          </button>
+          <div className="w-full h-px bg-slate-700/60 my-1 -mx-1" />
+          <span className="text-xs text-slate-500 mr-2">Documentos auxiliares:</span>
+          <button
+            onClick={generarAutorizaciones}
+            disabled={busy || deudores.length === 0}
+            className="flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-sm disabled:opacity-50"
+            title="Genera una autorización por cada deudor"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            Autorizaciones ({deudores.length})
+          </button>
+          <button
+            onClick={generarInfoInversionistas}
+            disabled={busy || acreedores.length === 0}
+            className="flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-sm disabled:opacity-50"
+            title="Genera un documento por cada acreedor"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            Info inversionista ({acreedores.length})
+          </button>
+          <button
+            onClick={generarCorretaje}
+            disabled={busy || deudores.length === 0}
+            className="flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-sm disabled:opacity-50"
+            title="Contrato de corretaje con el deudor principal"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+            Corretaje
           </button>
         </div>
       </div>

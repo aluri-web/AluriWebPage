@@ -95,6 +95,7 @@ export interface PrestamoForm {
   forma_pago: FormaPago
   comision_aluri: string
   observaciones: string
+  con_fianza: boolean
 }
 
 export interface ChecklistPayload {
@@ -188,5 +189,6 @@ export function emptyPrestamo(): PrestamoForm {
     forma_pago: '',
     comision_aluri: '',
     observaciones: '',
+    con_fianza: false,
   }
 }
