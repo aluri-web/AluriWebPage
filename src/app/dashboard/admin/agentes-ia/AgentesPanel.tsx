@@ -26,6 +26,8 @@ import { uploadFile } from '@/utils/uploadFile'
 import { type SolicitudSummary, type EvaluacionIA, saveEvaluation } from './actions'
 import FlashCardGenerator from './FlashCardGenerator'
 import ContractModal from './ContractModal'
+import F210EditModal, { type F210Casillas } from './F210EditModal'
+import { Edit3 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────
 
@@ -98,7 +100,7 @@ const DOC_LABELS: Record<string, string> = {
   extractos: 'Extractos bancarios (mes 1 o consolidado)',
   extractos_2: 'Extractos bancarios (mes 2)',
   extractos_3: 'Extractos bancarios (mes 3)',
-  declaracion_renta: 'Declaracion de renta',
+  declaracion_renta: 'Declaracion de renta (PDF nativo de MUISCA, no escaneado)',
   reporte_auco: 'Reporte AUCO (PDF)',
   // PN specific
   certificado_ingresos: 'Certificado laboral / de ingresos (1)',
@@ -205,6 +207,7 @@ export default function AgentesPanel({
   const [lastApplicantName, setLastApplicantName] = useState('')
   const [viewingEvaluation, setViewingEvaluation] = useState<EvaluacionIA | null>(null)
   const [contractModalEvalId, setContractModalEvalId] = useState<string | null>(null)
+  const [f210ModalState, setF210ModalState] = useState<{ evalId: string; casillas: F210Casillas } | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const selectedSolicitud = solicitudes.find((s) => s.id === selectedSolicitudId) || null
@@ -1374,6 +1377,23 @@ export default function AgentesPanel({
                           </a>
                         ))}
                       </div>
+                      <div className="mt-3">
+                        <button
+                          onClick={() => {
+                            const evalId = viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId
+                            if (!evalId) return
+                            setF210ModalState({ evalId, casillas: {} })
+                          }}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-700/40 rounded-lg transition-colors text-xs"
+                        >
+                          <Edit3 size={12} />
+                          Validar / corregir datos del F210
+                        </button>
+                        <p className="text-[10px] text-slate-500 mt-1">
+                          Si los valores extraídos automáticamente del F210 son incorrectos,
+                          ingrésalos manualmente. La ficha y los anexos se regenerarán.
+                        </p>
+                      </div>
                     </div>
                   )}
                   {lastEvaluationId && !isProcessing && Object.values(agents).some(a => a.status === 'error') && (
@@ -1464,6 +1484,19 @@ export default function AgentesPanel({
           onClose={() => setContractModalEvalId(null)}
         />
       )}
+
+      {/* F210 manual validation modal — admin can override the auto-extracted
+          casillas 29/30/31 and trigger a full recompute (ficha + anexos). */}
+      <F210EditModal
+        open={!!f210ModalState}
+        evaluationId={f210ModalState?.evalId || ''}
+        initial={f210ModalState?.casillas || {}}
+        onClose={() => setF210ModalState(null)}
+        onSuccess={() => {
+          // Reload page so the new ficha + anexos are visible
+          if (typeof window !== 'undefined') window.location.reload()
+        }}
+      />
     </div>
   )
 }
