@@ -1362,9 +1362,11 @@ export default function AgentesPanel({
                       <div className="text-xs text-slate-400 mb-2 font-semibold">Estudios detallados (uso interno)</div>
                       <div className="flex flex-wrap gap-2">
                         {[
-                          { type: 'anexo_juridico', label: 'Estudio Juridico' },
-                          { type: 'anexo_credito',  label: 'Estudio de Credito' },
-                          { type: 'anexo_kyc',      label: 'Verificacion KYC / SARLAFT' },
+                          { type: 'anexo_juridico',         label: 'Estudio Juridico' },
+                          { type: 'anexo_credito',          label: 'Estudio de Credito' },
+                          { type: 'anexo_kyc',              label: 'KYC / SARLAFT' },
+                          { type: 'anexo_credito_codeudor', label: 'Credito Codeudor' },
+                          { type: 'anexo_kyc_codeudor',     label: 'KYC Codeudor' },
                         ].map(a => (
                           <a
                             key={a.type}

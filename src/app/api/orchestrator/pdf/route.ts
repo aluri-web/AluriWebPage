@@ -4,10 +4,12 @@ const ORCHESTRATOR_URL = process.env.ORCHESTRATOR_URL || 'http://localhost:3001'
 
 // Map of supported PDF types to their orchestrator query param + filename label
 const PDF_TYPES: Record<string, { type: string; label: string }> = {
-  ficha:          { type: '',                label: 'ficha-tecnica'    },
-  anexo_juridico: { type: 'anexo_juridico',  label: 'anexo-juridico'   },
-  anexo_credito:  { type: 'anexo_credito',   label: 'anexo-credito'    },
-  anexo_kyc:      { type: 'anexo_kyc',       label: 'anexo-kyc'        },
+  ficha:                  { type: '',                       label: 'ficha-tecnica'           },
+  anexo_juridico:         { type: 'anexo_juridico',         label: 'anexo-juridico'          },
+  anexo_credito:          { type: 'anexo_credito',          label: 'anexo-credito'           },
+  anexo_kyc:              { type: 'anexo_kyc',              label: 'anexo-kyc'               },
+  anexo_credito_codeudor: { type: 'anexo_credito_codeudor', label: 'anexo-credito-codeudor' },
+  anexo_kyc_codeudor:     { type: 'anexo_kyc_codeudor',     label: 'anexo-kyc-codeudor'     },
 }
 
 export async function GET(req: NextRequest) {
