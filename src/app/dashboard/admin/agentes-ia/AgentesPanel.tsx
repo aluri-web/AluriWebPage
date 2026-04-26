@@ -97,15 +97,15 @@ const DOC_LABELS: Record<string, string> = {
   libertad_tradicion: 'Certificado Libertad y Tradicion',
   escritura: 'Escritura',
   cedula: 'Cedula de ciudadania / Rep. Legal',
-  extractos: 'Extractos bancarios (mes 1 o consolidado)',
-  extractos_2: 'Extractos bancarios (mes 2)',
-  extractos_3: 'Extractos bancarios (mes 3)',
+  extractos: 'Extractos bancarios — solo del solicitante (mes 1 o consolidado)',
+  extractos_2: 'Extractos bancarios — solo del solicitante (mes 2)',
+  extractos_3: 'Extractos bancarios — solo del solicitante (mes 3)',
   declaracion_renta: 'Declaracion de renta (PDF nativo de MUISCA, no escaneado)',
   reporte_auco: 'Reporte AUCO (PDF)',
   // PN specific
-  certificado_ingresos: 'Certificado laboral / de ingresos (1)',
-  certificado_ingresos_2: 'Soporte de ingresos adicional (2)',
-  certificado_ingresos_3: 'Soporte de ingresos adicional (3)',
+  certificado_ingresos: 'Certificado laboral / de ingresos — del solicitante (1)',
+  certificado_ingresos_2: 'Soporte de ingresos adicional — del solicitante (2)',
+  certificado_ingresos_3: 'Soporte de ingresos adicional — del solicitante (3)',
   contrato_arriendo: 'Contrato de arrendamiento (titular = arrendador)',
   contrato_arriendo_2: 'Contrato de arrendamiento adicional (2)',
   contrato_arriendo_3: 'Contrato de arrendamiento adicional (3)',
@@ -1028,6 +1028,12 @@ export default function AgentesPanel({
             />
             <span className="text-sm text-slate-300">Tiene codeudor</span>
           </label>
+          <p className="text-[11px] text-amber-400/80 mt-1.5 leading-snug">
+            ⚠ Activa esta opción si los ingresos provienen de una persona distinta al solicitante
+            (cónyuge, familiar, socio). Sus documentos van en los slots <em>codeudor_*</em> de abajo,
+            NO en los del solicitante. Si los mezclas, el agente confunde la identidad y la ficha
+            queda inconsistente.
+          </p>
 
           {hasCodeudor && (
             <div className="mt-3 space-y-2">
