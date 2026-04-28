@@ -1508,9 +1508,46 @@ export default function AgentesPanel({
                         Generar Pagare
                       </button>
                     )}
-                    {viewingEvaluation && viewingEvaluation.evaluation_id && !isProcessing && !updatingEvaluation && (
+                    {(viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId) && !isProcessing && !updatingEvaluation && (
                       <button
-                        onClick={() => enterUpdateMode(viewingEvaluation)}
+                        onClick={() => {
+                          // Si veníamos de viewing una eval del histórico, usamos esa.
+                          // Si la eval acaba de terminar, el state actual ya tiene los
+                          // slots y términos cargados — solo marcamos modo update.
+                          if (viewingEvaluation && viewingEvaluation.evaluation_id) {
+                            enterUpdateMode(viewingEvaluation)
+                            return
+                          }
+                          const evalId = agents.ficha.result?.evaluationId
+                          if (!evalId) return
+                          const docsSnapshot: Record<string, string> = {}
+                          for (const [k, slot] of Object.entries(slots)) {
+                            if (slot?.url) docsSnapshot[k] = slot.url
+                          }
+                          const minimalEv: EvaluacionIA = {
+                            id: '',
+                            solicitud_id: selectedSolicitudId,
+                            admin_id: '',
+                            applicant: { name: lastApplicantName || applicantName || 'Solicitante', cedula: 'pending-kyc' },
+                            operation: (lastOperation || {}) as Record<string, unknown>,
+                            documents: docsSnapshot,
+                            verdict: null,
+                            risk_level: null,
+                            risk_score: null,
+                            sections: null,
+                            pdf_url: null,
+                            evaluation_id: evalId,
+                            interest_rate: null,
+                            processing_ms: null,
+                            created_at: new Date().toISOString(),
+                          }
+                          setUpdatingEvaluation(minimalEv)
+                          // Ahora-only: NO tocamos slots/operation porque ya están en state.
+                          // Reseteamos los agent cards para que el admin sepa que va a re-correr.
+                          setAgents({ ...INITIAL_AGENTS })
+                          setFichaPdfUrl(null)
+                          if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg transition-colors text-sm"
                         title="Sube documentos faltantes o ajusta términos del crédito y re-evalúa. La ficha y los anexos se sobreescriben."
                       >
