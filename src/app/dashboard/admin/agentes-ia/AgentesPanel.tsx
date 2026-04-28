@@ -1472,10 +1472,25 @@ export default function AgentesPanel({
                           )
                         })()}
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             const evalId = viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId
                             if (!evalId) return
-                            setF210ModalState({ evalId, casillas: {} })
+                            // Pre-poblar el modal con los valores actuales para que el admin
+                            // vea qué extrajo el sistema (no campos en blanco).
+                            try {
+                              const res = await fetch(`/api/orchestrator/status?id=${evalId}`)
+                              const data = res.ok ? await res.json() : null
+                              const summary = data?.evaluation?.credito_output?.result?.tax_return_summary || {}
+                              const fallbackNet = data?.evaluation?.credito_output?.result?.patrimonio_liquido_cop
+                              const casillas: F210Casillas = {
+                                total_assets_cop: summary.total_assets_cop || undefined,
+                                total_liabilities_cop: summary.total_liabilities_cop || undefined,
+                                net_patrimony: summary.net_patrimony || fallbackNet || undefined,
+                              }
+                              setF210ModalState({ evalId, casillas })
+                            } catch {
+                              setF210ModalState({ evalId, casillas: {} })
+                            }
                           }}
                           className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-700/40 rounded-lg transition-colors text-xs"
                         >
