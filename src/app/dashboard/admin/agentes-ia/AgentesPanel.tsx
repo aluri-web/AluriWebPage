@@ -55,7 +55,7 @@ const AGENT_CONFIGS = [
     key: 'kyc',
     label: 'Fase 1: Triage KYC/SARLAFT',
     icon: ShieldCheck,
-    docs: ['cedula', 'reporte_auco', 'camara_comercio', 'rut', 'composicion_accionaria', 'codeudor_cedula'],
+    docs: ['cedula', 'reporte_auco', 'camara_comercio', 'rut', 'composicion_accionaria', 'codeudor_cedula', 'codeudor_reporte_auco'],
     color: 'blue',
     phase: 1,
     description: 'Verificación de identidad y listas restrictivas',
@@ -83,9 +83,9 @@ const AGENT_CONFIGS = [
 // Docs to hide based on persona type
 // Docs that are optional (not required for agent readiness)
 const OPTIONAL_DOCS = ['reporte_auco', 'certificado_ingresos', 'certificado_ingresos_2', 'certificado_ingresos_3', 'contrato_arriendo', 'contrato_arriendo_2', 'contrato_arriendo_3', 'estados_financieros', 'declaracion_renta', 'extractos_2', 'extractos_3', 'camara_comercio', 'rut', 'composicion_accionaria', 'impuesto_predial',
-  'codeudor_cedula', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_contrato_arriendo', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
+  'codeudor_cedula', 'codeudor_reporte_auco', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_contrato_arriendo', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
 
-const CODEUDOR_DOCS = ['codeudor_cedula', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_contrato_arriendo', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
+const CODEUDOR_DOCS = ['codeudor_cedula', 'codeudor_reporte_auco', 'codeudor_extractos', 'codeudor_extractos_2', 'codeudor_extractos_3', 'codeudor_declaracion_renta', 'codeudor_certificado_ingresos', 'codeudor_certificado_ingresos_2', 'codeudor_certificado_ingresos_3', 'codeudor_contrato_arriendo', 'codeudor_estados_financieros', 'codeudor_camara_comercio']
 
 const PERSONA_HIDDEN_DOCS: Record<string, string[]> = {
   persona_natural: ['estados_financieros', 'camara_comercio', 'rut', 'composicion_accionaria'],  // PN no necesita docs PJ
@@ -118,6 +118,7 @@ const DOC_LABELS: Record<string, string> = {
   impuesto_predial: 'Impuesto predial (año en curso)',
   // Codeudor documents
   codeudor_cedula: 'Cedula codeudor',
+  codeudor_reporte_auco: 'Reporte AUCO codeudor (PDF)',
   codeudor_extractos: 'Extractos codeudor (mes 1)',
   codeudor_extractos_2: 'Extractos codeudor (mes 2)',
   codeudor_extractos_3: 'Extractos codeudor (mes 3)',
