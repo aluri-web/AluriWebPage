@@ -144,6 +144,50 @@ export async function saveEvaluation(input: SaveEvaluationInput): Promise<{
   return { data: { id: data.id }, error: null }
 }
 
+export async function updateEvaluation(
+  evaluationId: string,
+  input: Omit<SaveEvaluationInput, 'evaluation_id'>,
+): Promise<{ data: { id: string } | null; error: string | null }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: 'No autenticado' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') return { data: null, error: 'No autorizado' }
+
+  const { data, error } = await supabase
+    .from('evaluaciones_ia')
+    .update({
+      applicant: input.applicant,
+      operation: input.operation,
+      documents: input.documents,
+      verdict: input.verdict || null,
+      risk_level: input.risk_level || null,
+      risk_score: input.risk_score != null ? Math.round(input.risk_score) : null,
+      sections: input.sections || null,
+      pdf_url: input.pdf_url || null,
+      interest_rate: input.interest_rate ?? null,
+      processing_ms: input.processing_ms ?? null,
+      ...(input.photo_urls ? { photo_urls: input.photo_urls } : {}),
+    })
+    .eq('evaluation_id', evaluationId)
+    .select('id')
+    .single()
+
+  if (error) {
+    console.error('Error updating evaluation:', error.message)
+    return { data: null, error: 'Error al actualizar evaluación' }
+  }
+
+  return { data: { id: data.id }, error: null }
+}
+
 export async function getEvaluations(solicitudId?: string): Promise<{
   data: EvaluacionIA[]
   error: string | null

@@ -21,9 +21,10 @@ import {
   ChevronDown,
   ChevronUp,
   Image as ImageIcon,
+  RefreshCw,
 } from 'lucide-react'
 import { uploadFile } from '@/utils/uploadFile'
-import { type SolicitudSummary, type EvaluacionIA, saveEvaluation } from './actions'
+import { type SolicitudSummary, type EvaluacionIA, saveEvaluation, updateEvaluation } from './actions'
 import FlashCardGenerator from './FlashCardGenerator'
 import ContractModal from './ContractModal'
 import F210EditModal, { type F210Casillas } from './F210EditModal'
@@ -207,6 +208,9 @@ export default function AgentesPanel({
   const [manualPhotos, setManualPhotos] = useState<string[]>([])
   const [lastApplicantName, setLastApplicantName] = useState('')
   const [viewingEvaluation, setViewingEvaluation] = useState<EvaluacionIA | null>(null)
+  // Modo "actualizar evaluación": muestra los slots editables sobre una eval existente
+  // y al re-evaluar usa el endpoint /update (UPDATE in-place) en lugar de crear nueva fila.
+  const [updatingEvaluation, setUpdatingEvaluation] = useState<EvaluacionIA | null>(null)
   const [contractModalEvalId, setContractModalEvalId] = useState<string | null>(null)
   const [f210ModalState, setF210ModalState] = useState<{ evalId: string; casillas: F210Casillas } | null>(null)
   const [f210Confidence, setF210Confidence] = useState<{ source: string | null; swapCorrected: boolean } | null>(null)
@@ -400,13 +404,56 @@ export default function AgentesPanel({
     setAgents({ ...INITIAL_AGENTS })
     setFichaPdfUrl(null)
     setViewingEvaluation(null)
+    setUpdatingEvaluation(null)
     setF210Confidence(null)
+  }
+
+  // Entra en modo "actualizar evaluación": precarga los slots con los documentos
+  // existentes, los términos del crédito, y deja todo editable. Al darle Evaluar
+  // se hace UPDATE in-place en lugar de crear una nueva fila.
+  const enterUpdateMode = (ev: EvaluacionIA) => {
+    if (!ev.evaluation_id) return
+    setUpdatingEvaluation(ev)
+    setViewingEvaluation(ev)
+
+    // Precargar slots con los docs existentes
+    const existingDocs = (ev.documents || {}) as Record<string, string>
+    setSlots(prev => {
+      const next: Record<string, DocumentSlot> = {}
+      Object.entries(prev).forEach(([k, v]) => {
+        next[k] = { ...v, url: existingDocs[k] || null }
+      })
+      return next
+    })
+
+    // Precargar términos del crédito
+    const op = (ev.operation || {}) as Record<string, unknown>
+    if (typeof op.loan_amount === 'number') setManualLoanAmount(op.loan_amount)
+    if (typeof op.loan_term_months === 'number') setManualLoanTerm(op.loan_term_months)
+    if (typeof op.property_appraisal_value === 'number') setManualPropertyValue(op.property_appraisal_value)
+    if (typeof op.persona_type === 'string') setPersonaType(op.persona_type as 'persona_natural' | 'persona_juridica')
+    if (typeof op.guarantee_type === 'string') setGuaranteeType(op.guarantee_type as 'hipoteca' | 'retroventa')
+    if (typeof op.rate_type === 'string') setRateType(op.rate_type as 'anticipado' | 'vencido')
+    if (typeof op.payment_mode === 'string') setPaymentMode(op.payment_mode as 'solo_intereses' | 'capital_intereses')
+    if (typeof op.property_type === 'string') setPropertyType(op.property_type)
+    if (typeof op.declared_income_cop === 'number') setDeclaredIncome(op.declared_income_cop)
+
+    if (ev.applicant?.name) setApplicantName(ev.applicant.name)
+
+    // Reset agent cards a "idle" para que el admin sepa que nada está corriendo
+    setAgents({ ...INITIAL_AGENTS })
+    setFichaPdfUrl(null)
+
+    // Scroll arriba para que el admin vea los slots
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   // ── Orchestrator execution ──
 
   const handleProcesar = async () => {
-    setViewingEvaluation(null)
+    // En modo update mantenemos viewingEvaluation set (la fila objetivo del UPDATE).
+    const isUpdate = !!updatingEvaluation?.evaluation_id
+    if (!isUpdate) setViewingEvaluation(null)
     setIsProcessing(true)
     setFichaPdfUrl(null)
 
@@ -490,10 +537,16 @@ export default function AgentesPanel({
       const photoUrls = [...solicitudPhotos, ...manualPhotos]
 
       // ── Step 1: Start evaluation (returns immediately with evaluationId) ──
-      const res = await fetch('/api/orchestrator/evaluate', {
+      // Si estamos en modo update, llamamos al endpoint /update con el ID
+      // existente para que se sobreescriba la fila en lugar de crear nueva.
+      const endpoint = isUpdate ? '/api/orchestrator/update-evaluation' : '/api/orchestrator/evaluate'
+      const reqBody = isUpdate
+        ? { evaluationId: updatingEvaluation!.evaluation_id, applicant, operation, documents, photo_urls: photoUrls, ...(adminNotes ? { admin_notes: adminNotes } : {}) }
+        : { applicant, operation, documents, photo_urls: photoUrls, ...(adminNotes ? { admin_notes: adminNotes } : {}) }
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicant, operation, documents, photo_urls: photoUrls, ...(adminNotes ? { admin_notes: adminNotes } : {}) }),
+        body: JSON.stringify(reqBody),
       })
 
       const startData = await res.json()
@@ -618,7 +671,7 @@ export default function AgentesPanel({
             savedDocuments[k] = v
           }
 
-          saveEvaluation({
+          const persistInput = {
             solicitud_id: selectedSolicitudId,
             applicant: updatedApplicant,
             operation: updatedOperation,
@@ -628,34 +681,60 @@ export default function AgentesPanel({
             risk_score: riskScore ?? null,
             sections: sections || null,
             pdf_url: evaluation.pdf_storage_path ? `/api/orchestrator/pdf?id=${evaluationId}` : null,
-            evaluation_id: evaluationId,
             interest_rate: interestRate,
             processing_ms: completedAt - now,
             photo_urls: photoUrls.length > 0 ? photoUrls : null,
-          }).then(({ data: saved }) => {
-            if (saved) {
-              setEvaluations(prev => [{
-                id: saved.id,
-                solicitud_id: selectedSolicitudId,
-                admin_id: '',
-                applicant,
-                operation,
-                documents: savedDocuments,
-                verdict: verdict || null,
-                risk_level: riskLevel || null,
-                risk_score: riskScore ?? null,
-                sections: sections || null,
-                pdf_url: evaluation.pdf_storage_path ? `/api/orchestrator/pdf?id=${evaluationId}` : null,
-                evaluation_id: evaluationId,
-                interest_rate: interestRate,
-                processing_ms: completedAt - now,
-                photo_urls: photoUrls.length > 0 ? photoUrls : null,
-                created_at: new Date().toISOString(),
-              }, ...prev])
-            }
-          }).catch(() => {
-            console.error('[AgentesPanel] Error saving evaluation')
-          })
+          }
+
+          if (isUpdate) {
+            updateEvaluation(evaluationId, persistInput).then(({ data: updated }) => {
+              if (updated) {
+                setEvaluations(prev => prev.map(ev => ev.evaluation_id === evaluationId ? {
+                  ...ev,
+                  applicant: updatedApplicant,
+                  operation: updatedOperation,
+                  documents: savedDocuments,
+                  verdict: verdict || null,
+                  risk_level: riskLevel || null,
+                  risk_score: riskScore ?? null,
+                  sections: sections || null,
+                  pdf_url: persistInput.pdf_url,
+                  interest_rate: interestRate,
+                  processing_ms: completedAt - now,
+                  photo_urls: photoUrls.length > 0 ? photoUrls : null,
+                } : ev))
+              }
+            }).catch(() => {
+              console.error('[AgentesPanel] Error updating evaluation')
+            })
+            // Salimos del modo update — la eval ya está actualizada
+            setUpdatingEvaluation(null)
+          } else {
+            saveEvaluation({ ...persistInput, evaluation_id: evaluationId }).then(({ data: saved }) => {
+              if (saved) {
+                setEvaluations(prev => [{
+                  id: saved.id,
+                  solicitud_id: selectedSolicitudId,
+                  admin_id: '',
+                  applicant,
+                  operation,
+                  documents: savedDocuments,
+                  verdict: verdict || null,
+                  risk_level: riskLevel || null,
+                  risk_score: riskScore ?? null,
+                  sections: sections || null,
+                  pdf_url: evaluation.pdf_storage_path ? `/api/orchestrator/pdf?id=${evaluationId}` : null,
+                  evaluation_id: evaluationId,
+                  interest_rate: interestRate,
+                  processing_ms: completedAt - now,
+                  photo_urls: photoUrls.length > 0 ? photoUrls : null,
+                  created_at: new Date().toISOString(),
+                }, ...prev])
+              }
+            }).catch(() => {
+              console.error('[AgentesPanel] Error saving evaluation')
+            })
+          }
 
           setIsProcessing(false)
           return
@@ -1120,7 +1199,12 @@ export default function AgentesPanel({
             {isProcessing ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                Procesando...
+                {updatingEvaluation ? 'Actualizando...' : 'Procesando...'}
+              </>
+            ) : updatingEvaluation ? (
+              <>
+                <RefreshCw size={18} />
+                Re-evaluar y actualizar
               </>
             ) : (
               <>
@@ -1280,7 +1364,7 @@ export default function AgentesPanel({
       </div>
 
             {/* Section 4: Agent Progress & Results */}
-      {viewingEvaluation && (
+      {viewingEvaluation && !updatingEvaluation && (
         <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-xl px-5 py-3">
           <div className="flex items-center gap-3">
             <History size={16} className="text-amber-400" />
@@ -1298,6 +1382,26 @@ export default function AgentesPanel({
           >
             <X size={12} />
             Cerrar
+          </button>
+        </div>
+      )}
+
+      {updatingEvaluation && (
+        <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-5 py-3">
+          <div className="flex items-center gap-3">
+            <RefreshCw size={16} className="text-emerald-400" />
+            <span className="text-sm text-emerald-200">
+              Actualizando evaluación de <span className="font-semibold text-white">{updatingEvaluation.applicant?.name}</span>
+              {' — '}los slots están precargados con los documentos existentes. Sube los que faltan o reemplaza los que sean incorrectos, ajusta términos del crédito si es necesario, y vuelve a evaluar. La ficha y los anexos actuales se sobreescribirán.
+            </span>
+          </div>
+          <button
+            onClick={clearViewingEvaluation}
+            disabled={isProcessing}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+          >
+            <X size={12} />
+            Cancelar
           </button>
         </div>
       )}
@@ -1402,6 +1506,16 @@ export default function AgentesPanel({
                       >
                         <FileText size={14} />
                         Generar Pagare
+                      </button>
+                    )}
+                    {viewingEvaluation && viewingEvaluation.evaluation_id && !isProcessing && !updatingEvaluation && (
+                      <button
+                        onClick={() => enterUpdateMode(viewingEvaluation)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg transition-colors text-sm"
+                        title="Sube documentos faltantes o ajusta términos del crédito y re-evalúa. La ficha y los anexos se sobreescriben."
+                      >
+                        <RefreshCw size={14} />
+                        Actualizar evaluación
                       </button>
                     )}
                   </div>
