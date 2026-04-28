@@ -1427,6 +1427,44 @@ export default function AgentesPanel({
         </div>
       )}
 
+      {/* Recovery: cuando una evaluacion se queda atascada en 'processing' por
+          mas de 5 minutos (background job murio o agente colgado), permitir al
+          admin marcarla como fallida para reintentarla. El backend rechaza si
+          lleva menos de 5 minutos para no clobberar un job genuino. */}
+      {isProcessing && lastEvaluationId && (
+        <div className="flex items-center justify-between bg-amber-500/5 border border-amber-700/30 rounded-xl px-5 py-2.5 text-xs">
+          <span className="text-amber-300/80">
+            ¿La evaluación lleva mucho tiempo sin avanzar (&gt;5 min)? Puede que el proceso en backend esté colgado.
+          </span>
+          <button
+            onClick={async () => {
+              if (!lastEvaluationId) return
+              if (!confirm('Marcar esta evaluación como fallida? Solo se aceptan evaluaciones con más de 5 minutos en "processing".')) return
+              try {
+                const res = await fetch('/api/orchestrator/cancel-stuck', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ evaluationId: lastEvaluationId }),
+                })
+                const data = await res.json()
+                if (!res.ok) {
+                  alert(data?.error || 'No se pudo cancelar')
+                  return
+                }
+                alert('Evaluación marcada como fallida. Recargando...')
+                window.location.reload()
+              } catch (err) {
+                alert('Error al cancelar: ' + (err instanceof Error ? err.message : String(err)))
+              }
+            }}
+            className="ml-3 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-600/20 hover:bg-amber-600/30 text-amber-200 border border-amber-700/40 rounded-lg text-xs font-medium transition-colors"
+          >
+            <X size={12} />
+            Cancelar y reintentar
+          </button>
+        </div>
+      )}
+
       {(isProcessing || Object.values(agents).some((a) => a.status !== 'idle')) && (
         <div>
           {/* Overall progress */}
