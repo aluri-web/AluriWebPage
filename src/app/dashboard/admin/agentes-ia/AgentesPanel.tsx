@@ -230,7 +230,18 @@ export default function AgentesPanel({
     const config = AGENT_CONFIGS.find((a) => a.key === agentKey)
     if (!config) return false
     const hidden = PERSONA_HIDDEN_DOCS[personaType] || []
-    return config.docs.filter(d => !hidden.includes(d) && !OPTIONAL_DOCS.includes(d)).every((docKey) => slots[docKey]?.url)
+    const required = config.docs.filter(d => !hidden.includes(d) && !OPTIONAL_DOCS.includes(d))
+
+    // Caso ama-de-casa: si hay codeudor con extracto, el extracto del solicitante
+    // se vuelve opcional (los ingresos provienen del codeudor). El módulo de
+    // crédito requiere al menos UN extracto en total — del solicitante o del codeudor.
+    const hasAnyCodeudorExtracto = !!(slots['codeudor_extractos']?.url || slots['codeudor_extractos_2']?.url || slots['codeudor_extractos_3']?.url)
+    const skipExtractos = hasCodeudor && hasAnyCodeudorExtracto
+
+    return required.every((docKey) => {
+      if (skipExtractos && docKey === 'extractos') return true
+      return !!slots[docKey]?.url
+    })
   }
 
   const pdfFilename = (name?: string, dateStr?: string) => {
@@ -1060,6 +1071,11 @@ export default function AgentesPanel({
             (cónyuge, familiar, socio). Sus documentos van en los slots <em>codeudor_*</em> de abajo,
             NO en los del solicitante. Si los mezclas, el agente confunde la identidad y la ficha
             queda inconsistente.
+          </p>
+          <p className="text-[11px] text-emerald-400/80 mt-1.5 leading-snug">
+            💡 Caso ama-de-casa: si el solicitante (dueño del inmueble) no tiene cuenta bancaria,
+            puedes dejar vacío el slot <em>extractos</em> del solicitante. Mientras subas extractos
+            del codeudor, el sistema lo acepta y aprueba la operación con condición de codeudor solidario.
           </p>
 
           {hasCodeudor && (
