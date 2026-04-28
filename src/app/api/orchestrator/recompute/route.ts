@@ -35,12 +35,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'evaluationId is required' }, { status: 400 })
     }
 
+    const which = body.which === 'codeudor' ? 'codeudor' : 'solicitante'
+
     const res = await fetch(
       `${ORCHESTRATOR_URL}/api/evaluations/${evaluationId}/recompute-overrides`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credito_overrides: body.credito_overrides ?? {} }),
+        body: JSON.stringify({ credito_overrides: body.credito_overrides ?? {}, which }),
       },
     )
     const data = await res.json()

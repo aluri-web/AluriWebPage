@@ -13,6 +13,10 @@ interface Props {
   open: boolean
   evaluationId: string
   initial: F210Casillas
+  /** Identifica de quién es el F210 que estamos validando */
+  which?: 'solicitante' | 'codeudor'
+  /** Nombre legible para mostrar en el header */
+  personName?: string
   onClose: () => void
   onSuccess: () => void
 }
@@ -27,7 +31,7 @@ function parseCOP(s: string): number {
   return cleaned ? Number(cleaned) : 0
 }
 
-export default function F210EditModal({ open, evaluationId, initial, onClose, onSuccess }: Props) {
+export default function F210EditModal({ open, evaluationId, initial, which = 'solicitante', personName, onClose, onSuccess }: Props) {
   const [activos, setActivos] = useState<string>(fmtCOP(initial.total_assets_cop))
   const [deudas, setDeudas] = useState<string>(fmtCOP(initial.total_liabilities_cop))
   const [liquido, setLiquido] = useState<string>(fmtCOP(initial.net_patrimony))
@@ -51,6 +55,7 @@ export default function F210EditModal({ open, evaluationId, initial, onClose, on
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           evaluationId,
+          which,
           credito_overrides: {
             tax_return: {
               total_assets_cop: aNum,
@@ -83,7 +88,13 @@ export default function F210EditModal({ open, evaluationId, initial, onClose, on
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-lg">
         <div className="flex items-center justify-between p-4 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-white">Validar declaración de renta (F210)</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-white">Validar declaración de renta (F210)</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {which === 'codeudor' ? 'Codeudor' : 'Solicitante'}
+              {personName ? ` — ${personName}` : ''}
+            </p>
+          </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white" disabled={submitting}>
             <X size={20} />
           </button>
@@ -91,9 +102,8 @@ export default function F210EditModal({ open, evaluationId, initial, onClose, on
 
         <div className="p-5 space-y-4">
           <p className="text-xs text-slate-400">
-            El sistema extrajo estos valores del F210 automáticamente. Si alguno está mal,
-            corrígelo y haz click en <strong>Recalcular</strong>. La ficha y los anexos se
-            regenerarán con los valores corregidos.
+            El sistema extrajo estos valores del F210 del <strong>{which === 'codeudor' ? 'codeudor' : 'solicitante'}</strong> automáticamente.
+            Si alguno está mal, corrígelo y haz click en <strong>Recalcular</strong>. La ficha y los anexos se regenerarán con los valores corregidos.
           </p>
 
           <div className="space-y-3">

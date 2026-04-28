@@ -212,8 +212,9 @@ export default function AgentesPanel({
   // y al re-evaluar usa el endpoint /update (UPDATE in-place) en lugar de crear nueva fila.
   const [updatingEvaluation, setUpdatingEvaluation] = useState<EvaluacionIA | null>(null)
   const [contractModalEvalId, setContractModalEvalId] = useState<string | null>(null)
-  const [f210ModalState, setF210ModalState] = useState<{ evalId: string; casillas: F210Casillas } | null>(null)
+  const [f210ModalState, setF210ModalState] = useState<{ evalId: string; casillas: F210Casillas; which: 'solicitante' | 'codeudor'; personName?: string } | null>(null)
   const [f210Confidence, setF210Confidence] = useState<{ source: string | null; swapCorrected: boolean } | null>(null)
+  const [f210CodeudorConfidence, setF210CodeudorConfidence] = useState<{ source: string | null; swapCorrected: boolean } | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const selectedSolicitud = solicitudes.find((s) => s.id === selectedSolicitudId) || null
@@ -377,6 +378,7 @@ export default function AgentesPanel({
     setFichaPdfUrl(ev.pdf_url || null)
     setViewingEvaluation(ev)
     setF210Confidence(null)
+    setF210CodeudorConfidence(null)
 
     // Fetch live credito_output to surface F210 extraction confidence
     if (ev.evaluation_id) {
@@ -388,6 +390,14 @@ export default function AgentesPanel({
             setF210Confidence({
               source: r.tax_return_extraction_source ?? null,
               swapCorrected: !!r.tax_return_swap_corrected,
+            })
+          }
+          // Codeudor F210 confidence
+          const cr = data?.evaluation?.credito_codeudor_output?.result || {}
+          if (cr.tax_return_extraction_source !== undefined || cr.tax_return_swap_corrected !== undefined) {
+            setF210CodeudorConfidence({
+              source: cr.tax_return_extraction_source ?? null,
+              swapCorrected: !!cr.tax_return_swap_corrected,
             })
           }
         })
@@ -406,6 +416,7 @@ export default function AgentesPanel({
     setViewingEvaluation(null)
     setUpdatingEvaluation(null)
     setF210Confidence(null)
+    setF210CodeudorConfidence(null)
   }
 
   // Entra en modo "actualizar evaluación": precarga los slots con los documentos
@@ -824,12 +835,22 @@ export default function AgentesPanel({
           const kycStatus = evaluation.kyc_output?.status
           const creditoStatus = evaluation.credito_output?.status
 
-          // F210 extraction confidence — for admin badge
+          // F210 extraction confidence — for admin badge (solicitante)
           const creditoResultData = evaluation.credito_output?.result || {}
           setF210Confidence({
             source: creditoResultData.tax_return_extraction_source ?? null,
             swapCorrected: !!creditoResultData.tax_return_swap_corrected,
           })
+          // F210 codeudor confidence — solo si el codeudor también tiene F210
+          const creditoCodResult = evaluation.credito_codeudor_output?.result || {}
+          if (creditoCodResult.tax_return_extraction_source || creditoCodResult.tax_return_swap_corrected) {
+            setF210CodeudorConfidence({
+              source: creditoCodResult.tax_return_extraction_source ?? null,
+              swapCorrected: !!creditoCodResult.tax_return_swap_corrected,
+            })
+          } else {
+            setF210CodeudorConfidence(null)
+          }
 
           setAgents({
             titulos: {
@@ -1579,37 +1600,38 @@ export default function AgentesPanel({
                           </a>
                         ))}
                       </div>
-                      <div className="mt-3">
-                        {f210Confidence?.source && (() => {
-                          const swap = f210Confidence.swapCorrected
-                          const src = f210Confidence.source
-                          let badge: { color: string; emoji: string; label: string; hint: string }
+                      {(() => {
+                        const buildBadge = (conf: { source: string | null; swapCorrected: boolean } | null, label: string) => {
+                          if (!conf?.source && !conf?.swapCorrected) return null
+                          const swap = conf.swapCorrected
+                          const src = conf.source
+                          let badge: { color: string; emoji: string; title: string; hint: string }
                           if (swap) {
                             badge = {
                               color: 'bg-red-500/15 border-red-700/50 text-red-300',
                               emoji: '🔴',
-                              label: 'F210: casillas corregidas automáticamente',
+                              title: `F210 ${label}: casillas corregidas automáticamente`,
                               hint: 'Se detectó un swap entre casilla 30 y 31. Recomendado: validar manualmente.',
                             }
                           } else if (src === 'pymupdf_text') {
                             badge = {
                               color: 'bg-emerald-500/15 border-emerald-700/50 text-emerald-300',
                               emoji: '✅',
-                              label: 'F210: extracción determinística (alta confianza)',
+                              title: `F210 ${label}: extracción determinística (alta confianza)`,
                               hint: 'PDF nativo de MUISCA con texto seleccionable.',
                             }
                           } else if (src === 'tesseract_ocr') {
                             badge = {
                               color: 'bg-amber-500/15 border-amber-700/50 text-amber-300',
                               emoji: '⚠️',
-                              label: 'F210: OCR (Tesseract) — verificar valores',
+                              title: `F210 ${label}: OCR (Tesseract) — verificar valores`,
                               hint: 'PDF escaneado sin capa de texto. Revisar casillas 29/30/31.',
                             }
                           } else if (src === 'llm_fallback') {
                             badge = {
                               color: 'bg-orange-500/15 border-orange-700/50 text-orange-300',
                               emoji: '⚠️',
-                              label: 'F210: extracción por visión (LLM) — verificar valores',
+                              title: `F210 ${label}: extracción por visión (LLM) — verificar valores`,
                               hint: 'Ni texto seleccionable ni OCR — el LLM leyó el documento. Validar antes de cerrar.',
                             }
                           } else {
@@ -1617,42 +1639,74 @@ export default function AgentesPanel({
                           }
                           return (
                             <div className={`mb-2 inline-flex flex-col gap-0.5 px-3 py-1.5 border rounded-lg text-xs ${badge.color}`}>
-                              <span className="font-semibold">{badge.emoji} {badge.label}</span>
+                              <span className="font-semibold">{badge.emoji} {badge.title}</span>
                               <span className="text-[10px] opacity-80">{badge.hint}</span>
                             </div>
                           )
-                        })()}
-                        <button
-                          onClick={async () => {
-                            const evalId = viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId
-                            if (!evalId) return
-                            // Pre-poblar el modal con los valores actuales para que el admin
-                            // vea qué extrajo el sistema (no campos en blanco).
-                            try {
-                              const res = await fetch(`/api/orchestrator/status?id=${evalId}`)
-                              const data = res.ok ? await res.json() : null
-                              const summary = data?.evaluation?.credito_output?.result?.tax_return_summary || {}
-                              const fallbackNet = data?.evaluation?.credito_output?.result?.patrimonio_liquido_cop
-                              const casillas: F210Casillas = {
-                                total_assets_cop: summary.total_assets_cop || undefined,
-                                total_liabilities_cop: summary.total_liabilities_cop || undefined,
-                                net_patrimony: summary.net_patrimony || fallbackNet || undefined,
-                              }
-                              setF210ModalState({ evalId, casillas })
-                            } catch {
-                              setF210ModalState({ evalId, casillas: {} })
+                        }
+
+                        const openF210Modal = async (which: 'solicitante' | 'codeudor', personName?: string) => {
+                          const evalId = viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId
+                          if (!evalId) return
+                          const slot = which === 'codeudor' ? 'credito_codeudor_output' : 'credito_output'
+                          try {
+                            const res = await fetch(`/api/orchestrator/status?id=${evalId}`)
+                            const data = res.ok ? await res.json() : null
+                            const summary = data?.evaluation?.[slot]?.result?.tax_return_summary || {}
+                            const fallbackNet = data?.evaluation?.[slot]?.result?.patrimonio_liquido_cop
+                            const casillas: F210Casillas = {
+                              total_assets_cop: summary.total_assets_cop || undefined,
+                              total_liabilities_cop: summary.total_liabilities_cop || undefined,
+                              net_patrimony: summary.net_patrimony || fallbackNet || undefined,
                             }
-                          }}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-700/40 rounded-lg transition-colors text-xs"
-                        >
-                          <Edit3 size={12} />
-                          Validar / corregir datos del F210
-                        </button>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          Si los valores extraídos automáticamente del F210 son incorrectos,
-                          ingrésalos manualmente. La ficha y los anexos se regenerarán.
-                        </p>
-                      </div>
+                            setF210ModalState({ evalId, casillas, which, personName })
+                          } catch {
+                            setF210ModalState({ evalId, casillas: {}, which, personName })
+                          }
+                        }
+
+                        const solicitanteName = viewingEvaluation?.applicant?.name || lastApplicantName
+                        const codeudorName = (viewingEvaluation?.operation?.codeudor_name as string | undefined)
+                          || (lastOperation?.codeudor_name as string | undefined)
+                        const hasCodeudorF210 = !!(f210CodeudorConfidence?.source || f210CodeudorConfidence?.swapCorrected)
+
+                        return (
+                          <div className="mt-3 space-y-3">
+                            {/* Solicitante */}
+                            <div>
+                              {buildBadge(f210Confidence, 'solicitante')}
+                              <button
+                                onClick={() => openF210Modal('solicitante', solicitanteName)}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-700/40 rounded-lg transition-colors text-xs"
+                              >
+                                <Edit3 size={12} />
+                                Validar / corregir F210 del solicitante
+                                {solicitanteName ? <span className="text-amber-400/70">({solicitanteName.split(' ').slice(0, 2).join(' ')})</span> : null}
+                              </button>
+                            </div>
+
+                            {/* Codeudor — solo si tiene F210 (badge confidence o overrides previos) */}
+                            {hasCodeudorF210 && (
+                              <div>
+                                {buildBadge(f210CodeudorConfidence, 'codeudor')}
+                                <button
+                                  onClick={() => openF210Modal('codeudor', codeudorName)}
+                                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-700/40 rounded-lg transition-colors text-xs"
+                                >
+                                  <Edit3 size={12} />
+                                  Validar / corregir F210 del codeudor
+                                  {codeudorName ? <span className="text-amber-400/70">({codeudorName.split(' ').slice(0, 2).join(' ')})</span> : null}
+                                </button>
+                              </div>
+                            )}
+
+                            <p className="text-[10px] text-slate-500">
+                              Si los valores extraídos automáticamente del F210 son incorrectos,
+                              ingrésalos manualmente. La ficha y los anexos se regenerarán.
+                            </p>
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                   {lastEvaluationId && !isProcessing && Object.values(agents).some(a => a.status === 'error') && (
@@ -1750,6 +1804,8 @@ export default function AgentesPanel({
         open={!!f210ModalState}
         evaluationId={f210ModalState?.evalId || ''}
         initial={f210ModalState?.casillas || {}}
+        which={f210ModalState?.which || 'solicitante'}
+        personName={f210ModalState?.personName}
         onClose={() => setF210ModalState(null)}
         onSuccess={() => {
           // Reload page so the new ficha + anexos are visible
