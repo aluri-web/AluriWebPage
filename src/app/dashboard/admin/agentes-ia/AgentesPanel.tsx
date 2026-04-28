@@ -100,7 +100,7 @@ const DOC_LABELS: Record<string, string> = {
   extractos: 'Extractos bancarios — solo del solicitante (mes 1 o consolidado)',
   extractos_2: 'Extractos bancarios — solo del solicitante (mes 2)',
   extractos_3: 'Extractos bancarios — solo del solicitante (mes 3)',
-  declaracion_renta: 'Declaracion de renta (PDF nativo de MUISCA, no escaneado)',
+  declaracion_renta: 'Declaración de renta — preferiblemente PDF original de MUISCA. Si no, escanea con CamScanner / Adobe Scan / Google Drive (no foto cruda).',
   reporte_auco: 'Reporte AUCO (PDF)',
   // PN specific
   certificado_ingresos: 'Certificado laboral / de ingresos — del solicitante (1)',
@@ -208,6 +208,7 @@ export default function AgentesPanel({
   const [viewingEvaluation, setViewingEvaluation] = useState<EvaluacionIA | null>(null)
   const [contractModalEvalId, setContractModalEvalId] = useState<string | null>(null)
   const [f210ModalState, setF210ModalState] = useState<{ evalId: string; casillas: F210Casillas } | null>(null)
+  const [f210Confidence, setF210Confidence] = useState<{ source: string | null; swapCorrected: boolean } | null>(null)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const selectedSolicitud = solicitudes.find((s) => s.id === selectedSolicitudId) || null
@@ -359,6 +360,23 @@ export default function AgentesPanel({
 
     setFichaPdfUrl(ev.pdf_url || null)
     setViewingEvaluation(ev)
+    setF210Confidence(null)
+
+    // Fetch live credito_output to surface F210 extraction confidence
+    if (ev.evaluation_id) {
+      fetch(`/api/orchestrator/status?id=${ev.evaluation_id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const r = data?.evaluation?.credito_output?.result || {}
+          if (r.tax_return_extraction_source !== undefined || r.tax_return_swap_corrected !== undefined) {
+            setF210Confidence({
+              source: r.tax_return_extraction_source ?? null,
+              swapCorrected: !!r.tax_return_swap_corrected,
+            })
+          }
+        })
+        .catch(() => {})
+    }
 
     // Set solicitud if it matches one we have
     if (ev.solicitud_id) {
@@ -370,6 +388,7 @@ export default function AgentesPanel({
     setAgents({ ...INITIAL_AGENTS })
     setFichaPdfUrl(null)
     setViewingEvaluation(null)
+    setF210Confidence(null)
   }
 
   // ── Orchestrator execution ──
@@ -713,6 +732,13 @@ export default function AgentesPanel({
           const tituloStatus = evaluation.titulo_study_output?.status
           const kycStatus = evaluation.kyc_output?.status
           const creditoStatus = evaluation.credito_output?.status
+
+          // F210 extraction confidence — for admin badge
+          const creditoResultData = evaluation.credito_output?.result || {}
+          setF210Confidence({
+            source: creditoResultData.tax_return_extraction_source ?? null,
+            swapCorrected: !!creditoResultData.tax_return_swap_corrected,
+          })
 
           setAgents({
             titulos: {
@@ -1386,6 +1412,48 @@ export default function AgentesPanel({
                         ))}
                       </div>
                       <div className="mt-3">
+                        {f210Confidence?.source && (() => {
+                          const swap = f210Confidence.swapCorrected
+                          const src = f210Confidence.source
+                          let badge: { color: string; emoji: string; label: string; hint: string }
+                          if (swap) {
+                            badge = {
+                              color: 'bg-red-500/15 border-red-700/50 text-red-300',
+                              emoji: '🔴',
+                              label: 'F210: casillas corregidas automáticamente',
+                              hint: 'Se detectó un swap entre casilla 30 y 31. Recomendado: validar manualmente.',
+                            }
+                          } else if (src === 'pymupdf_text') {
+                            badge = {
+                              color: 'bg-emerald-500/15 border-emerald-700/50 text-emerald-300',
+                              emoji: '✅',
+                              label: 'F210: extracción determinística (alta confianza)',
+                              hint: 'PDF nativo de MUISCA con texto seleccionable.',
+                            }
+                          } else if (src === 'tesseract_ocr') {
+                            badge = {
+                              color: 'bg-amber-500/15 border-amber-700/50 text-amber-300',
+                              emoji: '⚠️',
+                              label: 'F210: OCR (Tesseract) — verificar valores',
+                              hint: 'PDF escaneado sin capa de texto. Revisar casillas 29/30/31.',
+                            }
+                          } else if (src === 'llm_fallback') {
+                            badge = {
+                              color: 'bg-orange-500/15 border-orange-700/50 text-orange-300',
+                              emoji: '⚠️',
+                              label: 'F210: extracción por visión (LLM) — verificar valores',
+                              hint: 'Ni texto seleccionable ni OCR — el LLM leyó el documento. Validar antes de cerrar.',
+                            }
+                          } else {
+                            return null
+                          }
+                          return (
+                            <div className={`mb-2 inline-flex flex-col gap-0.5 px-3 py-1.5 border rounded-lg text-xs ${badge.color}`}>
+                              <span className="font-semibold">{badge.emoji} {badge.label}</span>
+                              <span className="text-[10px] opacity-80">{badge.hint}</span>
+                            </div>
+                          )
+                        })()}
                         <button
                           onClick={() => {
                             const evalId = viewingEvaluation?.evaluation_id || agents.ficha.result?.evaluationId
