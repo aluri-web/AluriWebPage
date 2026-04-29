@@ -11,7 +11,7 @@ import Link from 'next/link'
 import { MoreHorizontal } from 'lucide-react'
 import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
 
-type SortField = 'code' | 'status' | 'debtor_name' | 'amount_requested' | 'ltv' | 'interest_rate_ea' | 'amount_funded' | 'created_at'
+type SortField = 'code' | 'status' | 'debtor_name' | 'amount_requested'
 type SortDirection = 'asc' | 'desc'
 
 const PAGE_SIZE = 20
@@ -34,8 +34,8 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const drag = useRef({ isDown: false, moved: false, startX: 0, scrollLeft: 0 })
-  const [longPressLoan, setLongPressLoan] = useState<LoanTableRow | null>(null)
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null)
+  const wasDraggingRef = useRef(false)
+  const [actionsLoan, setActionsLoan] = useState<LoanTableRow | null>(null)
   const [editCreditId, setEditCreditId] = useState<string | null>(null)
   const [deleteCreditId, setDeleteCreditId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -65,6 +65,9 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     }
 
     const handleDragEnd = () => {
+      if (drag.current.moved) {
+        wasDraggingRef.current = true
+      }
       drag.current.isDown = false
       drag.current.moved = false
       setIsDragging(false)
@@ -96,18 +99,6 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           break
         case 'amount_requested':
           comparison = (a.amount_requested || 0) - (b.amount_requested || 0)
-          break
-        case 'ltv':
-          comparison = (a.ltv || 0) - (b.ltv || 0)
-          break
-        case 'interest_rate_ea':
-          comparison = (a.interest_rate_ea || 0) - (b.interest_rate_ea || 0)
-          break
-        case 'amount_funded':
-          comparison = (a.amount_funded || 0) - (b.amount_funded || 0)
-          break
-        case 'created_at':
-          comparison = new Date(a.fecha_desembolso || a.created_at).getTime() - new Date(b.fecha_desembolso || b.created_at).getTime()
           break
       }
       return sortDirection === 'asc' ? comparison : -comparison
@@ -156,14 +147,6 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     }).format(amount)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    })
-  }
-
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       fundraising: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
@@ -182,35 +165,6 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     return (
       <span className={`px-2 py-1 text-xs font-medium rounded border ${styles[status] || 'bg-slate-500/20 text-slate-400'}`}>
         {labels[status] || status}
-      </span>
-    )
-  }
-
-  const getLtvBadge = (ltv: number | null) => {
-    if (!ltv) return <span className="text-slate-500">-</span>
-    let color = 'text-emerald-400'
-    if (ltv > 70) color = 'text-red-400'
-    else if (ltv > 50) color = 'text-amber-400'
-    return <span className={`font-medium ${color}`}>{ltv.toFixed(1)}%</span>
-  }
-
-  const getRiskBadge = (score: string | null) => {
-    if (!score) return <span className="text-slate-500">-</span>
-    const styles: Record<string, string> = {
-      'A1': 'bg-teal-400/10 text-teal-400 border-teal-400/30',
-      'A2': 'bg-teal-400/10 text-teal-400 border-teal-400/30',
-      'B1': 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-      'B2': 'bg-red-500/10 text-red-400 border-red-500/30',
-    }
-    const labels: Record<string, string> = {
-      'A1': 'Bajo',
-      'A2': 'Moderado',
-      'B1': 'Medio',
-      'B2': 'Alto',
-    }
-    return (
-      <span className={`px-2 py-1 text-xs font-medium rounded border ${styles[score] || ''}`}>
-        {score} - {labels[score] || score}
       </span>
     )
   }
@@ -235,21 +189,16 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     setPaymentLoan(null)
   }
 
-  const handleLongPressStart = useCallback((loan: LoanTableRow) => {
-    longPressTimer.current = setTimeout(() => {
-      setLongPressLoan(loan)
-    }, 500) // 500ms para activar long press
-  }, [])
-
-  const handleLongPressEnd = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
+  const handleRowClick = useCallback((loan: LoanTableRow) => {
+    if (wasDraggingRef.current) {
+      wasDraggingRef.current = false
+      return
     }
+    setActionsLoan(loan)
   }, [])
 
-  const closeLongPressMenu = useCallback(() => {
-    setLongPressLoan(null)
+  const closeActionsMenu = useCallback(() => {
+    setActionsLoan(null)
   }, [])
 
   // Preparar datos para exportar
@@ -356,7 +305,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
           className="overflow-x-auto scrollbar-visible cursor-grab active:cursor-grabbing"
           onMouseDown={handleDragStart}
         >
-          <table className="w-full min-w-[1400px]" style={{ userSelect: isDragging ? 'none' : undefined }}>
+          <table className="w-full min-w-[900px]" style={{ userSelect: isDragging ? 'none' : undefined }}>
             <thead>
               <tr className="border-b border-slate-800 bg-slate-800/50">
                 <SortableHeader field="code" className="text-left" sticky>Codigo</SortableHeader>
@@ -369,28 +318,12 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                   Co-Deudor
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                  Ciudad
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                  Avaluo
-                </th>
-                <SortableHeader field="amount_requested" className="text-right">Monto</SortableHeader>
-                <SortableHeader field="ltv" className="text-right">LTV</SortableHeader>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                  Riesgo
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                  Tasa NM
-                </th>
-                <SortableHeader field="interest_rate_ea" className="text-right">Tasa EA</SortableHeader>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
-                  Comision
-                </th>
-                <SortableHeader field="amount_funded" className="text-right">Fondeado</SortableHeader>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Inversionistas
                 </th>
-                <SortableHeader field="created_at" className="text-left">Desembolso</SortableHeader>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                  Ciudad
+                </th>
+                <SortableHeader field="amount_requested" className="text-right">Monto</SortableHeader>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Acciones
                 </th>
@@ -406,12 +339,8 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                 return (
                   <tr
                     key={loan.id}
-                    className="hover:bg-slate-800/30 transition-colors relative"
-                    onMouseDown={() => handleLongPressStart(loan)}
-                    onMouseUp={handleLongPressEnd}
-                    onMouseLeave={handleLongPressEnd}
-                    onTouchStart={() => handleLongPressStart(loan)}
-                    onTouchEnd={handleLongPressEnd}
+                    className="hover:bg-slate-800/30 transition-colors relative cursor-pointer"
+                    onClick={() => handleRowClick(loan)}
                   >
                     <td className="px-4 py-3 whitespace-nowrap sticky left-0 z-10 bg-slate-900 shadow-[2px_0_4px_rgba(0,0,0,0.3)]">
                       <span className="px-2 py-1 bg-slate-800 text-teal-400 text-xs font-mono rounded">
@@ -443,38 +372,6 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-400">
                       {loan.co_debtor_name || <span className="text-slate-600">-</span>}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
-                      {loan.property_city || '-'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300 text-right">
-                      {formatCurrency(loan.property_value)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-white font-medium text-right">
-                      {formatCurrency(loan.amount_requested)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                      {getLtvBadge(loan.ltv)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
-                      {getRiskBadge(loan.risk_score)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300 text-right">
-                      {loan.interest_rate_nm ? `${loan.interest_rate_nm}%` : '-'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-teal-400 font-medium text-right">
-                      {loan.interest_rate_ea ? `${loan.interest_rate_ea}%` : '-'}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300 text-right">
-                      {formatCurrency(loan.debtor_commission)}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                      <div>
-                        <span className="text-teal-400 font-medium">{formatCurrency(loan.amount_funded)}</span>
-                        {remaining > 0 && (
-                          <p className="text-xs text-amber-400">Falta: {formatCurrency(remaining)}</p>
-                        )}
-                      </div>
-                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex gap-1">
                         {loan.investors.length > 0 ? (
@@ -497,11 +394,14 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
-                      {loan.fecha_desembolso ? formatDate(loan.fecha_desembolso) : <span className="text-slate-600">-</span>}
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-300">
+                      {loan.property_city || '-'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-white font-medium text-right">
+                      {formatCurrency(loan.amount_requested)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {/* Add Investment Button */}
                         <button
                           onClick={() => openAddInvestmentModal(loan)}
@@ -632,30 +532,30 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
       )}
 
       {/* Long Press Actions Menu */}
-      {longPressLoan && (
+      {actionsLoan && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center"
-          onClick={closeLongPressMenu}
+          onClick={closeActionsMenu}
         >
           <div
             className="bg-slate-900 border border-slate-700 rounded-xl p-6 max-w-sm w-full mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4">
-              <h3 className="text-white font-semibold text-lg">Acciones - {longPressLoan.code}</h3>
-              <p className="text-slate-400 text-sm">{longPressLoan.debtor_name}</p>
+              <h3 className="text-white font-semibold text-lg">Acciones - {actionsLoan.code}</h3>
+              <p className="text-slate-400 text-sm">{actionsLoan.debtor_name}</p>
             </div>
 
             <div className="space-y-2">
               {/* Add Investment */}
               <button
                 onClick={() => {
-                  openAddInvestmentModal(longPressLoan)
-                  closeLongPressMenu()
+                  openAddInvestmentModal(actionsLoan)
+                  closeActionsMenu()
                 }}
-                disabled={longPressLoan.amount_requested - longPressLoan.amount_funded <= 0}
+                disabled={actionsLoan.amount_requested - actionsLoan.amount_funded <= 0}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors ${
-                  longPressLoan.amount_requested - longPressLoan.amount_funded > 0
+                  actionsLoan.amount_requested - actionsLoan.amount_funded > 0
                     ? 'border-teal-500/30 text-teal-400 hover:bg-teal-500/10'
                     : 'border-slate-700 text-slate-600 cursor-not-allowed'
                 }`}
@@ -665,11 +565,11 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
               </button>
 
               {/* Register Payment */}
-              {(longPressLoan.status === 'active' || longPressLoan.status === 'defaulted') && (
+              {(actionsLoan.status === 'active' || actionsLoan.status === 'defaulted') && (
                 <button
                   onClick={() => {
-                    openPaymentModal(longPressLoan)
-                    closeLongPressMenu()
+                    openPaymentModal(actionsLoan)
+                    closeActionsMenu()
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-colors"
                 >
@@ -681,8 +581,8 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
               {/* Edit Credit */}
               <button
                 onClick={() => {
-                  setEditCreditId(longPressLoan.id)
-                  closeLongPressMenu()
+                  setEditCreditId(actionsLoan.id)
+                  closeActionsMenu()
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition-colors"
               >
@@ -693,8 +593,8 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
               {/* Delete Credit */}
               <button
                 onClick={() => {
-                  setDeleteCreditId(longPressLoan.id)
-                  closeLongPressMenu()
+                  setDeleteCreditId(actionsLoan.id)
+                  closeActionsMenu()
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
               >
@@ -704,8 +604,8 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
 
               {/* View Details */}
               <Link
-                href={`/dashboard/admin/colocaciones/${longPressLoan.id}`}
-                onClick={closeLongPressMenu}
+                href={`/dashboard/admin/colocaciones/${actionsLoan.id}`}
+                onClick={closeActionsMenu}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
               >
                 <MoreHorizontal size={20} />
@@ -714,7 +614,7 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
             </div>
 
             <button
-              onClick={closeLongPressMenu}
+              onClick={closeActionsMenu}
               className="w-full mt-4 px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors"
             >
               Cancelar

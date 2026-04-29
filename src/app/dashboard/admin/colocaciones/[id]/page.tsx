@@ -48,7 +48,7 @@ async function getCreditDetails(id: string) {
             return null
         }
 
-        // Fetch the profile separately
+        // Fetch the cliente profile separately
         const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('*')
@@ -59,9 +59,26 @@ async function getCreditDetails(id: string) {
             console.warn('Could not fetch profile:', profileError.message)
         }
 
+        // Fetch the co-debtor profile if present
+        let coDeudorProfile = null
+        if (credit.co_deudor_id) {
+            const { data: coData, error: coError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', credit.co_deudor_id)
+                .single()
+
+            if (coError) {
+                console.warn('Could not fetch co-debtor profile:', coError.message)
+            } else {
+                coDeudorProfile = coData
+            }
+        }
+
         return {
             ...credit,
-            profiles: profile || null
+            profiles: profile || null,
+            co_deudor_profile: coDeudorProfile
         }
     } catch (error) {
         console.error('Unexpected error in getCreditDetails:', error)
@@ -91,7 +108,7 @@ export default async function CreditDetailsPage({ params }: { params: Promise<{ 
 
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                        <h1 className="text-3xl font-bold text-white flex items-center gap-3 flex-wrap">
                             Credito #{credit.codigo_credito}
                             <span className={`text-sm px-3 py-1 rounded-full border ${credit.estado === 'activo' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
                                 credit.estado === 'publicado' ? 'bg-teal-500/10 border-teal-500/20 text-teal-400' :
@@ -103,6 +120,14 @@ export default async function CreditDetailsPage({ params }: { params: Promise<{ 
                                 }`}>
                                 {{ publicado: 'COLOCANDO', activo: 'DESEMBOLSADO', en_firma: 'EN FIRMA', firmado: 'FIRMADO', finalizado: 'FINALIZADO', castigado: 'CASTIGADO', mora: 'EN MORA', no_colocado: 'NO COLOCADO' }[credit.estado] || credit.estado.toUpperCase().replace('_', ' ')}
                             </span>
+                            {(credit.estado === 'activo' || credit.estado === 'mora') && (
+                                <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${credit.en_mora
+                                    ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                                    : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                    }`}>
+                                    {credit.en_mora ? 'EN MORA' : 'AL DIA'}
+                                </span>
+                            )}
                         </h1>
                         <p className="text-slate-400 mt-1">
                             {credit.profiles?.full_name || 'Cliente desconocido'} • {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(credit.valor_colocado)}

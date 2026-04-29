@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings, Eye, CreditCard, User, MapPin, Home, HandCoins, TrendingUp } from 'lucide-react'
+import { Settings, Eye, CreditCard, User, MapPin, Home, HandCoins, TrendingUp, Wallet, Users, ShieldAlert } from 'lucide-react'
 import CreditWorkflow from '../CreditWorkflow'
 import InvestorViewTab from './InvestorViewTab'
 import PropietarioViewTab from './PropietarioViewTab'
@@ -71,6 +71,26 @@ function AdminViewContent({ credit }: { credit: any }) {
   const formatCOP = (value: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value)
 
+  // Compute risk score from LTV (same logic as list)
+  const ltv = credit.ltv ?? null
+  const risk: { score: string | null; label: string | null } = (() => {
+    if (ltv === null || ltv === undefined) return { score: null, label: null }
+    if (ltv <= 40) return { score: 'A1', label: 'Bajo Riesgo' }
+    if (ltv <= 55) return { score: 'A2', label: 'Riesgo Moderado' }
+    if (ltv <= 70) return { score: 'B1', label: 'Riesgo Medio' }
+    return { score: 'B2', label: 'Riesgo Alto' }
+  })()
+
+  const riskStyles: Record<string, string> = {
+    A1: 'bg-teal-400/10 text-teal-400 border-teal-400/30',
+    A2: 'bg-teal-400/10 text-teal-400 border-teal-400/30',
+    B1: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    B2: 'bg-red-500/10 text-red-400 border-red-500/30',
+  }
+
+  // Show saldos for credits that have been disbursed
+  const showSaldos = ['activo', 'mora', 'finalizado', 'castigado'].includes(credit.estado)
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Main Content */}
@@ -85,6 +105,14 @@ function AdminViewContent({ credit }: { credit: any }) {
             <h3 className="font-semibold text-white">Detalles del Credito</h3>
           </div>
           <div className="p-6 grid grid-cols-2 gap-6">
+            {credit.monto_solicitado != null && (
+              <div>
+                <span className="block text-sm text-slate-500 mb-1">Monto Solicitado</span>
+                <span className="text-lg font-medium text-white">
+                  {formatCOP(credit.monto_solicitado)}
+                </span>
+              </div>
+            )}
             <div>
               <span className="block text-sm text-slate-500 mb-1">Monto Aprobado</span>
               <span className="text-lg font-medium text-white">
@@ -133,6 +161,14 @@ function AdminViewContent({ credit }: { credit: any }) {
                 </span>
               </div>
             )}
+            {risk.score && (
+              <div>
+                <span className="block text-sm text-slate-500 mb-1">Riesgo</span>
+                <span className={`inline-block text-sm font-medium px-2.5 py-1 rounded border ${riskStyles[risk.score] || 'bg-slate-500/10 text-slate-400 border-slate-500/30'}`}>
+                  {risk.score} - {risk.label}
+                </span>
+              </div>
+            )}
             {credit.notaria && (
               <div>
                 <span className="block text-sm text-slate-500 mb-1">Notaria</span>
@@ -149,6 +185,42 @@ function AdminViewContent({ credit }: { credit: any }) {
             )}
           </div>
         </div>
+
+        {/* Saldos Card - solo para creditos desembolsados */}
+        {showSaldos && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-2">
+              <Wallet size={18} className="text-emerald-400" />
+              <h3 className="font-semibold text-white">Saldos Actuales</h3>
+              {credit.en_mora && (
+                <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/30 flex items-center gap-1">
+                  <ShieldAlert size={12} />
+                  En Mora
+                </span>
+              )}
+            </div>
+            <div className="p-6 grid grid-cols-3 gap-6">
+              <div>
+                <span className="block text-sm text-slate-500 mb-1">Saldo Capital</span>
+                <span className="text-lg font-medium text-white">
+                  {formatCOP(credit.saldo_capital || 0)}
+                </span>
+              </div>
+              <div>
+                <span className="block text-sm text-slate-500 mb-1">Saldo Intereses</span>
+                <span className="text-lg font-medium text-white">
+                  {formatCOP(credit.saldo_intereses || 0)}
+                </span>
+              </div>
+              <div>
+                <span className="block text-sm text-slate-500 mb-1">Saldo Mora</span>
+                <span className={`text-lg font-medium ${credit.saldo_mora > 0 ? 'text-red-400' : 'text-white'}`}>
+                  {formatCOP(credit.saldo_mora || 0)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Property Info Card */}
         {(credit.direccion_inmueble || credit.ciudad_inmueble || credit.valor_comercial) && (
@@ -206,19 +278,31 @@ function AdminViewContent({ credit }: { credit: any }) {
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-2">
             <User size={18} className="text-purple-400" />
-            <h3 className="font-semibold text-white">Informacion del Cliente</h3>
+            <h3 className="font-semibold text-white">Informacion del Deudor</h3>
           </div>
           <div className="p-6">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-400">
                 {credit.profiles?.full_name?.charAt(0) || '?'}
               </div>
-              <div>
-                <h4 className="font-medium text-white">{credit.profiles?.full_name}</h4>
-                <p className="text-sm text-slate-500">{credit.profiles?.email}</p>
+              <div className="min-w-0">
+                <h4 className="font-medium text-white truncate">{credit.profiles?.full_name}</h4>
+                <p className="text-sm text-slate-500 truncate">{credit.profiles?.email}</p>
               </div>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2.5">
+              {credit.profiles?.document_id && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Cedula</span>
+                  <span className="text-slate-300 font-mono">{credit.profiles.document_id}</span>
+                </div>
+              )}
+              {credit.profiles?.phone && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-500">Telefono</span>
+                  <span className="text-slate-300">{credit.profiles.phone}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">ID Cliente</span>
                 <span className="text-slate-300 font-mono text-xs">{credit.cliente_id?.substring(0, 8)}...</span>
@@ -226,6 +310,43 @@ function AdminViewContent({ credit }: { credit: any }) {
             </div>
           </div>
         </div>
+
+        {/* Co-Debtor Info */}
+        {credit.co_deudor_profile && (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-800 flex items-center gap-2">
+              <Users size={18} className="text-blue-400" />
+              <h3 className="font-semibold text-white">Co-Deudor</h3>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-400">
+                  {credit.co_deudor_profile.full_name?.charAt(0) || '?'}
+                </div>
+                <div className="min-w-0">
+                  <h4 className="font-medium text-white truncate">{credit.co_deudor_profile.full_name}</h4>
+                  {credit.co_deudor_profile.email && (
+                    <p className="text-sm text-slate-500 truncate">{credit.co_deudor_profile.email}</p>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2.5">
+                {credit.co_deudor_profile.document_id && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Cedula</span>
+                    <span className="text-slate-300 font-mono">{credit.co_deudor_profile.document_id}</span>
+                  </div>
+                )}
+                {credit.co_deudor_profile.phone && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Telefono</span>
+                    <span className="text-slate-300">{credit.co_deudor_profile.phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Fondeo & Inversionistas */}
         <FondeoCard credit={credit} />
