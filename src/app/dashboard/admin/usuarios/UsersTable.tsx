@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Users, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import EditUserModal, { UserProfile } from './EditUserModal'
 import ExportExcelButton from '@/components/dashboard/ExportExcelButton'
 
@@ -13,6 +14,7 @@ type SortKey = 'id' | 'full_name' | 'email' | 'role' | 'verification_status' | '
 type SortDirection = 'asc' | 'desc'
 
 export default function UsersTable({ users }: UsersTableProps) {
+  const router = useRouter()
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -175,7 +177,11 @@ export default function UsersTable({ users }: UsersTableProps) {
             </thead>
             <tbody className="text-sm">
               {sortedUsers.map((user) => (
-                <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                <tr
+                  key={user.id}
+                  onClick={() => router.push(`/dashboard/admin/usuarios/${user.id}`)}
+                  className="border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer"
+                >
                   <td className="py-4 px-2 font-mono text-slate-400 text-xs">
                     {user.id.slice(0, 8)}...
                   </td>
@@ -198,7 +204,7 @@ export default function UsersTable({ users }: UsersTableProps) {
                   <td className="py-4 px-2 text-slate-300">
                     {formatDate(user.created_at)}
                   </td>
-                  <td className="py-4 px-2">
+                  <td className="py-4 px-2" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => setEditingUser(user)}
                       className="text-amber-400 hover:text-amber-300 text-sm font-medium transition-colors"

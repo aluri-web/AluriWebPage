@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
-import { Banknote, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, Pencil, Trash2 } from 'lucide-react'
+import { Banknote, DollarSign, ArrowUpDown, ArrowUp, ArrowDown, Pencil, Trash2, Search, X } from 'lucide-react'
 import { LoanTableRow, InvestorOption } from './actions'
 import AddInvestmentModal from './AddInvestmentModal'
 import PaymentModal from './PaymentModal'
@@ -39,9 +39,30 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
   const [editCreditId, setEditCreditId] = useState<string | null>(null)
   const [deleteCreditId, setDeleteCreditId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const colocados = useMemo(() => loans.filter(l => l.status !== 'cancelled'), [loans])
-  const noColocados = useMemo(() => loans.filter(l => l.status === 'cancelled'), [loans])
+  // Apply search before splitting into tabs
+  const filteredLoans = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return loans
+    return loans.filter(l => {
+      const haystack = [
+        l.code,
+        l.debtor_name,
+        l.debtor_cedula,
+        l.co_debtor_name,
+        l.property_city,
+        ...(l.investors || []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [loans, searchQuery])
+
+  const colocados = useMemo(() => filteredLoans.filter(l => l.status !== 'cancelled'), [filteredLoans])
+  const noColocados = useMemo(() => filteredLoans.filter(l => l.status === 'cancelled'), [filteredLoans])
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     const container = tableScrollRef.current
@@ -254,14 +275,17 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
     )
   }
 
-  const emptyMessage = activeTab === 'colocados'
-    ? 'No hay creditos colocados'
-    : 'No hay creditos no colocados'
+  const emptyMessage = searchQuery
+    ? 'No hay resultados para tu busqueda'
+    : activeTab === 'colocados'
+      ? 'No hay creditos colocados'
+      : 'No hay creditos no colocados'
 
   return (
     <>
-      {/* Tabs */}
-      <div className="flex gap-2 mb-4">
+      {/* Tabs + Search */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+        <div className="flex gap-2">
         <button
           onClick={() => { setActiveTab('colocados'); setCurrentPage(1) }}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -282,6 +306,28 @@ export default function LoansTable({ loans, investors }: LoansTableProps) {
         >
           No Colocados ({noColocados.length})
         </button>
+        </div>
+
+        {/* Search input */}
+        <div className="relative flex-1 sm:max-w-md sm:ml-auto">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+            placeholder="Buscar por codigo, deudor, cedula, ciudad o inversionista..."
+            className="w-full pl-9 pr-9 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/30"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => { setSearchQuery(''); setCurrentPage(1) }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-white"
+              title="Limpiar busqueda"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {currentLoans.length === 0 ? (
