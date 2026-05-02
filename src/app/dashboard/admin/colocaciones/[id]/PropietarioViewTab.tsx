@@ -1,8 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Building2, DollarSign, Hash, Calendar, TrendingUp, Home } from 'lucide-react'
 import { calcularDiasMoraLive } from '@/utils/mora-helper'
+import EditPaymentModal from '../../pagos/EditPaymentModal'
 
 interface Transaccion {
   id: string
@@ -39,6 +40,7 @@ interface PropietarioViewCredit {
 }
 
 interface PagoAgrupado {
+  referencia: string | null
   fecha: string
   capital: number
   interes: number
@@ -123,7 +125,14 @@ function buildPagos(transacciones: Transaccion[], valorColocado: number) {
   for (const tx of pagos) {
     if (!tx.fecha_aplicacion) continue
     const key = tx.referencia_pago || tx.id
-    const existing = grupos.get(key) || { fecha: tx.fecha_aplicacion, capital: 0, interes: 0, mora: 0, abono: 0 }
+    const existing = grupos.get(key) || {
+      referencia: tx.referencia_pago,
+      fecha: tx.fecha_aplicacion,
+      capital: 0,
+      interes: 0,
+      mora: 0,
+      abono: 0,
+    }
 
     if (tx.tipo_transaccion === 'pago_capital') existing.capital += Number(tx.monto)
     else if (tx.tipo_transaccion === 'pago_interes') existing.interes += Number(tx.monto)
@@ -157,6 +166,8 @@ export default function PropietarioViewTab({ credit }: { credit: PropietarioView
     () => buildPagos(credit.transacciones || [], credit.valor_colocado || credit.monto_solicitado),
     [credit.transacciones, credit.valor_colocado, credit.monto_solicitado]
   )
+
+  const [editingReferencia, setEditingReferencia] = useState<string | null>(null)
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -307,19 +318,26 @@ export default function PropietarioViewTab({ credit }: { credit: PropietarioView
                       </td>
                     </tr>
                   ) : (
-                    pagos.map((row, i) => (
-                      <tr
-                        key={i}
-                        className={i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-900/50'}
-                      >
-                        <td className="px-4 py-2.5 text-slate-300">{formatDate(row.fecha)}</td>
-                        <td className="px-4 py-2.5 text-right text-white font-medium">{formatCOP(row.abono)}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-300">{formatCOP(row.capital)}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-300">{formatCOP(row.interes)}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-300">{row.mora > 0 ? formatCOP(row.mora) : '-'}</td>
-                        <td className="px-4 py-2.5 text-right text-white font-medium">{formatCOP(row.saldo)}</td>
-                      </tr>
-                    ))
+                    pagos.map((row, i) => {
+                      const editable = !!row.referencia
+                      return (
+                        <tr
+                          key={i}
+                          onClick={editable ? () => setEditingReferencia(row.referencia) : undefined}
+                          title={editable ? 'Click para editar este pago' : 'Pago sin referencia (legacy) — no editable'}
+                          className={`${i % 2 === 0 ? 'bg-slate-900' : 'bg-slate-900/50'} ${
+                            editable ? 'cursor-pointer hover:bg-slate-800/70 transition-colors' : 'cursor-not-allowed opacity-80'
+                          }`}
+                        >
+                          <td className="px-4 py-2.5 text-slate-300">{formatDate(row.fecha)}</td>
+                          <td className="px-4 py-2.5 text-right text-white font-medium">{formatCOP(row.abono)}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-300">{formatCOP(row.capital)}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-300">{formatCOP(row.interes)}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-300">{row.mora > 0 ? formatCOP(row.mora) : '-'}</td>
+                          <td className="px-4 py-2.5 text-right text-white font-medium">{formatCOP(row.saldo)}</td>
+                        </tr>
+                      )
+                    })
                   )}
                 </tbody>
               </table>
@@ -327,6 +345,14 @@ export default function PropietarioViewTab({ credit }: { credit: PropietarioView
           </div>
         </div>
       </div>
+
+      {editingReferencia && (
+        <EditPaymentModal
+          referencia={editingReferencia}
+          isOpen={!!editingReferencia}
+          onClose={() => setEditingReferencia(null)}
+        />
+      )}
     </div>
   )
 }
